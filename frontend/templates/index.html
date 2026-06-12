@@ -2456,10 +2456,13 @@ async function openSkoDetail(skoId) {
   const eqStatusColor = { active:'#4ade80', inactive:'#6b7280', maintenance:'#fbbf24' };
   const eqRows = (s.equipment||[]).map(e => {
     const pmcsBtns = (e.pmcs_templates||[]).map(t =>
-      `<button onclick="window.open('/pmcs/${t.id}','_blank')" style="font-size:0.7rem;background:#1e3a5f;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-right:3px;">${esc(t.title)}</button>`
+      `<button onclick="window.open('/pmcs/${t.id}','_blank')" style="font-size:0.7rem;background:#1e3a5f;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-right:3px;margin-bottom:2px;">📋 ${esc(t.title)}</button>`
     ).join('');
     const taskWarn = e.next_task
-      ? `<span style="font-size:0.72rem;color:${e.next_task.status==='overdue'?'#f87171':'#fbbf24'};">⚠ ${e.next_task.status} task${e.next_task.next_due?' · due '+e.next_task.next_due:''}</span>`
+      ? `<span style="font-size:0.72rem;color:${e.next_task.status==='overdue'?'#f87171':'#fbbf24'};">⚠ ${e.next_task.status}${e.next_task.next_due?' · due '+e.next_task.next_due:''}</span>`
+      : '';
+    const noPmcs = !e.pmcs_templates?.length
+      ? `<span style="color:var(--muted);font-size:0.72rem;">No templates</span>`
       : '';
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:8px 10px;">
@@ -2473,8 +2476,15 @@ async function openSkoDetail(skoId) {
         </span>
       </td>
       <td style="padding:8px 10px;">${taskWarn}</td>
-      <td style="padding:8px 10px;">${pmcsBtns||'<span style="color:var(--muted);font-size:0.75rem;">No PMCS</span>'}</td>
-      ${isAdmin()?`<td style="padding:8px 10px;"><button onclick="removeSkoEquipment(${skoId},${e.id})" style="font-size:0.7rem;background:none;border:1px solid #f87171;color:#f87171;border-radius:3px;padding:2px 7px;cursor:pointer;">Remove</button></td>`:'<td></td>'}
+      <td style="padding:8px 10px;min-width:160px;">
+        <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">
+          ${pmcsBtns}${noPmcs}
+          <button onclick="openSkoCalModal(${e.id},'${esc(e.name)}')" style="font-size:0.7rem;background:#164e63;color:#a5f3fc;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">📐 Log Cal</button>
+        </div>
+      </td>
+      ${isAdmin()?`<td style="padding:8px 10px;white-space:nowrap;">
+        <button onclick="removeSkoEquipment(${skoId},${e.id})" style="font-size:0.7rem;background:none;border:1px solid #f87171;color:#f87171;border-radius:3px;padding:2px 7px;cursor:pointer;">Remove</button>
+      </td>`:'<td></td>'}
     </tr>`;
   }).join('');
 
@@ -2521,7 +2531,7 @@ async function openSkoDetail(skoId) {
             <th style="padding:6px 10px;text-align:left;">Name / S/N</th>
             <th style="padding:6px 10px;text-align:left;">Status</th>
             <th style="padding:6px 10px;text-align:left;">Tasks</th>
-            <th style="padding:6px 10px;text-align:left;">PMCS</th>
+            <th style="padding:6px 10px;text-align:left;">PMCS / Calibration</th>
             <th style="padding:6px 10px;"></th>
           </tr></thead>
           <tbody>${eqRows||'<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--muted);font-size:0.82rem;">No equipment assigned. Edit the SKO to add equipment.</td></tr>'}</tbody>
@@ -2614,6 +2624,77 @@ async function confirmAddEquipment(skoId) {
     toast(`Added ${ids.length} equipment item${ids.length!==1?'s':''}.`);
     skosData = await api('GET', '/api/skos');
     await openSkoDetail(skoId);
+  } catch(err) { toast(err.message, false); }
+}
+
+// ── Per-equipment Calibration modal (from SKO detail) ────────────────────────
+function openSkoCalModal(eqId, eqName) {
+  const today = new Date().toISOString().slice(0,10);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-cal-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:420px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">Log Calibration</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${esc(eqName)}</div>
+      </div>
+      <button onclick="document.getElementById('sko-cal-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" onsubmit="submitSkoCal(event,${eqId})">
+      <div style="grid-column:1/-1;">
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Calibrated At *</label>
+        <input name="calibrated_at" class="form-input" type="date" style="width:100%;" value="${today}" required>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Next Due</label>
+        <input name="next_due" class="form-input" type="date" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Result</label>
+        <select name="result" class="form-input" style="width:100%;">
+          <option value="pass">Pass</option>
+          <option value="fail">Fail</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Calibrated By</label>
+        <input name="calibrated_by" class="form-input" style="width:100%;" value="${esc(currentUser?.username||'')}">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Certificate #</label>
+        <input name="certificate_num" class="form-input" style="width:100%;" placeholder="Optional">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
+        <textarea name="notes" class="form-input" style="width:100%;height:56px;resize:vertical;"></textarea>
+      </div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('sko-cal-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save Calibration</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function submitSkoCal(e, eqId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    equipment_id: eqId,
+    calibrated_at: fd.get('calibrated_at'),
+    next_due: fd.get('next_due') || null,
+    result: fd.get('result'),
+    calibrated_by: fd.get('calibrated_by') || null,
+    certificate_num: fd.get('certificate_num') || null,
+    notes: fd.get('notes') || null,
+  };
+  try {
+    await api('POST', '/api/calibration', body);
+    document.getElementById('sko-cal-backdrop').remove();
+    toast('Calibration logged.');
   } catch(err) { toast(err.message, false); }
 }
 
