@@ -560,7 +560,7 @@ if (!document.getElementById('eq-tab-style')) {
 
 function eqTab(tab) {
   document.querySelectorAll('.eq-tab').forEach(b => b.classList.toggle('active-tab', b.id===`tab-${tab}`));
-  const { id, eq, tasks, cals, atts } = window._eqDetail;
+  const { id, eq, tasks, cals, atts, hist } = window._eqDetail;
   const body = $('eq-detail-body');
 
   if (tab === 'details') {
