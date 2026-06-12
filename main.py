@@ -52,9 +52,11 @@ async def auth_middleware(request: Request, call_next):
     if _PUBLIC_PMCS_RE.match(path) or _PUBLIC_API_RE.match(path):
         return await call_next(request)
 
-    # Extract token from Authorization header or cookie
+    # Extract token from Authorization header, cookie, or query param (for file downloads)
     auth_header = request.headers.get("Authorization", "")
-    token = auth_header.removeprefix("Bearer ").strip() or request.cookies.get("auth_token", "")
+    token = (auth_header.removeprefix("Bearer ").strip()
+             or request.cookies.get("auth_token", "")
+             or request.query_params.get("token", ""))
 
     if token:
         try:
