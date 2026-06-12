@@ -93,7 +93,7 @@ ok ".env written"
 
 # ── Uploads dirs + init DB ────────────────────────────────────────────────────
 info "Creating upload directories and initialising database…"
-mkdir -p "$INSTALL_DIR/uploads/equipment" "$INSTALL_DIR/uploads/pmcs"
+mkdir -p "$INSTALL_DIR/uploads/equipment" "$INSTALL_DIR/uploads/pmcs" "$INSTALL_DIR/frontend/static"
 "$INSTALL_DIR/venv/bin/python" - <<'PYEOF'
 import asyncio, sys, os
 sys.path.insert(0, os.getcwd())
