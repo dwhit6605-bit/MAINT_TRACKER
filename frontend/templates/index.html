@@ -3196,9 +3196,17 @@ async function saveSmtp(e) {
   }
 }
 
-async function testSmtp(e) {
+async function testSmtp() {
   const btn = document.getElementById('smtp-test-btn');
   const resultEl = document.getElementById('smtp-result');
+  // If the form is open and password is blank, warn — test uses saved DB value
+  const passField = document.querySelector('#smtp-form [name="SMTP_PASS"]');
+  if (passField && !passField.value) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#fffbeb';
+    resultEl.style.border = '1px solid #fcd34d';
+    resultEl.textContent = 'Note: testing with saved password (password field is blank). Save new credentials first if you changed them.';
+  }
   btn.disabled = true;
   btn.textContent = 'Sending…';
   try {
