@@ -107,7 +107,7 @@
     <h1>{{ template.title }}</h1>
     <div class="sub">
       {% if template.equipment_name %}{{ template.equipment_name }} · {% endif %}
-      PMCS Checklist · {{ template.items | length }} items
+      PMCS Checklist · {{ items | length }} items
     </div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
   </div>
@@ -130,12 +130,12 @@
     <span class="ss-ok">✓ <span id="cnt-ok">0</span> OK</span>
     <span class="ss-fault">✕ <span id="cnt-fault">0</span> Fault</span>
     <span class="ss-na">— <span id="cnt-na">0</span> N/A</span>
-    <span style="color:#94a3b8;">· <span id="cnt-rem">{{ template.items | length }}</span> remaining</span>
+    <span style="color:#94a3b8;">· <span id="cnt-rem">{{ items | length }}</span> remaining</span>
   </div>
 
   <div class="items-list" id="items-list">
     {% set ns = namespace(last_interval='') %}
-    {% for item in template.items %}
+    {% for item in items %}
       {% if item.interval != ns.last_interval %}
         {% set ns.last_interval = item.interval %}
         {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
@@ -192,7 +192,7 @@
 </div>
 
 <script>
-const TOTAL = {{ template.items | length }};
+const TOTAL = {{ items | length }};
 const statuses = {};  // item_id -> 'ok'|'fault'|'na'
 
 function setStatus(itemId, status) {

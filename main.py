@@ -64,10 +64,9 @@ async def pmcs_checklist(request: Request, template_id: int):
             (template_id,)
         ) as cur:
             items = [dict(i) for i in await cur.fetchall()]
-    template_data = {**dict(tmpl), "items": items}
     return templates.TemplateResponse(
         "pmcs_checklist.html",
-        {"request": request, "template": template_data}
+        {"request": request, "template": dict(tmpl), "items": items}
     )
 
 
