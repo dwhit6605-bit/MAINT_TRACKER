@@ -2338,7 +2338,7 @@ function renderSkosTable() {
     </tr>`;
   }).join('');
 
-  document.getElementById('main').innerHTML = `
+  document.getElementById('page-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <div style="font-size:0.8rem;color:var(--muted);">
         ${skosData.length} SKO${skosData.length!==1?'s':''} &nbsp;·&nbsp;
