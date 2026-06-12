@@ -121,6 +121,10 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         PMCS
       </a>
+      <a href="/skos" class="nav-link" data-page="skos">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11m0 0L4 7"/></svg>
+        SKOs
+      </a>
       <a href="/users" class="nav-link admin-nav" data-page="users" style="display:none">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         Users
@@ -267,8 +271,8 @@ function closeSidebar() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -2281,6 +2285,330 @@ async function csvSubmit(type, pmcsTemplateId) {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 let usersData = [];
+
+// ─── SKOs ─────────────────────────────────────────────────────────────────────
+let skosData = [];
+
+async function skosPage() {
+  skosData = await api('GET', '/api/skos');
+  const statusBadge = s => {
+    const map = { complete:'background:#166534;color:#bbf7d0', incomplete:'background:#854d0e;color:#fef3c7', nmc:'background:#7f1d1d;color:#fecaca' };
+    const label = { complete:'Complete', incomplete:'Incomplete', nmc:'NMC' };
+    return `<span style="font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:4px;${map[s]||map.incomplete}">${label[s]||s.toUpperCase()}</span>`;
+  };
+  const rows = skosData.map(s => {
+    const compCount = s.components?.length || 0;
+    const shortCount = (s.components||[]).filter(c => c.quantity_on_hand < c.quantity_required).length;
+    const co = s.active_checkout;
+    const coCell = co
+      ? `<span style="color:#fbbf24;font-size:0.78rem;">⬆ ${esc(co.checked_out_by)}${co.expected_return?' (due '+co.expected_return+')':''}</span>`
+      : `<span style="color:#4ade80;font-size:0.78rem;">Available</span>`;
+    return `<tr>
+      <td style="padding:10px 12px;font-weight:600;">${esc(s.name)}</td>
+      <td style="padding:10px 12px;color:var(--muted);font-size:0.82rem;">${esc(s.nsn||'—')}</td>
+      <td style="padding:10px 12px;">${statusBadge(s.status)}</td>
+      <td style="padding:10px 12px;font-size:0.82rem;">${compCount} items${shortCount?' · <span style="color:#f87171;">'+shortCount+' short</span>':''}</td>
+      <td style="padding:10px 12px;">${coCell}</td>
+      <td style="padding:10px 12px;white-space:nowrap;">
+        ${co
+          ? `<button onclick="openCheckinModal(${s.id},'${esc(s.name)}')" style="font-size:0.72rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">⬇ Check In</button>`
+          : `<button onclick="openCheckoutModal(${s.id},'${esc(s.name)}')" style="font-size:0.72rem;background:#166534;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">⬆ Check Out</button>`}
+        <button onclick="openSkoDetail(${s.id})" style="font-size:0.72rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">Detail</button>
+        ${isAdmin() ? `<button onclick="openSkoModal(${s.id})" style="font-size:0.72rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">Edit</button>
+        <button onclick="deleteSko(${s.id},'${esc(s.name)}')" style="font-size:0.72rem;background:#7f1d1d;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;">Delete</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div>
+        <div style="font-size:0.8rem;color:var(--muted);">
+          ${skosData.length} SKO${skosData.length!==1?'s':''} &nbsp;·&nbsp;
+          ${skosData.filter(s=>s.status==='complete').length} complete &nbsp;·&nbsp;
+          ${skosData.filter(s=>s.active_checkout).length} checked out
+        </div>
+      </div>
+      ${isAdmin() ? `<button onclick="openSkoModal(null)" class="btn-primary" style="font-size:0.82rem;">+ Add SKO</button>` : ''}
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">Name</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">NSN</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">Status</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">Components</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">Checkout</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--muted);">No SKOs yet. ${isAdmin()?\'Click "+ Add SKO" to get started.\':\'\'}</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+function openSkoModal(id) {
+  const s = id ? skosData.find(x => x.id === id) : null;
+  const comps = s?.components || [];
+  const compRows = comps.map((c,i) => skoCompRow(i, c)).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-modal-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1.05rem;font-weight:700;">${s ? 'Edit SKO' : 'New SKO'}</h3>
+      <button onclick="document.getElementById('sko-modal-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form id="sko-form" class="px-6 py-4" onsubmit="saveSko(event,${id||'null'})">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Name *</label>
+          <input name="name" class="form-input" style="width:100%;" required value="${esc(s?.name||'')}">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">NSN</label>
+          <input name="nsn" class="form-input" style="width:100%;" placeholder="1234-56-789-0123" value="${esc(s?.nsn||'')}">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Status</label>
+          <select name="status" class="form-input" style="width:100%;">
+            <option value="complete" ${s?.status==='complete'?'selected':''}>Complete</option>
+            <option value="incomplete" ${s?.status==='incomplete'?'selected':''}>Incomplete</option>
+            <option value="nmc" ${s?.status==='nmc'?'selected':''}>NMC</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Description</label>
+          <textarea name="description" class="form-input" style="width:100%;height:60px;resize:vertical;">${esc(s?.description||'')}</textarea>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
+          <textarea name="notes" class="form-input" style="width:100%;height:50px;resize:vertical;">${esc(s?.notes||'')}</textarea>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:0.75rem;margin-top:0.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <span style="font-size:0.82rem;font-weight:700;">Components</span>
+          <button type="button" onclick="addSkoCompRow()" style="font-size:0.72rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;color:var(--text);">+ Add Item</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.5rem;display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 24px;gap:4px;padding:0 2px;">
+          <span>Item Name</span><span>NSN</span><span>Req'd</span><span>On Hand</span><span></span>
+        </div>
+        <div id="sko-comp-list">${compRows}</div>
+      </div>
+      <div class="flex justify-end gap-3" style="padding-top:0.75rem;border-top:1px solid var(--border);margin-top:0.75rem;">
+        <button type="button" onclick="document.getElementById('sko-modal-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  _skoCompIdx = comps.length;
+}
+
+let _skoCompIdx = 0;
+function skoCompRow(i, c) {
+  c = c || {};
+  return `<div id="sko-comp-${i}" style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 24px;gap:4px;margin-bottom:4px;">
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" placeholder="Item name" name="comp_name_${i}" value="${esc(c.item_name||'')}" required>
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" placeholder="NSN" name="comp_nsn_${i}" value="${esc(c.nsn||'')}">
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" type="number" min="0" placeholder="Req'd" name="comp_req_${i}" value="${c.quantity_required??1}">
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" type="number" min="0" placeholder="On Hand" name="comp_oh_${i}" value="${c.quantity_on_hand??0}">
+    <button type="button" onclick="document.getElementById('sko-comp-${i}').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0;">✕</button>
+  </div>`;
+}
+
+function addSkoCompRow() {
+  const list = document.getElementById('sko-comp-list');
+  const div = document.createElement('div');
+  div.innerHTML = skoCompRow(_skoCompIdx++);
+  list.appendChild(div.firstChild);
+}
+
+async function saveSko(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    name: fd.get('name'),
+    nsn: fd.get('nsn') || null,
+    description: fd.get('description') || null,
+    status: fd.get('status'),
+    notes: fd.get('notes') || null,
+    components: [],
+  };
+  // collect component rows
+  document.querySelectorAll('#sko-comp-list > div[id^="sko-comp-"]').forEach(row => {
+    const i = row.id.replace('sko-comp-','');
+    const name = fd.get(`comp_name_${i}`);
+    if (!name) return;
+    body.components.push({
+      item_name: name,
+      nsn: fd.get(`comp_nsn_${i}`) || null,
+      quantity_required: parseInt(fd.get(`comp_req_${i}`)) || 1,
+      quantity_on_hand: parseInt(fd.get(`comp_oh_${i}`)) || 0,
+    });
+  });
+  try {
+    if (id) await api('PUT', `/api/skos/${id}`, body);
+    else await api('POST', '/api/skos', body);
+    document.getElementById('sko-modal-backdrop').remove();
+    toast(id ? 'SKO updated.' : 'SKO created.');
+    await skosPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteSko(id, name) {
+  if (!confirm(`Delete SKO "${name}"?`)) return;
+  try {
+    await api('DELETE', `/api/skos/${id}`);
+    toast('SKO deleted.');
+    await skosPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+function openCheckoutModal(skoId, skoName) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-co-backdrop';
+  const today = new Date().toISOString().slice(0,10);
+  overlay.innerHTML = `<div class="modal" style="max-width:400px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1.05rem;font-weight:700;">Check Out — ${esc(skoName)}</h3>
+      <button onclick="document.getElementById('sko-co-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;" onsubmit="submitCheckout(event,${skoId})">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Checked Out By *</label>
+        <input name="checked_out_by" class="form-input" style="width:100%;" placeholder="Last, First MI" required value="${esc(currentUser?.username||'')}">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Expected Return</label>
+        <input name="expected_return" class="form-input" type="date" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
+        <textarea name="notes" class="form-input" style="width:100%;height:60px;resize:vertical;"></textarea>
+      </div>
+      <div class="flex justify-end gap-3" style="padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('sko-co-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Check Out</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function submitCheckout(e, skoId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    checked_out_by: fd.get('checked_out_by'),
+    expected_return: fd.get('expected_return') || null,
+    notes: fd.get('notes') || null,
+  };
+  try {
+    await api('POST', `/api/skos/${skoId}/checkout`, body);
+    document.getElementById('sko-co-backdrop').remove();
+    toast('SKO checked out.');
+    await skosPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+function openCheckinModal(skoId, skoName) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-ci-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:380px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1.05rem;font-weight:700;">Check In — ${esc(skoName)}</h3>
+      <button onclick="document.getElementById('sko-ci-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;" onsubmit="submitCheckin(event,${skoId})">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
+        <textarea name="notes" class="form-input" style="width:100%;height:70px;resize:vertical;" placeholder="Condition on return, missing items, etc."></textarea>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button type="button" onclick="document.getElementById('sko-ci-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Check In</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function submitCheckin(e, skoId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('POST', `/api/skos/${skoId}/checkin`, { notes: fd.get('notes') || null });
+    document.getElementById('sko-ci-backdrop').remove();
+    toast('SKO checked in.');
+    await skosPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function openSkoDetail(skoId) {
+  const s = await api('GET', `/api/skos/${skoId}`);
+  const statusColor = { complete:'#166534', incomplete:'#854d0e', nmc:'#7f1d1d' };
+  const compRows = (s.components||[]).map(c => {
+    const short = c.quantity_on_hand < c.quantity_required;
+    return `<tr>
+      <td style="padding:6px 10px;font-size:0.82rem;">${esc(c.item_name)}</td>
+      <td style="padding:6px 10px;font-size:0.8rem;color:var(--muted);">${esc(c.nsn||'—')}</td>
+      <td style="padding:6px 10px;text-align:center;font-size:0.82rem;">${c.quantity_required}</td>
+      <td style="padding:6px 10px;text-align:center;font-size:0.82rem;${short?'color:#f87171;font-weight:700;':'color:#4ade80;'}">${c.quantity_on_hand}</td>
+    </tr>`;
+  }).join('');
+  const histRows = (s.checkout_history||[]).slice(0,10).map(co => `<tr>
+    <td style="padding:5px 10px;font-size:0.79rem;">${esc(co.checked_out_by)}</td>
+    <td style="padding:5px 10px;font-size:0.79rem;">${(co.checkout_date||'').slice(0,10)}</td>
+    <td style="padding:5px 10px;font-size:0.79rem;">${co.returned_at ? co.returned_at.slice(0,10) : '<span style="color:#fbbf24;">Out</span>'}</td>
+    <td style="padding:5px 10px;font-size:0.79rem;color:var(--muted);">${esc(co.notes||'')}</td>
+  </tr>`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-detail-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;">${esc(s.name)}</div>
+        ${s.nsn ? `<div style="font-size:0.78rem;color:var(--muted);">NSN: ${esc(s.nsn)}</div>` : ''}
+      </div>
+      <button onclick="document.getElementById('sko-detail-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div class="px-6 py-4" style="display:flex;flex-direction:column;gap:1rem;">
+      ${s.description ? `<p style="font-size:0.85rem;color:var(--muted);margin:0;">${esc(s.description)}</p>` : ''}
+      <div>
+        <div style="font-size:0.78rem;font-weight:700;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Components</div>
+        ${compRows ? `<table style="width:100%;border-collapse:collapse;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--border);">
+          <thead><tr style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;">
+            <th style="padding:6px 10px;text-align:left;">Item</th><th style="padding:6px 10px;text-align:left;">NSN</th>
+            <th style="padding:6px 10px;text-align:center;">Req'd</th><th style="padding:6px 10px;text-align:center;">On Hand</th>
+          </tr></thead>
+          <tbody>${compRows}</tbody>
+        </table>` : '<p style="font-size:0.82rem;color:var(--muted);">No components listed.</p>'}
+      </div>
+      ${histRows ? `<div>
+        <div style="font-size:0.78rem;font-weight:700;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Checkout History</div>
+        <table style="width:100%;border-collapse:collapse;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--border);">
+          <thead><tr style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;">
+            <th style="padding:5px 10px;text-align:left;">By</th><th style="padding:5px 10px;text-align:left;">Out</th>
+            <th style="padding:5px 10px;text-align:left;">Returned</th><th style="padding:5px 10px;text-align:left;">Notes</th>
+          </tr></thead>
+          <tbody>${histRows}</tbody>
+        </table>
+      </div>` : ''}
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
 
 async function usersPage() {
   if (!isAdmin()) { $('page-content').innerHTML = '<div class="flex items-center justify-center h-32 text-gray-400">Access denied.</div>'; return; }

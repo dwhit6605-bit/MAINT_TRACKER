@@ -75,3 +75,30 @@ class InventoryAdjust(BaseModel):
     quantity: int
     reference: Optional[str] = None
     performed_by: Optional[str] = None
+
+
+class SkoComponentCreate(BaseModel):
+    item_name: str
+    nsn: Optional[str] = None
+    quantity_required: int = 1
+    quantity_on_hand: int = 0
+    notes: Optional[str] = None
+
+
+class SkoCreate(BaseModel):
+    name: str
+    nsn: Optional[str] = None
+    description: Optional[str] = None
+    status: str = "complete"
+    notes: Optional[str] = None
+    components: Optional[list[SkoComponentCreate]] = None
+
+
+class SkoCheckout(BaseModel):
+    checked_out_by: str
+    expected_return: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SkoCheckin(BaseModel):
+    notes: Optional[str] = None

@@ -173,6 +173,39 @@ async def init_db():
                 created_at    TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_task_parts ON task_parts_used(task_id);
+
+            CREATE TABLE IF NOT EXISTS skos (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL,
+                nsn         TEXT,
+                description TEXT,
+                status      TEXT NOT NULL DEFAULT 'complete',
+                notes       TEXT,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS sko_components (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                sko_id            INTEGER NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
+                item_name         TEXT NOT NULL,
+                nsn               TEXT,
+                quantity_required INTEGER NOT NULL DEFAULT 1,
+                quantity_on_hand  INTEGER NOT NULL DEFAULT 0,
+                notes             TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sko_components ON sko_components(sko_id);
+
+            CREATE TABLE IF NOT EXISTS sko_checkouts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                sko_id          INTEGER NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
+                checked_out_by  TEXT NOT NULL,
+                checkout_date   TEXT NOT NULL DEFAULT (datetime('now')),
+                expected_return TEXT,
+                returned_at     TEXT,
+                notes           TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sko_checkouts ON sko_checkouts(sko_id);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}
