@@ -1052,7 +1052,7 @@ function openDA2404Modal(taskId) {
   setTimeout(() => document.getElementById('da-org').focus(), 50);
 }
 
-function exportDA2404(taskId) {
+async function exportDA2404(taskId) {
   const org        = document.getElementById('da-org').value.trim();
   const tm         = document.getElementById('da-tm').value.trim();
   const tmDate     = document.getElementById('da-tm-date').value;
@@ -1061,7 +1061,18 @@ function exportDA2404(taskId) {
 
   const params = new URLSearchParams({ organization: org, tm_number: tm, tm_date: tmDate, supervisor, manhours });
   document.getElementById('subtask-backdrop').remove();
-  window.open(`/api/maintenance/${taskId}/da2404?${params}`, '_blank');
+  try {
+    const resp = await fetch(`/api/maintenance/${taskId}/da2404?${params}`, {
+      headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    if (!resp.ok) { toast('Failed to generate DA 2404', false); return; }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  } catch(e) { toast('PDF error: ' + e.message, false); }
 }
 
 // ── Calibration actions from detail panel ─────────────────────────────────────
