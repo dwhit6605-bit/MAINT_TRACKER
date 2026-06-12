@@ -40,14 +40,31 @@
     .table-row:hover { background-color:#f9fafb; }
     .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.45); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
     .modal { background-color:#fff; border-radius:1rem; box-shadow:0 25px 50px rgba(0,0,0,0.25); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
+
+    /* ── Mobile ── */
+    #sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:29; }
+    #sidebar-overlay.open { display:block; }
+    #hamburger { display:none; align-items:center; justify-content:center; padding:0.4rem; background:none; border:none; cursor:pointer; color:#374151; border-radius:0.375rem; margin-right:0.5rem; }
+    #hamburger:hover { background:#f3f4f6; }
+    @media (max-width: 768px) {
+      #sidebar { position:fixed; top:0; bottom:0; left:-17rem; width:16rem; z-index:30; transition:left 0.25s ease; }
+      #sidebar.open { left:0; }
+      #hamburger { display:flex; }
+      .col-m-hide { display:none !important; }
+      .modal { border-radius:0.75rem; }
+      #page-content { padding: 0.75rem; }
+      header.top-bar { padding-left: 0.75rem; padding-right: 0.75rem; }
+    }
   </style>
 </head>
 <body class="h-full bg-gray-50 font-sans text-gray-800">
 
 <div class="flex h-screen overflow-hidden">
 
+  <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
   <!-- Sidebar -->
-  <aside class="w-64 flex-shrink-0 bg-brand text-white flex flex-col">
+  <aside id="sidebar" class="w-64 flex-shrink-0 bg-brand text-white flex flex-col">
     <div class="px-5 py-5 border-b border-white/20">
       <div class="text-xl font-bold tracking-wide">MAINT SUPER</div>
       <div class="text-xs text-blue-200 mt-0.5">Maintenance &amp; Calibration</div>
@@ -92,10 +109,16 @@
   <!-- Main content -->
   <main class="flex-1 flex flex-col overflow-hidden">
     <!-- Top bar -->
-    <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-      <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
+    <header class="top-bar bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center">
+        <button id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
+      </div>
       <div class="flex items-center gap-3" id="page-actions"></div>
     </header>
+
 
     <!-- Page content -->
     <div class="flex-1 overflow-y-auto p-6" id="page-content">
@@ -160,6 +183,16 @@ function modal(html, onload) {
 function closeModal() { $('modal-container').innerHTML = ''; }
 
 
+// ─── Mobile sidebar ──────────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage };
 const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists' };
@@ -178,7 +211,7 @@ function renderPage(page) {
 }
 
 document.querySelectorAll('.nav-link').forEach(a => {
-  a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.page); });
+  a.addEventListener('click', e => { e.preventDefault(); closeSidebar(); navigate(a.dataset.page); });
 });
 window.addEventListener('popstate', e => renderPage(e.state?.page || 'dashboard'));
 renderPage('{{ page }}');
@@ -321,12 +354,12 @@ function renderEquipmentTable(rows) {
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="px-4 py-3 text-left">Name</th>
-              <th class="px-4 py-3 text-left">Category</th>
-              <th class="px-4 py-3 text-left">Serial #</th>
-              <th class="px-4 py-3 text-left">Location</th>
+              <th class="px-4 py-3 text-left col-m-hide">Category</th>
+              <th class="px-4 py-3 text-left col-m-hide">Serial #</th>
+              <th class="px-4 py-3 text-left col-m-hide">Location</th>
               <th class="px-4 py-3 text-left">Status</th>
               <th class="px-4 py-3 text-left">Maintenance</th>
-              <th class="px-4 py-3 text-left">Cal Due</th>
+              <th class="px-4 py-3 text-left col-m-hide">Cal Due</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -343,16 +376,16 @@ function equipmentRows(rows) {
       <td class="px-4 py-3">
         <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#0f4c81;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
       </td>
-      <td class="px-4 py-3 text-gray-500">${esc(e.category)}</td>
-      <td class="px-4 py-3 text-gray-500 font-mono text-xs">${esc(e.serial_num||'—')}</td>
-      <td class="px-4 py-3 text-gray-500">${esc(e.location||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.category)}</td>
+      <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(e.serial_num||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.location||'—')}</td>
       <td class="px-4 py-3"><span class="${sc[e.status]||'badge-gray'}">${e.status}</span></td>
       <td class="px-4 py-3">
         ${e.overdue_tasks ? `<span class="badge-red">${e.overdue_tasks} overdue</span>` :
           e.pending_tasks ? `<span class="badge-blue">${e.pending_tasks} pending</span>` :
           `<span class="badge-green">OK</span>`}
       </td>
-      <td class="px-4 py-3">${dueBadge(e.cal_next_due)}</td>
+      <td class="px-4 py-3 col-m-hide">${dueBadge(e.cal_next_due)}</td>
       <td class="px-4 py-3 text-right" style="white-space:nowrap;">
         <button onclick="openQRModal(${e.id},'${esc(e.name)}')" class="text-gray-400 hover:text-gray-700 text-xs mr-3" title="QR Code">&#9641; QR</button>
         <button onclick="openEquipmentModal(${e.id})" class="text-brand hover:underline text-xs mr-3">Edit</button>
@@ -1300,11 +1333,11 @@ function renderMaintenanceTable(rows) {
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="px-4 py-3 text-left">Task</th>
-              <th class="px-4 py-3 text-left">Equipment</th>
-              <th class="px-4 py-3 text-left">Type</th>
+              <th class="px-4 py-3 text-left col-m-hide">Equipment</th>
+              <th class="px-4 py-3 text-left col-m-hide">Type</th>
               <th class="px-4 py-3 text-left">Status</th>
               <th class="px-4 py-3 text-left">Due</th>
-              <th class="px-4 py-3 text-left">Assigned</th>
+              <th class="px-4 py-3 text-left col-m-hide">Assigned</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -1322,11 +1355,11 @@ function maintenanceRows(rows) {
   return rows.map(t=>`
     <tr class="table-row border-b last:border-0">
       <td class="px-4 py-3 font-medium">${esc(t.title)}</td>
-      <td class="px-4 py-3 text-gray-500">${esc(t.equipment_name)}</td>
-      <td class="px-4 py-3"><span class="${tc[t.task_type]||'badge-gray'}">${t.task_type}</span></td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.equipment_name)}</td>
+      <td class="px-4 py-3 col-m-hide"><span class="${tc[t.task_type]||'badge-gray'}">${t.task_type}</span></td>
       <td class="px-4 py-3"><span class="${sc[t.status]||'badge-gray'}">${t.status}</span></td>
       <td class="px-4 py-3">${dueBadge(t.next_due, t.status==='completed'?'completed':t.status)}</td>
-      <td class="px-4 py-3 text-gray-500">${esc(t.assigned_to||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.assigned_to||'—')}</td>
       <td class="px-4 py-3 text-right space-x-2">
         ${t.status!=='completed'?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
         <button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>
@@ -1466,8 +1499,8 @@ function renderCalTable(rows) {
             <tr>
               <th class="px-4 py-3 text-left">Equipment</th>
               <th class="px-4 py-3 text-left">Calibrated</th>
-              <th class="px-4 py-3 text-left">By</th>
-              <th class="px-4 py-3 text-left">Cert #</th>
+              <th class="px-4 py-3 text-left col-m-hide">By</th>
+              <th class="px-4 py-3 text-left col-m-hide">Cert #</th>
               <th class="px-4 py-3 text-left">Result</th>
               <th class="px-4 py-3 text-left">Next Due</th>
               <th class="px-4 py-3 text-right">Actions</th>
@@ -1484,8 +1517,8 @@ function calRows(rows) {
     <tr class="table-row border-b last:border-0">
       <td class="px-4 py-3 font-medium">${esc(c.equipment_name)}</td>
       <td class="px-4 py-3 text-gray-500">${fmtDate(c.calibrated_at)}</td>
-      <td class="px-4 py-3 text-gray-500">${esc(c.calibrated_by||'—')}</td>
-      <td class="px-4 py-3 font-mono text-xs">${esc(c.certificate_num||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(c.calibrated_by||'—')}</td>
+      <td class="px-4 py-3 font-mono text-xs col-m-hide">${esc(c.certificate_num||'—')}</td>
       <td class="px-4 py-3"><span class="${c.result==='pass'?'badge-green':'badge-red'}">${c.result.toUpperCase()}</span></td>
       <td class="px-4 py-3">${dueBadge(c.next_due, c.result==='fail'?'fail':undefined)}</td>
       <td class="px-4 py-3 text-right">
@@ -1577,10 +1610,10 @@ function renderInventoryTable(rows) {
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="px-4 py-3 text-left">Name</th>
-              <th class="px-4 py-3 text-left">Part #</th>
-              <th class="px-4 py-3 text-left">Location</th>
+              <th class="px-4 py-3 text-left col-m-hide">Part #</th>
+              <th class="px-4 py-3 text-left col-m-hide">Location</th>
               <th class="px-4 py-3 text-right">Qty</th>
-              <th class="px-4 py-3 text-right">Min</th>
+              <th class="px-4 py-3 text-right col-m-hide">Min</th>
               <th class="px-4 py-3 text-left">Status</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -1596,10 +1629,10 @@ function inventoryRows(rows) {
     const low = i.min_stock > 0 && i.quantity <= i.min_stock;
     return `<tr class="table-row border-b last:border-0">
       <td class="px-4 py-3 font-medium">${esc(i.name)}</td>
-      <td class="px-4 py-3 font-mono text-xs text-gray-500">${esc(i.part_number||'—')}</td>
-      <td class="px-4 py-3 text-gray-500">${esc(i.location||'—')}</td>
+      <td class="px-4 py-3 font-mono text-xs text-gray-500 col-m-hide">${esc(i.part_number||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(i.location||'—')}</td>
       <td class="px-4 py-3 text-right font-mono font-medium ${i.quantity===0?'text-red-600':low?'text-yellow-600':''}">${i.quantity} ${i.unit}</td>
-      <td class="px-4 py-3 text-right text-gray-400">${i.min_stock} ${i.unit}</td>
+      <td class="px-4 py-3 text-right text-gray-400 col-m-hide">${i.min_stock} ${i.unit}</td>
       <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
       <td class="px-4 py-3 text-right space-x-2">
         <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-brand hover:underline text-xs">Adjust</button>
