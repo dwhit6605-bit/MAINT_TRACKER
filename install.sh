@@ -53,7 +53,7 @@ apt-get install -y -qq software-properties-common
 add-apt-repository -y ppa:deadsnakes/ppa > /dev/null 2>&1
 apt-get update -qq
 apt-get install -y -qq \
-    python3.12 python3.12-venv python3.12-distutils \
+    python3.12 python3.12-venv \
     nginx certbot python3-certbot-nginx git curl
 ok "System packages installed"
 
