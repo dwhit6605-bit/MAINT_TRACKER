@@ -35,6 +35,16 @@ async def dashboard_summary(db=Depends(get_db)):
         AND DATE(c.next_due) BETWEEN DATE('now') AND DATE('now', '+30 days')
     """)
     low_stock       = await scalar("SELECT COUNT(*) FROM inventory_items WHERE quantity <= min_stock AND min_stock > 0")
+    warranty_soon   = await scalar("""
+        SELECT COUNT(*) FROM equipment
+        WHERE warranty_expiry IS NOT NULL AND status='active'
+        AND DATE(warranty_expiry) BETWEEN DATE('now') AND DATE('now', '+90 days')
+    """)
+    eol_soon        = await scalar("""
+        SELECT COUNT(*) FROM equipment
+        WHERE end_of_life_date IS NOT NULL AND status='active'
+        AND DATE(end_of_life_date) <= DATE('now', '+180 days')
+    """)
 
     async with db.execute("""
         SELECT m.id, m.title, m.next_due, m.status, e.name as equipment_name
@@ -67,6 +77,24 @@ async def dashboard_summary(db=Depends(get_db)):
     """) as cur:
         low_items = [dict(r) for r in await cur.fetchall()]
 
+    async with db.execute("""
+        SELECT id, name, serial_num, warranty_expiry, end_of_life_date,
+               CASE
+                 WHEN end_of_life_date IS NOT NULL AND DATE(end_of_life_date) <= DATE('now', '+180 days')
+                   THEN 'eol'
+                 ELSE 'warranty'
+               END as alert_type
+        FROM equipment
+        WHERE status='active' AND (
+            (warranty_expiry IS NOT NULL AND DATE(warranty_expiry) BETWEEN DATE('now') AND DATE('now', '+90 days'))
+            OR
+            (end_of_life_date IS NOT NULL AND DATE(end_of_life_date) <= DATE('now', '+180 days'))
+        )
+        ORDER BY COALESCE(end_of_life_date, warranty_expiry) ASC
+        LIMIT 10
+    """) as cur:
+        lifecycle_alerts = [dict(r) for r in await cur.fetchall()]
+
     return {
         "counts": {
             "total_equipment": total_equipment,
@@ -76,8 +104,11 @@ async def dashboard_summary(db=Depends(get_db)):
             "cal_overdue": cal_overdue,
             "cal_due_30d": cal_due_30d,
             "low_stock": low_stock,
+            "warranty_soon": warranty_soon,
+            "eol_soon": eol_soon,
         },
         "upcoming_tasks": upcoming_tasks,
         "upcoming_cals": upcoming_cals,
         "low_items": low_items,
+        "lifecycle_alerts": lifecycle_alerts,
     }

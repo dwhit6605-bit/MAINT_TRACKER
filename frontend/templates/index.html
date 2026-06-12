@@ -121,6 +121,10 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         PMCS
       </a>
+      <a href="/users" class="nav-link admin-nav" data-page="users" style="display:none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Users
+      </a>
     </nav>
     <div class="px-5 py-3 flex items-center justify-between text-xs" style="border-top:1px solid rgba(241,228,208,0.15);color:rgba(241,228,208,0.45);">
       <span>WHITWERX &copy; 2025</span>
@@ -143,7 +147,14 @@
         </button>
         <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
       </div>
-      <div class="flex items-center gap-3" id="page-actions"></div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3" id="page-actions"></div>
+        <div id="user-badge" style="display:none;align-items:center;gap:0.5rem;font-size:0.8rem;color:#64748b;border-left:1px solid #e5e7eb;padding-left:0.75rem;margin-left:0.25rem;">
+          <span id="user-name" style="font-weight:600;color:#374151;"></span>
+          <span id="user-role-badge"></span>
+          <button onclick="logout()" style="font-size:0.75rem;color:#6b7280;background:none;border:1px solid #e5e7eb;cursor:pointer;padding:0.2rem 0.5rem;border-radius:0.25rem;line-height:1.4;">Sign out</button>
+        </div>
+      </div>
     </header>
 
 
@@ -169,10 +180,45 @@
 const $ = id => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+let currentUser = null;
+function getToken() { return localStorage.getItem('auth_token'); }
+function isAdmin() { return currentUser?.role === 'admin'; }
+function logout() {
+  ['auth_token','auth_username','auth_role'].forEach(k => localStorage.removeItem(k));
+  window.location.href = '/login';
+}
+async function initAuth() {
+  const token = getToken();
+  if (!token) { window.location.href = '/login'; return false; }
+  try {
+    currentUser = await fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
+    const badge = $('user-badge');
+    if (badge) {
+      badge.style.display = 'flex';
+      $('user-name').textContent = currentUser.username;
+      const roleEl = $('user-role-badge');
+      roleEl.textContent = currentUser.role;
+      roleEl.style.cssText = `font-size:0.65rem;padding:1px 6px;border-radius:9999px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:${currentUser.role==='admin'?'#fee2e2':'#dce8f5'};color:${currentUser.role==='admin'?'#b91c1c':'#1e3a5f'};`;
+    }
+    if (isAdmin()) document.querySelectorAll('.admin-nav').forEach(el => el.style.display = '');
+    return true;
+  } catch(e) {
+    localStorage.removeItem('auth_token');
+    window.location.href = '/login';
+    return false;
+  }
+}
+
 async function api(method, path, body) {
+  const token = getToken();
   const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(path, opts);
+  if (r.status === 401) { localStorage.removeItem('auth_token'); window.location.href = '/login'; return; }
   if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
   return r.json();
 }
@@ -221,8 +267,8 @@ function closeSidebar() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -241,7 +287,7 @@ document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => { e.preventDefault(); closeSidebar(); navigate(a.dataset.page); });
 });
 window.addEventListener('popstate', e => renderPage(e.state?.page || 'dashboard'));
-renderPage('{{ page }}');
+initAuth().then(ok => { if (ok) renderPage('{{ page }}'); });
 
 // Bell: load overdue count
 (async () => {
@@ -338,6 +384,26 @@ async function dashboardPage() {
         </tbody>
       </table>
     </div>` : ''}
+
+    <!-- Lifecycle alerts -->
+    ${data.lifecycle_alerts && data.lifecycle_alerts.length ? `
+    <div class="card mt-4" style="border-left:4px solid #b45309;">
+      <h2 class="font-semibold text-gray-700 mb-3">Equipment Lifecycle Alerts</h2>
+      <table class="w-full text-sm">
+        <thead><tr class="text-xs text-gray-500 border-b">
+          <th class="pb-2 text-left">Equipment</th><th class="pb-2 text-left col-m-hide">Serial #</th>
+          <th class="pb-2 text-left">Warranty Expiry</th><th class="pb-2 text-left">End of Life</th>
+        </tr></thead>
+        <tbody>${data.lifecycle_alerts.map(e=>`
+          <tr class="table-row border-b last:border-0">
+            <td class="py-2 pr-4 font-medium">${esc(e.name)}</td>
+            <td class="py-2 pr-4 text-gray-500 font-mono text-xs col-m-hide">${esc(e.serial_num||'—')}</td>
+            <td class="py-2 pr-4">${e.warranty_expiry ? dueBadge(e.warranty_expiry) : '<span class="text-gray-300">—</span>'}</td>
+            <td class="py-2">${e.end_of_life_date ? dueBadge(e.end_of_life_date) : '<span class="text-gray-300">—</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
   `;
 }
 
@@ -358,9 +424,9 @@ const EQ_CATS = ['Hand Tools','Power Tools','Test Equipment','Machinery',
 
 async function equipmentPage() {
   $('page-actions').innerHTML = `
-    <button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
+    ${isAdmin() ? `<button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="/api/csv/equipment/export" download="equipment.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
-    <button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>`;
+    ${isAdmin() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
   await refreshEquipment();
 }
 
@@ -418,8 +484,8 @@ function equipmentRows(rows) {
       <td class="px-4 py-3 col-m-hide">${dueBadge(e.cal_next_due)}</td>
       <td class="px-4 py-3 text-right" style="white-space:nowrap;">
         <button onclick="openQRModal(${e.id},'${esc(e.name)}')" class="text-gray-400 hover:text-gray-700 text-xs mr-3" title="QR Code">&#9641; QR</button>
-        <button onclick="openEquipmentModal(${e.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>
-        <button onclick="deleteEquipment(${e.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+        ${isAdmin() ? `<button onclick="openEquipmentModal(${e.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>` : ''}
+        ${isAdmin() ? `<button onclick="deleteEquipment(${e.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
     </tr>`).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">No equipment found.</td></tr>';
 }
@@ -495,6 +561,7 @@ function eqTab(tab) {
 
   if (tab === 'details') {
     const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
+    const lcDate = (d, label) => d ? `<div><div class="label">${label}</div><div style="font-size:0.875rem;">${fmtDate(d)} ${daysUntil(d)<0?'<span style="color:#dc2626;font-size:0.72rem;font-weight:700;">EXPIRED</span>':daysUntil(d)<=90?`<span style="color:#b45309;font-size:0.72rem;font-weight:600;">(${daysUntil(d)}d)</span>`:''}</div></div>` : '';
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
         <div><div class="label">Status</div><span class="${sc[eq.status]||'badge-gray'}" style="font-size:0.8rem;">${eq.status}</span></div>
@@ -506,9 +573,18 @@ function eqTab(tab) {
         <div><div class="label">Category</div><div style="font-size:0.875rem;">${esc(eq.category)}</div></div>
         ${eq.notes?`<div style="grid-column:1/-1"><div class="label">Notes</div><div style="font-size:0.875rem;color:#4b5563;">${esc(eq.notes)}</div></div>`:''}
       </div>
+      ${(eq.purchase_date||eq.warranty_expiry||eq.end_of_life_date) ? `
+      <div style="background:#f8fafc;border:1px solid #dce8f5;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:1rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">Lifecycle</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+          ${eq.purchase_date?`<div><div class="label" style="font-size:0.72rem;">Purchased</div><div style="font-size:0.8rem;">${fmtDate(eq.purchase_date)}</div></div>`:''}
+          ${lcDate(eq.warranty_expiry,'Warranty Expiry')}
+          ${lcDate(eq.end_of_life_date,'End of Life')}
+        </div>
+      </div>` : ''}
       <div style="display:flex;gap:0.75rem;padding-top:0.5rem;border-top:1px solid #f3f4f6;">
-        <button onclick="openEquipmentModal(${id}); closeModal();" class="btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Edit Details</button>
-        <button onclick="deleteEquipment(${id})" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.9rem;color:#dc2626;border-color:#fca5a5;">Delete Equipment</button>
+        ${isAdmin() ? `<button onclick="openEquipmentModal(${id}); closeModal();" class="btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Edit Details</button>` : ''}
+        ${isAdmin() ? `<button onclick="deleteEquipment(${id})" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.9rem;color:#dc2626;border-color:#fca5a5;">Delete Equipment</button>` : ''}
       </div>`;
   }
 
@@ -518,7 +594,7 @@ function eqTab(tab) {
     body.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-weight:600;font-size:0.875rem;">Maintenance Tasks</div>
-        <button onclick="openEqTaskModal(${id})" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Add Task</button>
+        ${isAdmin() ? `<button onclick="openEqTaskModal(${id})" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Add Task</button>` : ''}
       </div>
       ${activeTasks.length === 0 && doneTasks.length === 0 ? '<p style="font-size:0.875rem;color:#9ca3af;">No maintenance tasks recorded.</p>' : ''}
       ${activeTasks.map(t => eqTaskRow(t)).join('')}
@@ -624,8 +700,8 @@ function eqTaskRow(t) {
       <div style="display:flex;gap:0.5rem;flex-shrink:0;">
         ${!isDone ? `<button onclick="eqCompleteTask(${t.id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✓ Done</button>` : ''}
         ${isDone ? `<button onclick="openDA2404Modal(${t.id})" style="font-size:0.72rem;background:#fef9c3;color:#854d0e;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">DA 2404</button>` : ''}
-        <button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
-        <button onclick="eqDeleteTask(${t.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
+        ${isAdmin() ? `<button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>` : ''}
+        ${isAdmin() ? `<button onclick="eqDeleteTask(${t.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -648,8 +724,8 @@ function eqCalRow(c) {
         ${c.notes ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">${esc(c.notes)}</div>` : ''}
       </div>
       <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-        <button onclick="eqUpdateCalDue(${c.id})" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
-        <button onclick="eqDeleteCal(${c.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
+        ${isAdmin() ? `<button onclick="eqUpdateCalDue(${c.id})" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>` : ''}
+        ${isAdmin() ? `<button onclick="eqDeleteCal(${c.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -1128,7 +1204,7 @@ async function eqUploadFiles(files, eqId) {
     try {
       const fd = new FormData();
       fd.append('file', f);
-      const r = await fetch(`/api/attachments/${eqId}`, { method:'POST', body:fd });
+      const r = await fetch(`/api/attachments/${eqId}`, { method:'POST', body:fd, headers:{'Authorization':'Bearer '+(getToken()||'')} });
       if (!r.ok) { const e=await r.json().catch(()=>({})); toast(e.detail||'Upload failed', false); }
     } catch(err) { toast(err.message, false); }
   }
@@ -1226,6 +1302,12 @@ async function openEquipmentModal(id) {
       <div><label class="label">Model</label><input class="input" name="model" value="${esc(eq.model||'')}"></div>
       <div><label class="label">Manufacturer</label><input class="input" name="manufacturer" value="${esc(eq.manufacturer||'')}"></div>
       <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(eq.notes||'')}</textarea></div>
+
+      <div style="grid-column:1/-1;padding:0.5rem 0 0.25rem;border-top:1px solid #f3f4f6;"><div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Lifecycle Dates (optional)</div></div>
+      <div><label class="label">Purchase Date</label><input class="input" type="date" name="purchase_date" value="${eq.purchase_date||''}"></div>
+      <div><label class="label">Warranty Expiry</label><input class="input" type="date" name="warranty_expiry" value="${eq.warranty_expiry||''}"></div>
+      <div style="grid-column:1/-1"><label class="label">End of Life Date</label><input class="input" type="date" name="end_of_life_date" value="${eq.end_of_life_date||''}" style="max-width:50%;"></div>
+
       <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
         <button type="submit" class="btn-primary">Save</button>
@@ -1339,7 +1421,7 @@ let maintenanceData = [], equipList = [];
 async function maintenancePage() {
   $('page-actions').innerHTML = `
     <a href="/api/csv/maintenance/export" download="maintenance.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
-    <button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>`;
+    ${isAdmin() ? `<button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>` : ''}`;
   [maintenanceData, equipList] = await Promise.all([
     api('GET', '/api/maintenance'),
     api('GET', '/api/equipment'),
@@ -1394,7 +1476,7 @@ function maintenanceRows(rows) {
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.assigned_to||'—')}</td>
       <td class="px-4 py-3 text-right space-x-2">
         ${t.status!=='completed'?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
-        <button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+        ${isAdmin() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
     </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No tasks found.</td></tr>';
 }
@@ -1468,8 +1550,13 @@ async function saveTask(e) {
   } catch(err) { toast(err.message, false); }
 }
 
-function completeTaskModal(id) {
-  modal(`<div class="modal">
+let _completePartsRows = [];
+let _inventoryForComplete = [];
+
+async function completeTaskModal(id) {
+  _completePartsRows = [];
+  _inventoryForComplete = await api('GET', '/api/inventory').catch(() => []);
+  modal(`<div class="modal" style="max-width:36rem;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">Mark Task Complete</h2>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
@@ -1478,6 +1565,15 @@ function completeTaskModal(id) {
       <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
       <div><label class="label">Override Next Due</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+
+      <div style="border-top:1px solid #f3f4f6;padding-top:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:#374151;">Parts Used (optional)</div>
+          <button type="button" onclick="addCompletePartRow()" class="btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;">+ Add Part</button>
+        </div>
+        <div id="complete-parts-list" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+      </div>
+
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
         <button type="submit" class="btn-primary">Mark Complete</button>
@@ -1486,10 +1582,32 @@ function completeTaskModal(id) {
   </div>`);
 }
 
+function addCompletePartRow() {
+  const idx = _completePartsRows.length;
+  _completePartsRows.push({ item_id: '', quantity_used: 1 });
+  const optionsHtml = _inventoryForComplete.map(i =>
+    `<option value="${i.id}">${esc(i.name)}${i.part_number ? ' ('+esc(i.part_number)+')' : ''} — ${i.quantity} ${esc(i.unit)} on hand</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.id = `cpart-${idx}`;
+  row.style.cssText = 'display:flex;gap:0.5rem;align-items:center;';
+  row.innerHTML = `
+    <select class="input" style="flex:2;" onchange="_completePartsRows[${idx}].item_id=parseInt(this.value)">
+      <option value="">— Select part —</option>${optionsHtml}
+    </select>
+    <input type="number" class="input" style="width:5rem;" min="0.01" step="0.01" value="1"
+           placeholder="Qty" oninput="_completePartsRows[${idx}].quantity_used=parseFloat(this.value)||1">
+    <button type="button" onclick="document.getElementById('cpart-${idx}').remove();_completePartsRows[${idx}]=null;"
+            style="color:#dc2626;background:none;border:none;cursor:pointer;font-size:1.1rem;padding:0 0.25rem;">✕</button>`;
+  document.getElementById('complete-parts-list').appendChild(row);
+}
+
 async function submitComplete(e, id) {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = Object.fromEntries(fd);
+  const parts = _completePartsRows.filter(p => p && p.item_id);
+  if (parts.length) body.parts_used = parts;
   try {
     await api('POST', `/api/maintenance/${id}/complete`, body);
     closeModal();
@@ -2124,7 +2242,7 @@ async function csvSubmit(type, pmcsTemplateId) {
   fd.append('file', fileInput.files[0]);
 
   try {
-    const r = await fetch(cfg.uploadUrl, { method: 'POST', body: fd });
+    const r = await fetch(cfg.uploadUrl, { method: 'POST', body: fd, headers:{'Authorization':'Bearer '+(getToken()||'')} });
     const data = await r.json();
     const resultEl = document.getElementById('csv-result');
     resultEl.style.display = 'block';
@@ -2159,6 +2277,100 @@ async function csvSubmit(type, pmcsTemplateId) {
     btn.disabled = false;
     btn.textContent = 'Import';
   }
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+let usersData = [];
+
+async function usersPage() {
+  if (!isAdmin()) { $('page-content').innerHTML = '<div class="flex items-center justify-center h-32 text-gray-400">Access denied.</div>'; return; }
+  $('page-actions').innerHTML = `<button onclick="openUserModal()" class="btn-primary">+ Add User</button>`;
+  usersData = await api('GET', '/api/auth/users');
+  renderUsersTable();
+}
+
+function renderUsersTable() {
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-3 text-left">Username</th>
+            <th class="px-4 py-3 text-left">Role</th>
+            <th class="px-4 py-3 text-left col-m-hide">Created</th>
+            <th class="px-4 py-3 text-left col-m-hide">Last Login</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${usersData.map(u=>`
+          <tr class="table-row border-b last:border-0">
+            <td class="px-4 py-3 font-medium">${esc(u.username)}</td>
+            <td class="px-4 py-3"><span class="${u.role==='admin'?'badge-red':'badge-blue'}">${u.role}</span></td>
+            <td class="px-4 py-3 text-gray-500 col-m-hide">${u.created_at ? fmtDate(u.created_at.slice(0,10)) : '—'}</td>
+            <td class="px-4 py-3 text-gray-500 col-m-hide">${u.last_login ? fmtDate(u.last_login.slice(0,10)) : 'Never'}</td>
+            <td class="px-4 py-3 text-right space-x-2">
+              <button onclick="openUserModal(${u.id})" class="text-gray-700 hover:underline text-xs">Edit</button>
+              <button onclick="deleteUser(${u.id},'${esc(u.username)}')" class="text-red-500 hover:underline text-xs">Delete</button>
+            </td>
+          </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No users found.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function openUserModal(id) {
+  const u = id ? usersData.find(x => x.id === id) : {};
+  const isEdit = !!id;
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">${isEdit ? 'Edit' : 'Add'} User</h2>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;line-height:1;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4 space-y-4" onsubmit="saveUser(event,${id||'null'})">
+      <div><label class="label">Username *</label>
+        <input class="input" name="username" required value="${esc(u?.username||'')}" ${isEdit ? 'readonly style="background:#f9fafb;"' : ''}>
+      </div>
+      <div><label class="label">${isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
+        <input class="input" type="password" name="password" ${isEdit ? '' : 'required'} autocomplete="new-password">
+      </div>
+      <div><label class="label">Role</label>
+        <select class="input" name="role">
+          <option value="operator" ${(u?.role||'operator')==='operator'?'selected':''}>operator</option>
+          <option value="admin" ${u?.role==='admin'?'selected':''}>admin</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveUser(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  if (!body.password) delete body.password;
+  try {
+    if (id) await api('PUT', `/api/auth/users/${id}`, body);
+    else await api('POST', '/api/auth/users', body);
+    closeModal();
+    toast(id ? 'User updated.' : 'User created.');
+    usersData = await api('GET', '/api/auth/users');
+    renderUsersTable();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`Delete user "${username}"?`)) return;
+  try {
+    await api('DELETE', `/api/auth/users/${id}`);
+    toast('User deleted.');
+    usersData = await api('GET', '/api/auth/users');
+    renderUsersTable();
+  } catch(err) { toast(err.message, false); }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

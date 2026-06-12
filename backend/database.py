@@ -154,10 +154,35 @@ async def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_audit_equipment ON audit_log(equipment_id);
             CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_log(entity_type, entity_id);
+
+            CREATE TABLE IF NOT EXISTS users (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                username        TEXT NOT NULL UNIQUE,
+                hashed_password TEXT NOT NULL,
+                role            TEXT NOT NULL DEFAULT 'operator',
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                last_login      TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS task_parts_used (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id       INTEGER NOT NULL REFERENCES maintenance_tasks(id) ON DELETE CASCADE,
+                item_id       INTEGER NOT NULL REFERENCES inventory_items(id),
+                quantity_used REAL NOT NULL DEFAULT 1,
+                notes         TEXT,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_parts ON task_parts_used(task_id);
         """)
         # Migrations — add columns that may not exist in older DBs
-        existing = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}
-        if "assigned_to" not in existing:
+        eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}
+        if "assigned_to" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN assigned_to TEXT")
+        if "purchase_date" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN purchase_date TEXT")
+        if "warranty_expiry" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN warranty_expiry TEXT")
+        if "end_of_life_date" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN end_of_life_date TEXT")
 
         await db.commit()

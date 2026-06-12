@@ -12,6 +12,9 @@ class EquipmentCreate(BaseModel):
     assigned_to: Optional[str] = None
     status: str = "active"
     notes: Optional[str] = None
+    purchase_date: Optional[str] = None
+    warranty_expiry: Optional[str] = None
+    end_of_life_date: Optional[str] = None
 
 
 class EquipmentUpdate(EquipmentCreate):
@@ -31,10 +34,17 @@ class MaintenanceTaskCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class PartUsed(BaseModel):
+    item_id: int
+    quantity_used: float = 1.0
+    notes: Optional[str] = None
+
+
 class MaintenanceComplete(BaseModel):
     completed_by: Optional[str] = None
     notes: Optional[str] = None
     next_due: Optional[str] = None
+    parts_used: Optional[list[PartUsed]] = None
 
 
 class CalibrationCreate(BaseModel):

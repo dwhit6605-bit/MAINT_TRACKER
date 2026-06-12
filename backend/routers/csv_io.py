@@ -1,9 +1,10 @@
 """CSV import / export endpoints for all major entities."""
 import csv
 import io
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from backend.database import get_db
+from backend.auth import require_admin
 from backend import audit
 
 router = APIRouter(prefix="/api/csv", tags=["csv"])
@@ -61,7 +62,8 @@ async def export_equipment(db=Depends(get_db)):
 # Upserts on serial_num when present, otherwise inserts
 
 @router.post("/equipment/import")
-async def import_equipment(file: UploadFile = File(...), db=Depends(get_db)):
+async def import_equipment(request: Request, file: UploadFile = File(...), db=Depends(get_db)):
+    require_admin(request)
     _, rows = _parse_upload(await file.read())
     created = updated = skipped = 0
     errors = []
@@ -153,7 +155,8 @@ async def export_inventory(db=Depends(get_db)):
 # Upserts on part_number when present
 
 @router.post("/inventory/import")
-async def import_inventory(file: UploadFile = File(...), db=Depends(get_db)):
+async def import_inventory(request: Request, file: UploadFile = File(...), db=Depends(get_db)):
+    require_admin(request)
     _, rows = _parse_upload(await file.read())
     created = updated = skipped = 0
     errors = []
@@ -280,7 +283,8 @@ async def export_pmcs_items(tmpl_id: int, db=Depends(get_db)):
 # Appends to existing items (does not delete)
 
 @router.post("/pmcs/{tmpl_id}/items/import")
-async def import_pmcs_items(tmpl_id: int, file: UploadFile = File(...), db=Depends(get_db)):
+async def import_pmcs_items(tmpl_id: int, request: Request, file: UploadFile = File(...), db=Depends(get_db)):
+    require_admin(request)
     async with db.execute(
         "SELECT id FROM pmcs_templates WHERE id=?", (tmpl_id,)
     ) as cur:

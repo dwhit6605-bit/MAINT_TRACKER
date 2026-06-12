@@ -46,6 +46,22 @@ ask "Days ahead to warn for due maintenance/calibration [default: 7]:"
 read -r DAYS_AHEAD
 DAYS_AHEAD="${DAYS_AHEAD:-7}"
 
+echo ""
+echo "─── Admin Account ───────────────────────────────────────────────────────────"
+ask "Admin username [default: admin]:"
+read -r ADMIN_USER
+ADMIN_USER="${ADMIN_USER:-admin}"
+
+ask "Admin password (min 8 characters):"
+read -r -s ADMIN_PASS
+echo ""
+while [[ ${#ADMIN_PASS} -lt 8 ]]; do
+  echo "Password must be at least 8 characters."
+  ask "Admin password:"
+  read -r -s ADMIN_PASS
+  echo ""
+done
+
 # ── System packages ───────────────────────────────────────────────────────────
 info "Updating system packages…"
 apt-get update -qq
@@ -77,9 +93,12 @@ ok "Python environment ready"
 
 # ── Write .env ────────────────────────────────────────────────────────────────
 info "Writing .env…"
+# Generate a random 64-char hex SECRET_KEY
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 cat > "$INSTALL_DIR/.env" <<EOF
 DB_PATH=maint.db
 BASE_URL=https://${DOMAIN}
+SECRET_KEY=${SECRET_KEY}
 NOTIFY_EMAIL_TO=${NOTIFY_TO}
 NOTIFY_EMAIL_FROM=${NOTIFY_FROM}
 SMTP_HOST=smtp-relay.brevo.com
@@ -100,6 +119,36 @@ sys.path.insert(0, os.getcwd())
 os.chdir('/opt/maint-super')
 from backend.database import init_db
 asyncio.run(init_db())
+PYEOF
+
+# Create initial admin user (skip if already exists)
+"$INSTALL_DIR/venv/bin/python" - "$ADMIN_USER" "$ADMIN_PASS" <<'PYEOF'
+import asyncio, sys, os
+sys.path.insert(0, os.getcwd())
+os.chdir('/opt/maint-super')
+username, password = sys.argv[1], sys.argv[2]
+from dotenv import load_dotenv
+load_dotenv()
+from backend.database import init_db
+from backend.auth import hash_password
+import aiosqlite
+
+async def create_admin():
+    db_path = os.getenv('DB_PATH', 'maint.db')
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute('SELECT id FROM users WHERE username=?', (username,)) as cur:
+            if await cur.fetchone():
+                print(f"User '{username}' already exists — skipping.")
+                return
+        await db.execute(
+            'INSERT INTO users (username, hashed_password, role) VALUES (?,?,?)',
+            (username, hash_password(password), 'admin')
+        )
+        await db.commit()
+        print(f"Admin user '{username}' created.")
+
+asyncio.run(create_admin())
 PYEOF
 ok "Database initialised"
 
@@ -177,6 +226,7 @@ echo "╚═══════════════════════�
 echo ""
 ok "MAINT SUPER is live at:  https://${DOMAIN}"
 echo ""
+echo "  Login:   Username: ${ADMIN_USER}  (set your password above)"
 echo "  Logs:    journalctl -u ${SERVICE_NAME} -f"
 echo "  Restart: systemctl restart ${SERVICE_NAME}"
 echo "  Update:  git -C ${INSTALL_DIR} pull && systemctl restart ${SERVICE_NAME}"

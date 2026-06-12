@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import EquipmentCreate, EquipmentUpdate
+from backend.auth import require_admin
 from backend import audit
 
 router = APIRouter(prefix="/api/equipment", tags=["equipment"])
@@ -27,7 +28,6 @@ async def list_assigned_units(db=Depends(get_db)):
         ORDER BY assigned_to
     """) as cur:
         rows = await cur.fetchall()
-    # seed defaults if DB has none yet
     db_units = [r["assigned_to"] for r in rows]
     defaults = ["ALPHA", "BRAVO", "CAGE"]
     merged = defaults[:]
@@ -58,12 +58,15 @@ async def get_equipment(eq_id: int, db=Depends(get_db)):
 
 
 @router.post("", status_code=201)
-async def create_equipment(data: EquipmentCreate, db=Depends(get_db)):
+async def create_equipment(data: EquipmentCreate, request: Request, db=Depends(get_db)):
+    require_admin(request)
     async with db.execute("""
-        INSERT INTO equipment (name, category, serial_num, model, manufacturer, location, assigned_to, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO equipment (name, category, serial_num, model, manufacturer,
+            location, assigned_to, status, notes, purchase_date, warranty_expiry, end_of_life_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data.name, data.category, data.serial_num, data.model,
-          data.manufacturer, data.location, data.assigned_to, data.status, data.notes)) as cur:
+          data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
+          data.purchase_date, data.warranty_expiry, data.end_of_life_date)) as cur:
         eq_id = cur.lastrowid
     await audit.log(db, "equipment", eq_id, "created", equipment_id=eq_id,
                     detail={"name": data.name, "category": data.category})
@@ -72,13 +75,17 @@ async def create_equipment(data: EquipmentCreate, db=Depends(get_db)):
 
 
 @router.put("/{eq_id}")
-async def update_equipment(eq_id: int, data: EquipmentUpdate, db=Depends(get_db)):
+async def update_equipment(eq_id: int, data: EquipmentUpdate, request: Request, db=Depends(get_db)):
+    require_admin(request)
     await db.execute("""
         UPDATE equipment SET name=?, category=?, serial_num=?, model=?, manufacturer=?,
-            location=?, assigned_to=?, status=?, notes=?, updated_at=datetime('now')
+            location=?, assigned_to=?, status=?, notes=?,
+            purchase_date=?, warranty_expiry=?, end_of_life_date=?,
+            updated_at=datetime('now')
         WHERE id=?
     """, (data.name, data.category, data.serial_num, data.model,
-          data.manufacturer, data.location, data.assigned_to, data.status, data.notes, eq_id))
+          data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
+          data.purchase_date, data.warranty_expiry, data.end_of_life_date, eq_id))
     await audit.log(db, "equipment", eq_id, "updated", equipment_id=eq_id,
                     detail={"name": data.name, "status": data.status})
     await db.commit()
@@ -86,7 +93,8 @@ async def update_equipment(eq_id: int, data: EquipmentUpdate, db=Depends(get_db)
 
 
 @router.delete("/{eq_id}")
-async def delete_equipment(eq_id: int, db=Depends(get_db)):
+async def delete_equipment(eq_id: int, request: Request, db=Depends(get_db)):
+    require_admin(request)
     async with db.execute("SELECT name FROM equipment WHERE id=?", (eq_id,)) as cur:
         row = await cur.fetchone()
     name = row["name"] if row else "unknown"

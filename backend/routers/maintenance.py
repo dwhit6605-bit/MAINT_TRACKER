@@ -1,10 +1,11 @@
 import os
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from backend.database import get_db
 from backend.models import MaintenanceTaskCreate, MaintenanceComplete
 from backend.da2404 import generate_da2404
+from backend.auth import require_admin
 from backend import audit
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
@@ -32,7 +33,8 @@ async def list_tasks(equipment_id: int = None, status: str = None, db=Depends(ge
 
 
 @router.post("", status_code=201)
-async def create_task(data: MaintenanceTaskCreate, db=Depends(get_db)):
+async def create_task(data: MaintenanceTaskCreate, request: Request, db=Depends(get_db)):
+    require_admin(request)
     async with db.execute("""
         INSERT INTO maintenance_tasks
             (equipment_id, title, description, task_type, interval_days, last_done, next_due, status, assigned_to, notes)
@@ -67,6 +69,25 @@ async def complete_task(task_id: int, data: MaintenanceComplete, db=Depends(get_
         WHERE id=?
     """, (data.completed_by, now, next_due, data.notes, task_id))
 
+    # Log parts used and adjust inventory
+    if data.parts_used:
+        for part in data.parts_used:
+            await db.execute("""
+                INSERT INTO task_parts_used (task_id, item_id, quantity_used, notes)
+                VALUES (?, ?, ?, ?)
+            """, (task_id, part.item_id, part.quantity_used, part.notes))
+            # Deduct from inventory (no negative stock)
+            await db.execute("""
+                UPDATE inventory_items
+                SET quantity = MAX(0, quantity - ?), updated_at=datetime('now')
+                WHERE id=?
+            """, (part.quantity_used, part.item_id))
+            await db.execute("""
+                INSERT INTO inventory_transactions (item_id, action, quantity, reference, performed_by)
+                VALUES (?, 'remove', ?, ?, ?)
+            """, (part.item_id, part.quantity_used,
+                  f"Task #{task_id}: {task['title']}", data.completed_by))
+
     # if recurring, create the next task
     if task["interval_days"] and next_due:
         await db.execute("""
@@ -79,13 +100,28 @@ async def complete_task(task_id: int, data: MaintenanceComplete, db=Depends(get_
     await audit.log(db, "maintenance", task_id, "completed",
                     equipment_id=task["equipment_id"],
                     actor=data.completed_by,
-                    detail={"next_due": next_due, "notes": data.notes})
+                    detail={"next_due": next_due, "notes": data.notes,
+                            "parts_used": len(data.parts_used) if data.parts_used else 0})
     await db.commit()
     return {"ok": True, "next_due": next_due}
 
 
+@router.get("/{task_id}/parts")
+async def get_task_parts(task_id: int, db=Depends(get_db)):
+    async with db.execute("""
+        SELECT tp.*, i.name as item_name, i.part_number, i.unit
+        FROM task_parts_used tp
+        JOIN inventory_items i ON i.id = tp.item_id
+        WHERE tp.task_id=?
+        ORDER BY tp.created_at
+    """, (task_id,)) as cur:
+        rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 @router.put("/{task_id}")
-async def update_task(task_id: int, data: MaintenanceTaskCreate, db=Depends(get_db)):
+async def update_task(task_id: int, data: MaintenanceTaskCreate, request: Request, db=Depends(get_db)):
+    require_admin(request)
     await db.execute("""
         UPDATE maintenance_tasks
         SET title=?, description=?, task_type=?, interval_days=?, last_done=?,
@@ -101,7 +137,8 @@ async def update_task(task_id: int, data: MaintenanceTaskCreate, db=Depends(get_
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, db=Depends(get_db)):
+async def delete_task(task_id: int, request: Request, db=Depends(get_db)):
+    require_admin(request)
     await db.execute("DELETE FROM maintenance_tasks WHERE id=?", (task_id,))
     await db.commit()
     return {"ok": True}
@@ -158,7 +195,6 @@ async def export_da2404(
         manhours=manhours,
     )
 
-    # Save as a permanent equipment attachment
     eq_id = task["equipment_id"]
     upload_dir = os.path.join("uploads", "equipment", str(eq_id))
     os.makedirs(upload_dir, exist_ok=True)
@@ -167,7 +203,6 @@ async def export_da2404(
     with open(file_path, "wb") as f:
         f.write(pdf_bytes)
     original_name = f"DA2404_{task['title'].replace(' ', '_')}_{inspection_date}.pdf"
-    # Upsert: replace any prior DA2404 for this task so re-exports don't accumulate duplicates
     async with db.execute(
         "SELECT id FROM equipment_attachments WHERE equipment_id=? AND filename=?",
         (eq_id, stored_name)
@@ -189,7 +224,6 @@ async def export_da2404(
 
 @router.post("/refresh-overdue")
 async def refresh_overdue(db=Depends(get_db)):
-    """Mark pending tasks past their due date as overdue."""
     today = datetime.utcnow().date().isoformat()
     await db.execute("""
         UPDATE maintenance_tasks SET status='overdue', updated_at=datetime('now')
