@@ -2300,6 +2300,8 @@ let allEquipment = [];
 let allInventory = [];
 
 async function skosPage() {
+  $('page-actions').innerHTML = `
+    ${isAdmin() ? `<button onclick="openSkoModal(null)" class="btn-primary">+ New SKO</button>` : ''}`;
   [skosData, allEquipment, allInventory] = await Promise.all([
     api('GET', '/api/skos'),
     api('GET', '/api/equipment'),
@@ -2309,65 +2311,80 @@ async function skosPage() {
 }
 
 function renderSkosTable() {
-  const statusBadge = s => {
-    const styles = {
-      complete:   'background:#166534;color:#bbf7d0',
-      incomplete: 'background:#854d0e;color:#fef3c7',
-      nmc:        'background:#7f1d1d;color:#fecaca',
-    };
-    const labels = { complete:'Complete', incomplete:'Incomplete', nmc:'NMC' };
-    return `<span style="font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:4px;${styles[s]||styles.incomplete}">${labels[s]||s.toUpperCase()}</span>`;
-  };
-
-  const eqStatusDot = s => {
-    const c = { active:'#4ade80', inactive:'#6b7280', maintenance:'#fbbf24' };
-    return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${c[s]||'#6b7280'};margin-right:4px;"></span>`;
-  };
-
-  const rows = skosData.map(s => {
+  const skoRows = skosData.map(s => {
     const co = s.active_checkout;
     const overdue = (s.equipment||[]).some(e => e.next_task?.status === 'overdue');
-    const coCell = co
-      ? `<span style="color:#fbbf24;font-size:0.78rem;">⬆ ${esc(co.checked_out_by)}${co.expected_return?' (due '+co.expected_return+')':''}</span>`
-      : `<span style="color:#4ade80;font-size:0.78rem;">Available</span>`;
-    return `<tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:10px 12px;">
-        <div style="font-weight:600;">${esc(s.name)}</div>
-        ${s.nsn?`<div style="font-size:0.75rem;color:var(--muted);">NSN: ${esc(s.nsn)}</div>`:''}
+    const readiness = overdue
+      ? `<span class="badge-red">⚠ Overdue</span>`
+      : `<span class="badge-green">Ready</span>`;
+    const checkout = co
+      ? `<span class="badge-yellow">⬆ ${esc(co.checked_out_by)}${co.expected_return?' · due '+co.expected_return:''}</span>`
+      : `<span class="badge-gray">Available</span>`;
+    return `<tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3">
+        <button onclick="openSkoDetail(${s.id})" style="font-weight:600;color:#141414;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(s.name)}</button>
+        ${s.nsn ? `<div class="text-xs text-gray-400">NSN: ${esc(s.nsn)}</div>` : ''}
       </td>
-      <td style="padding:10px 12px;">${s.equipment_count} item${s.equipment_count!==1?'s':''}</td>
-      <td style="padding:10px 12px;">${overdue?'<span style="color:#f87171;font-size:0.78rem;">⚠ Overdue task</span>':'<span style="color:#4ade80;font-size:0.78rem;">OK</span>'}</td>
-      <td style="padding:10px 12px;">${coCell}</td>
-      <td style="padding:10px 12px;white-space:nowrap;">
-        <button onclick="openSkoDetail(${s.id})" style="font-size:0.72rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">Open</button>
-        ${isAdmin()?`<button onclick="openSkoModal(${s.id})" style="font-size:0.72rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;margin-right:4px;">Edit</button>
-        <button onclick="deleteSko(${s.id},'${esc(s.name)}')" style="font-size:0.72rem;background:#7f1d1d;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;">Delete</button>`:''}
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${s.equipment_count} item${s.equipment_count!==1?'s':''}</td>
+      <td class="px-4 py-3">${readiness}</td>
+      <td class="px-4 py-3 col-m-hide">${checkout}</td>
+      <td class="px-4 py-3 text-right" style="white-space:nowrap;">
+        <button onclick="openSkoDetail(${s.id})" class="text-gray-800 hover:underline text-xs mr-3">Open</button>
+        ${isAdmin() ? `<button onclick="openSkoModal(${s.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>` : ''}
+        ${isAdmin() ? `<button onclick="deleteSko(${s.id},'${esc(s.name)}')" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
     </tr>`;
   }).join('');
 
-  document.getElementById('page-content').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <div style="font-size:0.8rem;color:var(--muted);">
-        ${skosData.length} SKO${skosData.length!==1?'s':''} &nbsp;·&nbsp;
-        ${skosData.filter(s=>s.active_checkout).length} checked out
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex items-center gap-3">
+        <input id="sko-search" class="input max-w-xs" placeholder="Search SKOs…" oninput="filterSkos(this.value)">
+        <span class="text-xs text-gray-400 ml-auto">${skosData.length} SKO${skosData.length!==1?'s':''} · ${skosData.filter(s=>s.active_checkout).length} checked out</span>
       </div>
-      ${isAdmin()?`<button onclick="openSkoModal(null)" class="btn-primary" style="font-size:0.82rem;">+ New SKO</button>`:''}
-    </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid var(--border);font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
-            <th style="padding:8px 12px;text-align:left;">SKO Name</th>
-            <th style="padding:8px 12px;text-align:left;">Equipment</th>
-            <th style="padding:8px 12px;text-align:left;">Readiness</th>
-            <th style="padding:8px 12px;text-align:left;">Checkout</th>
-            <th style="padding:8px 12px;text-align:left;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>${rows||`<tr><td colspan="5" style="padding:2rem;text-align:center;color:var(--muted);">No SKOs yet.${isAdmin()?' Click "+ New SKO" to create one.':''}</td></tr>`}</tbody>
-      </table>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">SKO Name</th>
+              <th class="px-4 py-3 text-left col-m-hide">Equipment</th>
+              <th class="px-4 py-3 text-left">Readiness</th>
+              <th class="px-4 py-3 text-left col-m-hide">Checkout</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sko-tbody">${skoRows || `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No SKOs yet.${isAdmin()?' Click "+ New SKO" to create one.':''}</td></tr>`}</tbody>
+        </table>
+      </div>
     </div>`;
+}
+
+function filterSkos(q) {
+  const s = q.toLowerCase();
+  const filtered = skosData.filter(x =>
+    x.name.toLowerCase().includes(s) || (x.nsn||'').toLowerCase().includes(s) || (x.description||'').toLowerCase().includes(s)
+  );
+  const skoRows = filtered.map(s => {
+    const co = s.active_checkout;
+    const overdue = (s.equipment||[]).some(e => e.next_task?.status === 'overdue');
+    const readiness = overdue ? `<span class="badge-red">⚠ Overdue</span>` : `<span class="badge-green">Ready</span>`;
+    const checkout = co ? `<span class="badge-yellow">⬆ ${esc(co.checked_out_by)}</span>` : `<span class="badge-gray">Available</span>`;
+    return `<tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3">
+        <button onclick="openSkoDetail(${s.id})" style="font-weight:600;color:#141414;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(s.name)}</button>
+        ${s.nsn ? `<div class="text-xs text-gray-400">NSN: ${esc(s.nsn)}</div>` : ''}
+      </td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${s.equipment_count} item${s.equipment_count!==1?'s':''}</td>
+      <td class="px-4 py-3">${readiness}</td>
+      <td class="px-4 py-3 col-m-hide">${checkout}</td>
+      <td class="px-4 py-3 text-right" style="white-space:nowrap;">
+        <button onclick="openSkoDetail(${s.id})" class="text-gray-800 hover:underline text-xs mr-3">Open</button>
+        ${isAdmin() ? `<button onclick="openSkoModal(${s.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>` : ''}
+        ${isAdmin() ? `<button onclick="deleteSko(${s.id},'${esc(s.name)}')" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+  $('sko-tbody').innerHTML = skoRows || `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No results.</td></tr>`;
 }
 
 // ── Add / Edit SKO modal ──────────────────────────────────────────────────────
