@@ -77,21 +77,12 @@ class InventoryAdjust(BaseModel):
     performed_by: Optional[str] = None
 
 
-class SkoComponentCreate(BaseModel):
-    item_name: str
-    nsn: Optional[str] = None
-    quantity_required: int = 1
-    quantity_on_hand: int = 0
-    notes: Optional[str] = None
-
-
 class SkoCreate(BaseModel):
     name: str
     nsn: Optional[str] = None
     description: Optional[str] = None
-    status: str = "complete"
     notes: Optional[str] = None
-    components: Optional[list[SkoComponentCreate]] = None
+    equipment_ids: Optional[list[int]] = None
 
 
 class SkoCheckout(BaseModel):
@@ -101,4 +92,11 @@ class SkoCheckout(BaseModel):
 
 
 class SkoCheckin(BaseModel):
+    notes: Optional[str] = None
+
+
+class SkoPartsUsed(BaseModel):
+    item_id: int
+    quantity: float = 1.0
+    used_by: Optional[str] = None
     notes: Optional[str] = None

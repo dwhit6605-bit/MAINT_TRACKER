@@ -185,16 +185,24 @@ async def init_db():
                 updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE TABLE IF NOT EXISTS sko_components (
-                id                INTEGER PRIMARY KEY AUTOINCREMENT,
-                sko_id            INTEGER NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
-                item_name         TEXT NOT NULL,
-                nsn               TEXT,
-                quantity_required INTEGER NOT NULL DEFAULT 1,
-                quantity_on_hand  INTEGER NOT NULL DEFAULT 0,
-                notes             TEXT
+            CREATE TABLE IF NOT EXISTS sko_equipment (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                sko_id       INTEGER NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
+                equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
+                UNIQUE(sko_id, equipment_id)
             );
-            CREATE INDEX IF NOT EXISTS idx_sko_components ON sko_components(sko_id);
+            CREATE INDEX IF NOT EXISTS idx_sko_equipment ON sko_equipment(sko_id);
+
+            CREATE TABLE IF NOT EXISTS sko_parts_used (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                sko_id     INTEGER NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
+                item_id    INTEGER NOT NULL REFERENCES inventory_items(id),
+                quantity   REAL NOT NULL DEFAULT 1,
+                used_by    TEXT,
+                notes      TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_sko_parts ON sko_parts_used(sko_id);
 
             CREATE TABLE IF NOT EXISTS sko_checkouts (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
