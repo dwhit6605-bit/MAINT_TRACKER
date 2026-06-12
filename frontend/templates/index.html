@@ -4,42 +4,69 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAINT SUPER — Maintenance &amp; Calibration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            brand: { DEFAULT: '#0f4c81', light: '#1a6bb5', dark: '#0a3460' },
+            brand: { DEFAULT: '#141414', light: '#2a2a2a', dark: '#0a0a0a' },
+          },
+          fontFamily: {
+            sans: ['"Open Sans"', 'sans-serif'],
           }
         }
       }
     }
   </script>
   <style>
+    /* ── Whitwerx palette ──
+       #141414  near-black  (sidebar, buttons, headers)
+       #F1E4D0  parchment   (page bg, active nav highlight)
+       #696969  mid-gray    (secondary text, dividers)
+       #FFFFFF  white       (cards, modals)
+       #040404  text        (body copy)
+    ── */
+    *, *::before, *::after { font-family: 'Open Sans', sans-serif; }
     [x-cloak]{display:none!important}
-    .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.625rem 1rem; border-radius:0.5rem; font-size:0.875rem; font-weight:500; transition:background-color 150ms; text-decoration:none; color:inherit; }
-    .nav-link:hover { background-color:rgba(255,255,255,0.12); }
-    .nav-link.active { background-color:#fff; color:#0f4c81; font-weight:600; }
-    .badge-red    { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#fee2e2; color:#b91c1c; white-space:nowrap; }
-    .badge-yellow { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#fef9c3; color:#a16207; white-space:nowrap; }
-    .badge-green  { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#dcfce7; color:#15803d; white-space:nowrap; }
-    .badge-blue   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#dbeafe; color:#1d4ed8; white-space:nowrap; }
-    .badge-gray   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#f3f4f6; color:#4b5563; white-space:nowrap; }
-    .card { background-color:#fff; border-radius:0.75rem; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #f3f4f6; padding:1.25rem; }
-    .btn-primary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#0f4c81; color:#fff; font-size:0.875rem; font-weight:500; border-radius:0.5rem; border:none; cursor:pointer; transition:background-color 150ms; }
-    .btn-primary:hover { background-color:#1a6bb5; }
-    .btn-secondary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#fff; color:#374151; font-size:0.875rem; font-weight:500; border-radius:0.5rem; border:1px solid #e5e7eb; cursor:pointer; transition:background-color 150ms; }
-    .btn-secondary:hover { background-color:#f9fafb; }
-    .btn-danger { display:inline-flex; align-items:center; gap:0.5rem; padding:0.375rem 0.75rem; background-color:#fef2f2; color:#dc2626; font-size:0.75rem; font-weight:500; border-radius:0.5rem; border:none; cursor:pointer; transition:background-color 150ms; }
+
+    /* Nav */
+    .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.625rem 1rem; border-radius:0.375rem; font-size:0.875rem; font-weight:500; transition:background-color 150ms; text-decoration:none; color:rgba(255,255,255,0.82); letter-spacing:0.01em; }
+    .nav-link:hover { background-color:rgba(255,255,255,0.08); color:#fff; }
+    .nav-link.active { background-color:#F1E4D0; color:#141414; font-weight:700; }
+
+    /* Badges */
+    .badge-red    { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#fee2e2; color:#b91c1c; white-space:nowrap; }
+    .badge-yellow { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#fef3c7; color:#92400e; white-space:nowrap; }
+    .badge-green  { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#d1fae5; color:#065f46; white-space:nowrap; }
+    .badge-blue   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#e8dece; color:#141414; white-space:nowrap; }
+    .badge-gray   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#e5e7eb; color:#374151; white-space:nowrap; }
+
+    /* Cards */
+    .card { background-color:#fff; border-radius:0.75rem; box-shadow:0 1px 4px rgba(0,0,0,0.08); border:1px solid #e8dece; padding:1.25rem; }
+
+    /* Buttons */
+    .btn-primary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#141414; color:#F1E4D0; font-size:0.875rem; font-weight:600; border-radius:0.375rem; border:none; cursor:pointer; transition:background-color 150ms; letter-spacing:0.01em; }
+    .btn-primary:hover { background-color:#2a2a2a; }
+    .btn-secondary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#fff; color:#141414; font-size:0.875rem; font-weight:500; border-radius:0.375rem; border:1px solid #d1c8bb; cursor:pointer; transition:background-color 150ms; }
+    .btn-secondary:hover { background-color:#F1E4D0; }
+    .btn-danger { display:inline-flex; align-items:center; gap:0.5rem; padding:0.375rem 0.75rem; background-color:#fef2f2; color:#dc2626; font-size:0.75rem; font-weight:500; border-radius:0.375rem; border:none; cursor:pointer; transition:background-color 150ms; }
     .btn-danger:hover { background-color:#fee2e2; }
-    .input { display:block; width:100%; border-radius:0.5rem; border:1px solid #d1d5db; padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 2px rgba(0,0,0,0.04); outline:none; box-sizing:border-box; background:#fff; font-family:inherit; }
-    .input:focus { border-color:#0f4c81; box-shadow:0 0 0 2px rgba(15,76,129,0.2); }
-    .label { display:block; font-size:0.875rem; font-weight:500; color:#374151; margin-bottom:0.25rem; }
+
+    /* Inputs */
+    .input { display:block; width:100%; border-radius:0.375rem; border:1px solid #d1c8bb; padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 2px rgba(0,0,0,0.04); outline:none; box-sizing:border-box; background:#fff; font-family:inherit; }
+    .input:focus { border-color:#141414; box-shadow:0 0 0 2px rgba(20,20,20,0.12); }
+    .label { display:block; font-size:0.875rem; font-weight:600; color:#141414; margin-bottom:0.25rem; }
+
+    /* Table */
     .table-row { transition:background-color 150ms; }
-    .table-row:hover { background-color:#f9fafb; }
-    .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.45); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
-    .modal { background-color:#fff; border-radius:1rem; box-shadow:0 25px 50px rgba(0,0,0,0.25); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
+    .table-row:hover { background-color:#faf7f3; }
+
+    /* Modal */
+    .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.55); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .modal { background-color:#fff; border-radius:0.75rem; box-shadow:0 25px 50px rgba(0,0,0,0.3); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
 
     /* ── Mobile ── */
     #sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:29; }
@@ -57,17 +84,17 @@
     }
   </style>
 </head>
-<body class="h-full bg-gray-50 font-sans text-gray-800">
+<body class="h-full font-sans text-gray-800" style="background-color:#F1E4D0;">
 
 <div class="flex h-screen overflow-hidden">
 
   <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
   <!-- Sidebar -->
-  <aside id="sidebar" class="w-64 flex-shrink-0 bg-brand text-white flex flex-col">
-    <div class="px-5 py-5 border-b border-white/20">
-      <div class="text-xl font-bold tracking-wide">MAINT SUPER</div>
-      <div class="text-xs text-blue-200 mt-0.5">Maintenance &amp; Calibration</div>
+  <aside id="sidebar" class="w-64 flex-shrink-0 text-white flex flex-col" style="background-color:#141414;">
+    <div class="px-5 py-5" style="border-bottom:1px solid rgba(241,228,208,0.15);">
+      <div class="text-xl font-bold tracking-widest" style="color:#F1E4D0;letter-spacing:0.12em;">MAINT SUPER</div>
+      <div class="text-xs mt-0.5" style="color:rgba(241,228,208,0.5);letter-spacing:0.05em;">WHITWERX · MAINTENANCE OPS</div>
     </div>
     <nav class="flex-1 px-3 py-4 space-y-1" id="sidebar-nav">
       <a href="/dashboard"   class="nav-link" data-page="dashboard">
@@ -95,7 +122,7 @@
         PMCS
       </a>
     </nav>
-    <div class="px-5 py-3 border-t border-white/20 text-xs text-blue-200 flex items-center justify-between">
+    <div class="px-5 py-3 flex items-center justify-between text-xs" style="border-top:1px solid rgba(241,228,208,0.15);color:rgba(241,228,208,0.45);">
       <span>WHITWERX &copy; 2025</span>
       <button id="nav-bell" onclick="navigate('dashboard')" title="Alerts" style="background:none;border:none;cursor:pointer;position:relative;padding:0;line-height:1;">
         <svg style="width:1.1rem;height:1.1rem;color:rgba(255,255,255,0.6);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,7 +136,7 @@
   <!-- Main content -->
   <main class="flex-1 flex flex-col overflow-hidden">
     <!-- Top bar -->
-    <header class="top-bar bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+    <header class="top-bar px-6 py-4 flex items-center justify-between flex-shrink-0" style="background:#fff;border-bottom:1px solid #e8dece;">
       <div class="flex items-center">
         <button id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
           <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -252,7 +279,7 @@ async function dashboardPage() {
   $('page-content').innerHTML = `
     <!-- Stat cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      ${statCard('Equipment', c.total_equipment, 'bg-blue-50 text-blue-700', 'Active')}
+      ${statCard('Equipment', c.total_equipment, 'bg-stone-100 text-stone-800', 'Active')}
       ${statCard('Overdue Tasks', c.overdue_tasks, c.overdue_tasks?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Maintenance')}
       ${statCard('Cal Overdue', c.cal_overdue, c.cal_overdue?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Calibration')}
       ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
@@ -377,7 +404,7 @@ function equipmentRows(rows) {
   return rows.map(e=>`
     <tr class="table-row border-b last:border-0">
       <td class="px-4 py-3">
-        <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#0f4c81;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
+        <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#141414;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
       </td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.category)}</td>
       <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(e.serial_num||'—')}</td>
@@ -391,7 +418,7 @@ function equipmentRows(rows) {
       <td class="px-4 py-3 col-m-hide">${dueBadge(e.cal_next_due)}</td>
       <td class="px-4 py-3 text-right" style="white-space:nowrap;">
         <button onclick="openQRModal(${e.id},'${esc(e.name)}')" class="text-gray-400 hover:text-gray-700 text-xs mr-3" title="QR Code">&#9641; QR</button>
-        <button onclick="openEquipmentModal(${e.id})" class="text-brand hover:underline text-xs mr-3">Edit</button>
+        <button onclick="openEquipmentModal(${e.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>
         <button onclick="deleteEquipment(${e.id})" class="text-red-500 hover:underline text-xs">Delete</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">No equipment found.</td></tr>';
@@ -433,7 +460,7 @@ async function openEqDetail(id) {
     <!-- Tabs -->
     <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 1.5rem;" id="eq-detail-tabs">
       <button onclick="eqTab('details')" id="tab-details" class="eq-tab active-tab">Details</button>
-      <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dbeafe;color:#1d4ed8;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
+      <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#e8dece;color:#141414;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
       <button onclick="eqTab('calibration')" id="tab-calibration" class="eq-tab">Calibration <span id="cal-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:1px 7px;">${cals.length||''}</span></button>
       <button onclick="eqTab('attachments')" id="tab-attachments" class="eq-tab">Attachments <span id="att-count-badge" style="margin-left:4px;font-size:0.7rem;background:#f3f4f6;color:#4b5563;border-radius:9999px;padding:1px 7px;">${atts.length||''}</span></button>
       <button onclick="eqTab('history')" id="tab-history" class="eq-tab">History</button>
@@ -455,8 +482,8 @@ if (!document.getElementById('eq-tab-style')) {
   s.id = 'eq-tab-style';
   s.textContent = `
     .eq-tab { background:none; border:none; cursor:pointer; padding:0.6rem 1rem; font-size:0.875rem; font-weight:500; color:#6b7280; border-bottom:2px solid transparent; margin-bottom:-1px; }
-    .eq-tab:hover { color:#0f4c81; }
-    .eq-tab.active-tab { color:#0f4c81; border-bottom-color:#0f4c81; }
+    .eq-tab:hover { color:#141414; }
+    .eq-tab.active-tab { color:#141414; border-bottom-color:#141414; }
   `;
   document.head.appendChild(s);
 }
@@ -471,7 +498,7 @@ function eqTab(tab) {
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
         <div><div class="label">Status</div><span class="${sc[eq.status]||'badge-gray'}" style="font-size:0.8rem;">${eq.status}</span></div>
-        <div><div class="label">Assigned To</div><div style="font-size:0.875rem;font-weight:${eq.assigned_to?'600':'400'};color:${eq.assigned_to?'#0f4c81':'#9ca3af'};">${esc(eq.assigned_to||'—')}</div></div>
+        <div><div class="label">Assigned To</div><div style="font-size:0.875rem;font-weight:${eq.assigned_to?'600':'400'};color:${eq.assigned_to?'#141414':'#9ca3af'};">${esc(eq.assigned_to||'—')}</div></div>
         <div><div class="label">Location</div><div style="font-size:0.875rem;">${esc(eq.location||'—')}</div></div>
         <div><div class="label">Manufacturer</div><div style="font-size:0.875rem;">${esc(eq.manufacturer||'—')}</div></div>
         <div><div class="label">Model</div><div style="font-size:0.875rem;">${esc(eq.model||'—')}</div></div>
@@ -520,13 +547,13 @@ function eqTab(tab) {
 
       <!-- Upload zone -->
       <label id="att-drop" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #d1d5db;border-radius:0.75rem;padding:1.5rem 1rem;cursor:pointer;margin-bottom:1rem;transition:border-color 200ms;gap:0.4rem;"
-             ondragover="event.preventDefault();this.style.borderColor='#0f4c81'"
+             ondragover="event.preventDefault();this.style.borderColor='#141414'"
              ondragleave="this.style.borderColor='#d1d5db'"
              ondrop="eqHandleDrop(event,${id})">
         <svg style="width:2rem;height:2rem;color:#9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
         </svg>
-        <span style="font-size:0.8rem;color:#6b7280;">Drop files here or <span style="color:#0f4c81;font-weight:600;">click to browse</span></span>
+        <span style="font-size:0.8rem;color:#6b7280;">Drop files here or <span style="color:#141414;font-weight:600;">click to browse</span></span>
         <span style="font-size:0.7rem;color:#9ca3af;">Photos, PDFs, documents — max 50 MB each</span>
         <input type="file" id="att-file-input" multiple style="display:none"
                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
@@ -535,7 +562,7 @@ function eqTab(tab) {
       <div id="att-upload-progress" style="display:none;margin-bottom:0.75rem;">
         <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;" id="att-progress-label">Uploading…</div>
         <div style="background:#e5e7eb;border-radius:9999px;height:6px;">
-          <div id="att-progress-bar" style="background:#0f4c81;height:6px;border-radius:9999px;width:0%;transition:width 200ms;"></div>
+          <div id="att-progress-bar" style="background:#141414;height:6px;border-radius:9999px;width:0%;transition:width 200ms;"></div>
         </div>
       </div>
 
@@ -553,7 +580,7 @@ function eqTab(tab) {
   }
 
   else if (tab === 'history') {
-    const _ACTION_COLORS = { created:'#dcfce7', updated:'#dbeafe', completed:'#f0fdf4', deleted:'#fef2f2', calibrated:'#ede9fe' };
+    const _ACTION_COLORS = { created:'#dcfce7', updated:'#e8dece', completed:'#f0fdf4', deleted:'#fef2f2', calibrated:'#ede9fe' };
     const _ACTION_LABELS = { created:'Created', updated:'Updated', completed:'Completed', deleted:'Deleted', calibrated:'Calibrated' };
     body.innerHTML = `
       <div style="font-weight:600;font-size:0.875rem;margin-bottom:1rem;">Audit History</div>
@@ -597,7 +624,7 @@ function eqTaskRow(t) {
       <div style="display:flex;gap:0.5rem;flex-shrink:0;">
         ${!isDone ? `<button onclick="eqCompleteTask(${t.id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✓ Done</button>` : ''}
         ${isDone ? `<button onclick="openDA2404Modal(${t.id})" style="font-size:0.72rem;background:#fef9c3;color:#854d0e;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">DA 2404</button>` : ''}
-        <button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
+        <button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#e8dece;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
         <button onclick="eqDeleteTask(${t.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
       </div>
     </div>
@@ -621,7 +648,7 @@ function eqCalRow(c) {
         ${c.notes ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">${esc(c.notes)}</div>` : ''}
       </div>
       <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-        <button onclick="eqUpdateCalDue(${c.id})" style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
+        <button onclick="eqUpdateCalDue(${c.id})" style="font-size:0.72rem;background:#e8dece;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
         <button onclick="eqDeleteCal(${c.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
       </div>
     </div>
@@ -1645,7 +1672,7 @@ function inventoryRows(rows) {
       <td class="px-4 py-3 text-right text-gray-400 col-m-hide">${i.min_stock} ${i.unit}</td>
       <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
       <td class="px-4 py-3 text-right space-x-2">
-        <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-brand hover:underline text-xs">Adjust</button>
+        <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>
         <button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>
         <button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>
       </td>
@@ -1782,7 +1809,7 @@ function pmcsCard(t) {
         ${t.description ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:0.25rem;">${esc(t.description)}</div>` : ''}
       </div>
       <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-        <span style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border-radius:9999px;padding:2px 10px;font-weight:600;">${t.item_count} items</span>
+        <span style="font-size:0.72rem;background:#e8dece;color:#141414;border-radius:9999px;padding:2px 10px;font-weight:600;">${t.item_count} items</span>
         <span style="font-size:0.72rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:2px 10px;font-weight:600;">${t.session_count} runs</span>
       </div>
     </div>
@@ -1968,7 +1995,7 @@ async function openPmcsArchive(tmplId, title) {
                 ? `<span style="font-size:0.72rem;font-weight:700;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:9999px;">${s.fault_count} fault${s.fault_count>1?'s':''}</span>`
                 : `<span style="font-size:0.72rem;font-weight:700;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:9999px;">All Clear</span>`}
               <a href="/api/pmcs/sessions/${s.id}/archive" target="_blank"
-                 style="font-size:0.75rem;background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:0.375rem;text-decoration:none;font-weight:600;">PDF</a>
+                 style="font-size:0.75rem;background:#e8dece;color:#141414;padding:3px 10px;border-radius:0.375rem;text-decoration:none;font-weight:600;">PDF</a>
             </div>
           </div>`).join('')}
     </div>
@@ -2032,13 +2059,13 @@ function openCsvImport(type, pmcsTemplateId) {
 
       <!-- File drop zone -->
       <label id="csv-drop-zone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #d1d5db;border-radius:0.75rem;padding:1.5rem 1rem;cursor:pointer;gap:0.4rem;transition:border-color 200ms;"
-             ondragover="event.preventDefault();this.style.borderColor='#0f4c81'"
+             ondragover="event.preventDefault();this.style.borderColor='#141414'"
              ondragleave="this.style.borderColor='#d1d5db'"
              ondrop="csvHandleDrop(event)">
         <svg style="width:2rem;height:2rem;color:#9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
-        <span style="font-size:0.8rem;color:#6b7280;">Drop CSV here or <span style="color:#0f4c81;font-weight:600;">click to browse</span></span>
+        <span style="font-size:0.8rem;color:#6b7280;">Drop CSV here or <span style="color:#141414;font-weight:600;">click to browse</span></span>
         <span id="csv-filename" style="font-size:0.72rem;color:#9ca3af;">No file selected</span>
         <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="csvFileSelected(this)">
       </label>
