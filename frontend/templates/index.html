@@ -2461,8 +2461,8 @@ async function openSkoDetail(skoId) {
     const taskWarn = e.next_task
       ? `<span style="font-size:0.72rem;color:${e.next_task.status==='overdue'?'#f87171':'#fbbf24'};">⚠ ${e.next_task.status}${e.next_task.next_due?' · due '+e.next_task.next_due:''}</span>`
       : '';
-    const noPmcs = !e.pmcs_templates?.length
-      ? `<span style="color:var(--muted);font-size:0.72rem;">No templates</span>`
+    const setupPmcsBtn = !e.pmcs_templates?.length
+      ? `<button onclick="openSkoSetupPmcsModal(${e.id},'${esc(e.name)}',${skoId})" style="font-size:0.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">+ Set up PMCS</button>`
       : '';
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:8px 10px;">
@@ -2476,9 +2476,9 @@ async function openSkoDetail(skoId) {
         </span>
       </td>
       <td style="padding:8px 10px;">${taskWarn}</td>
-      <td style="padding:8px 10px;min-width:160px;">
+      <td style="padding:8px 10px;min-width:180px;">
         <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">
-          ${pmcsBtns}${noPmcs}
+          ${pmcsBtns}${setupPmcsBtn}
           <button onclick="openSkoCalModal(${e.id},'${esc(e.name)}')" style="font-size:0.7rem;background:#164e63;color:#a5f3fc;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">📐 Log Cal</button>
         </div>
       </td>
@@ -2624,6 +2624,111 @@ async function confirmAddEquipment(skoId) {
     toast(`Added ${ids.length} equipment item${ids.length!==1?'s':''}.`);
     skosData = await api('GET', '/api/skos');
     await openSkoDetail(skoId);
+  } catch(err) { toast(err.message, false); }
+}
+
+// ── Create PMCS template from SKO detail ─────────────────────────────────────
+let _pmcsItemIdx = 0;
+
+function openSkoSetupPmcsModal(eqId, eqName, skoId) {
+  _pmcsItemIdx = 1;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-pmcs-setup-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:580px;max-height:92vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">Create PMCS Template</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${esc(eqName)}</div>
+      </div>
+      <button onclick="document.getElementById('sko-pmcs-setup-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form id="sko-pmcs-form" class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;" onsubmit="submitSkoSetupPmcs(event,${eqId},${skoId})">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Template Title *</label>
+        <input name="title" class="form-input" style="width:100%;" placeholder="e.g. Before Operations PMCS" required>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Description</label>
+        <input name="description" class="form-input" style="width:100%;" placeholder="Optional">
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <span style="font-size:0.82rem;font-weight:700;">Check Items</span>
+          <button type="button" onclick="addPmcsItemRow()" style="font-size:0.72rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;color:var(--text);">+ Add Item</button>
+        </div>
+        <div style="display:grid;grid-template-columns:50px 60px 1fr 24px;gap:4px;padding:0 2px;margin-bottom:4px;">
+          <span style="font-size:0.7rem;color:var(--muted);">Item #</span>
+          <span style="font-size:0.7rem;color:var(--muted);">Interval</span>
+          <span style="font-size:0.7rem;color:var(--muted);">Check Item *</span>
+          <span></span>
+        </div>
+        <div id="pmcs-item-list">${skoNewPmcsItemRow(0)}</div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border);margin-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('sko-pmcs-setup-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save &amp; Open Checklist</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function skoNewPmcsItemRow(i) {
+  return `<div id="pmcs-item-row-${i}" style="display:grid;grid-template-columns:50px 60px 1fr 24px;gap:4px;margin-bottom:4px;">
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" placeholder="${i+1}" name="item_no_${i}" value="${i+1}">
+    <select class="form-input" style="font-size:0.78rem;padding:4px 6px;" name="interval_${i}">
+      <option value="B">B</option><option value="D">D</option>
+      <option value="W">W</option><option value="M">M</option>
+      <option value="Q">Q</option><option value="S">S</option>
+      <option value="A">A</option>
+    </select>
+    <input class="form-input" style="font-size:0.78rem;padding:4px 6px;" placeholder="Check item description" name="check_item_${i}" required>
+    <button type="button" onclick="document.getElementById('pmcs-item-row-${i}').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0;">✕</button>
+  </div>`;
+}
+
+function addPmcsItemRow() {
+  const list = document.getElementById('pmcs-item-list');
+  const div = document.createElement('div');
+  div.innerHTML = skoNewPmcsItemRow(_pmcsItemIdx++);
+  list.appendChild(div.firstChild);
+}
+
+async function submitSkoSetupPmcs(e, eqId, skoId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    // 1. Create template
+    const tmpl = await api('POST', '/api/pmcs/templates', {
+      title: fd.get('title'),
+      description: fd.get('description') || null,
+      equipment_id: eqId,
+    });
+    // 2. Add check items
+    const rows = document.querySelectorAll('#pmcs-item-list > div[id^="pmcs-item-row-"]');
+    let order = 0;
+    for (const row of rows) {
+      const i = row.id.replace('pmcs-item-row-','');
+      const checkItem = fd.get(`check_item_${i}`);
+      if (!checkItem) continue;
+      await api('POST', `/api/pmcs/templates/${tmpl.id}/items`, {
+        item_no: fd.get(`item_no_${i}`) || String(order+1),
+        interval: fd.get(`interval_${i}`) || 'B',
+        check_item: checkItem,
+        order_index: order++,
+      });
+    }
+    document.getElementById('sko-pmcs-setup-backdrop').remove();
+    document.getElementById('sko-detail-backdrop')?.remove();
+    toast('PMCS template created — opening checklist…');
+    // Refresh SKO data then re-open detail, and open checklist
+    skosData = await api('GET', '/api/skos');
+    await openSkoDetail(skoId);
+    setTimeout(() => window.open(`/pmcs/${tmpl.id}`, '_blank'), 300);
   } catch(err) { toast(err.message, false); }
 }
 
