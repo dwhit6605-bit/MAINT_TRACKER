@@ -321,10 +321,25 @@ initAuth().then(ok => { if (ok) renderPage('{{ page }}'); });
 })();
 
 
+// ─── Overdue banner ───────────────────────────────────────────────────────────
+function showOverdueBanner(overdueTasks, overdueCals) {
+  if (document.getElementById('overdue-banner')) return; // already shown
+  if (!overdueTasks && !overdueCals) return;
+  const parts = [];
+  if (overdueTasks) parts.push(`${overdueTasks} overdue maintenance task${overdueTasks>1?'s':''}`);
+  if (overdueCals)  parts.push(`${overdueCals} overdue calibration${overdueCals>1?'s':''}`);
+  const banner = document.createElement('div');
+  banner.id = 'overdue-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:200;background:#dc2626;color:#fff;padding:0.6rem 1.25rem;display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+  banner.innerHTML = `<span>⚠ ${parts.join(' · ')} — action required</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;padding:0 0.25rem;line-height:1;">✕</button>`;
+  document.body.prepend(banner);
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 async function dashboardPage() {
   const data = await api('GET', '/api/dashboard');
   const c = data.counts;
+  showOverdueBanner(c.overdue_tasks, c.cal_overdue);
 
   $('page-content').innerHTML = `
     <!-- Stat cards -->
@@ -441,6 +456,16 @@ async function refreshEquipment() {
 
 function renderEquipmentTable(rows) {
   $('page-content').innerHTML = `
+    <div id="eq-bulk-bar" style="display:none;position:sticky;top:0;z-index:10;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;border-radius:0.5rem;margin-bottom:0.75rem;display:none;align-items:center;gap:0.75rem;font-size:0.85rem;">
+      <span id="eq-bulk-count" style="font-weight:700;"></span>
+      <span style="flex:1"></span>
+      <span style="font-size:0.78rem;opacity:.8;">Set status:</span>
+      <button onclick="bulkSetStatus('active')"      style="background:#4ade80;color:#14532d;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Active</button>
+      <button onclick="bulkSetStatus('inactive')"    style="background:#e5e7eb;color:#374151;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Inactive</button>
+      <button onclick="bulkSetStatus('maintenance')" style="background:#fbbf24;color:#78350f;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Maintenance</button>
+      <button onclick="bulkSetStatus('retired')"     style="background:#f87171;color:#7f1d1d;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Retired</button>
+      <button onclick="clearEqSelection()"           style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.78rem;">✕ Clear</button>
+    </div>
     <div class="card overflow-hidden p-0">
       <div class="px-5 py-4 border-b flex items-center gap-3">
         <input id="eq-search" class="input max-w-xs" placeholder="Search equipment…" oninput="filterEquipment(this.value)">
@@ -453,6 +478,7 @@ function renderEquipmentTable(rows) {
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
+              ${isAdmin() ? `<th class="px-3 py-3"><input type="checkbox" id="eq-check-all" onchange="toggleAllEq(this.checked)" style="cursor:pointer;"></th>` : ''}
               <th class="px-4 py-3 text-left">Name</th>
               <th class="px-4 py-3 text-left col-m-hide">Category</th>
               <th class="px-4 py-3 text-left col-m-hide">Serial #</th>
@@ -469,10 +495,48 @@ function renderEquipmentTable(rows) {
     </div>`;
 }
 
+function toggleAllEq(checked) {
+  document.querySelectorAll('.eq-row-check').forEach(cb => cb.checked = checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const checked = document.querySelectorAll('.eq-row-check:checked');
+  const bar = document.getElementById('eq-bulk-bar');
+  if (!bar) return;
+  if (checked.length > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('eq-bulk-count').textContent = `${checked.length} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearEqSelection() {
+  document.querySelectorAll('.eq-row-check').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('eq-check-all');
+  if (ca) ca.checked = false;
+  updateBulkBar();
+}
+
+async function bulkSetStatus(status) {
+  const ids = [...document.querySelectorAll('.eq-row-check:checked')].map(cb => parseInt(cb.dataset.id));
+  if (!ids.length) return;
+  if (!confirm(`Set ${ids.length} item${ids.length>1?'s':''} to "${status}"?`)) return;
+  await Promise.all(ids.map(id => {
+    const eq = equipmentData.find(e => e.id === id);
+    if (!eq) return;
+    return api('PUT', `/api/equipment/${id}`, { ...eq, status });
+  }));
+  clearEqSelection();
+  await refreshEquipment();
+}
+
 function equipmentRows(rows) {
-  const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
+  const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red',maintenance:'badge-yellow'};
   return rows.map(e=>`
     <tr class="table-row border-b last:border-0">
+      ${isAdmin() ? `<td class="px-3 py-3"><input type="checkbox" class="eq-row-check" data-id="${e.id}" onchange="updateBulkBar()" style="cursor:pointer;"></td>` : ''}
       <td class="px-4 py-3">
         <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#141414;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
       </td>
@@ -2470,6 +2534,14 @@ async function deleteSko(id, name) {
   } catch(err) { toast(err.message, false); }
 }
 
+async function openEqFromSko(eqId, skoId) {
+  document.getElementById('sko-detail-backdrop')?.remove();
+  if (!equipmentData.length) equipmentData = await api('GET', '/api/equipment');
+  await openEqDetail(eqId);
+  // stash skoId so closing eq detail can reopen SKO
+  window._prevSkoId = skoId;
+}
+
 // ── SKO Detail panel ──────────────────────────────────────────────────────────
 async function openSkoDetail(skoId) {
   const s = await api('GET', `/api/skos/${skoId}`);
@@ -2491,7 +2563,7 @@ async function openSkoDetail(skoId) {
       : '';
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:8px 10px;">
-        <div style="font-weight:600;font-size:0.85rem;">${esc(e.name)}</div>
+        <button onclick="openEqFromSko(${e.id},${skoId})" style="font-weight:600;font-size:0.85rem;background:none;border:none;cursor:pointer;padding:0;color:#141414;text-align:left;">${esc(e.name)}</button>
         ${e.serial_num?`<div style="font-size:0.75rem;color:var(--muted);">S/N: ${esc(e.serial_num)}</div>`:''}
       </td>
       <td style="padding:8px 10px;">

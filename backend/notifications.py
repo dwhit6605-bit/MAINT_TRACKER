@@ -59,13 +59,20 @@ async def run_daily_check():
         """, (horizon,)) as cur:
             maint = [dict(r) for r in await cur.fetchall()]
 
+        # Latest cal record per equipment — flag if overdue or due within horizon
         async with db.execute("""
-            SELECT c.next_due, c.result, e.name as equipment_name, e.serial_num, e.location
+            SELECT c.next_due, c.result, e.name as equipment_name, e.serial_num, e.location,
+                   CASE WHEN c.next_due < ? THEN 'overdue' ELSE 'due_soon' END as cal_status
             FROM calibration_records c
             JOIN equipment e ON e.id = c.equipment_id
             WHERE c.next_due IS NOT NULL AND c.next_due <= ?
+              AND c.id = (
+                SELECT id FROM calibration_records c2
+                WHERE c2.equipment_id = c.equipment_id
+                ORDER BY calibrated_at DESC LIMIT 1
+              )
             ORDER BY c.next_due ASC
-        """, (horizon,)) as cur:
+        """, (today, horizon)) as cur:
             cals = [dict(r) for r in await cur.fetchall()]
 
     if not maint and not cals:
@@ -90,6 +97,7 @@ async def run_daily_check():
           <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['equipment_name']}</td>
           <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['serial_num'] or '—'}</td>
           <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['next_due']}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;color:{'#dc2626' if r['cal_status']=='overdue' else '#92400e'};">{r['cal_status'].upper().replace('_',' ')}</td>
           <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['location'] or '—'}</td>
         </tr>""" for r in cals)
 
@@ -100,7 +108,7 @@ async def run_daily_check():
 
     {'<h3 style="margin-top:1.5rem;">⚙️ Maintenance</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px 10px;text-align:left;">Equipment</th><th style="padding:8px 10px;text-align:left;">Task</th><th style="padding:8px 10px;text-align:left;">Due</th><th style="padding:8px 10px;text-align:left;">Status</th><th style="padding:8px 10px;text-align:left;">Location</th></tr></thead><tbody>' + maint_rows + '</tbody></table>' if maint else ''}
 
-    {'<h3 style="margin-top:1.5rem;">🔬 Calibration</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px 10px;text-align:left;">Equipment</th><th style="padding:8px 10px;text-align:left;">Serial #</th><th style="padding:8px 10px;text-align:left;">Due</th><th style="padding:8px 10px;text-align:left;">Location</th></tr></thead><tbody>' + cal_rows + '</tbody></table>' if cals else ''}
+    {'<h3 style="margin-top:1.5rem;">🔬 Calibration</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px 10px;text-align:left;">Equipment</th><th style="padding:8px 10px;text-align:left;">Serial #</th><th style="padding:8px 10px;text-align:left;">Due</th><th style="padding:8px 10px;text-align:left;">Status</th><th style="padding:8px 10px;text-align:left;">Location</th></tr></thead><tbody>' + cal_rows + '</tbody></table>' if cals else ''}
 
     <p style="margin-top:2rem;font-size:0.8rem;color:#9ca3af;">Sent by MAINT SUPER · maint.whitwerx.net</p>
     </body></html>"""
