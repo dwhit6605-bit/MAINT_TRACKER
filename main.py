@@ -23,7 +23,7 @@ _PUBLIC_PREFIXES = ("/static", "/uploads")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
 _PUBLIC_API_RE = re.compile(
-    r"^/api/pmcs/(templates/\d+/sessions|sessions/\d+/(complete|archive))$"
+    r"^/api/(pmcs/(templates/\d+/sessions|sessions/\d+/(complete|archive))|qr/(equipment|pmcs)/\d+)$"
 )
 
 
