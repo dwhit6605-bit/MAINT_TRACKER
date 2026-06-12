@@ -2183,7 +2183,7 @@ function openCsvImport(type, pmcsTemplateId) {
 
       <!-- Template download -->
       <div style="display:flex;align-items:center;gap:0.75rem;">
-        <a href="${cfg.templateUrl}" download class="btn-secondary" style="font-size:0.78rem;padding:0.4rem 0.9rem;text-decoration:none;">⬇ Download blank template</a>
+        <a href="#" onclick="event.preventDefault();window.open('${cfg.templateUrl}?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;padding:0.4rem 0.9rem;text-decoration:none;">⬇ Download blank template</a>
         <span style="font-size:0.72rem;color:#9ca3af;">Start from here if importing for the first time</span>
       </div>
 
