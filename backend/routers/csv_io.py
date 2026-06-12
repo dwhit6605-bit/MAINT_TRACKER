@@ -257,6 +257,82 @@ async def export_calibration(db=Depends(get_db)):
     return _csv_response(rows, "calibration.csv")
 
 
+# ── Calibration template ───────────────────────────────────────────────────────
+
+@router.get("/calibration/template")
+async def calibration_template():
+    headers = ["equipment_name","serial_num","calibrated_at","next_due",
+               "calibrated_by","certificate_num","result","notes"]
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers)
+    writer.writerow(["AREARAE 001","1160A","2026-06-12","2027-06-12",
+                     "SGT Smith","CAL-2026-001","pass","Annual NIST traceable calibration"])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="calibration_template.csv"'},
+    )
+
+
+# ── Calibration import ─────────────────────────────────────────────────────────
+# Required: equipment_name (or serial_num), calibrated_at
+# Matches equipment by serial_num first, then name
+
+@router.post("/calibration/import")
+async def import_calibration(request: Request, file: UploadFile = File(...), db=Depends(get_db)):
+    require_admin(request)
+    _, rows = _parse_upload(await file.read())
+    created = skipped = 0
+    errors = []
+
+    for i, row in enumerate(rows, start=2):
+        cal_at = _str(row.get("calibrated_at"))
+        if not cal_at:
+            errors.append(f"Row {i}: missing required 'calibrated_at'")
+            skipped += 1
+            continue
+
+        serial = _str(row.get("serial_num"))
+        eq_name = _str(row.get("equipment_name"))
+        eq_id = None
+
+        if serial:
+            async with db.execute("SELECT id FROM equipment WHERE serial_num=?", (serial,)) as cur:
+                eq = await cur.fetchone()
+                if eq:
+                    eq_id = eq["id"]
+
+        if not eq_id and eq_name:
+            async with db.execute("SELECT id FROM equipment WHERE name=?", (eq_name,)) as cur:
+                eq = await cur.fetchone()
+                if eq:
+                    eq_id = eq["id"]
+
+        if not eq_id:
+            errors.append(f"Row {i}: equipment '{eq_name or serial}' not found")
+            skipped += 1
+            continue
+
+        async with db.execute("""
+            INSERT INTO calibration_records
+                (equipment_id, calibrated_at, next_due, calibrated_by, certificate_num, result, notes)
+            VALUES (?,?,?,?,?,?,?)
+        """, (eq_id, cal_at,
+              _str(row.get("next_due")), _str(row.get("calibrated_by")),
+              _str(row.get("certificate_num")), _str(row.get("result")) or "pass",
+              _str(row.get("notes")))) as cur:
+            rec_id = cur.lastrowid
+
+        await audit.log(db, "calibration", rec_id, "calibrated", equipment_id=eq_id,
+                        detail={"calibrated_at": cal_at, "result": _str(row.get("result")) or "pass"})
+        created += 1
+
+    await db.commit()
+    return {"created": created, "skipped": skipped, "errors": errors}
+
+
 # ── PMCS items export ──────────────────────────────────────────────────────────
 
 @router.get("/pmcs/{tmpl_id}/items/export")

@@ -1635,6 +1635,7 @@ let calData = [];
 async function calibrationPage() {
   $('page-actions').innerHTML = `
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/calibration/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openCsvImport('calibration')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
     <button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
   [calData, equipList] = await Promise.all([
     api('GET', '/api/calibration'),
@@ -2139,6 +2140,13 @@ const CSV_CONFIG = {
     templateUrl: '/api/csv/inventory/template',
     refreshFn: () => { inventoryData = []; inventoryPage(); },
     columns: 'name*, part_number, category, location, unit, quantity, min_stock, unit_cost, supplier, notes',
+  },
+  calibration: {
+    label: 'Calibration Records',
+    uploadUrl: '/api/csv/calibration/import',
+    templateUrl: '/api/csv/calibration/template',
+    refreshFn: () => calibrationPage(),
+    columns: 'equipment_name* (or serial_num*), calibrated_at*, next_due, calibrated_by, certificate_num, result (pass/fail), notes',
   },
   'pmcs-items': {
     label: 'PMCS Check Items',
