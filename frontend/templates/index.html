@@ -561,8 +561,9 @@ function equipmentRows(rows) {
 function filterEquipment(search) {
   const s = (search ?? $('eq-search').value).toLowerCase();
   const cat = $('eq-cat-filter')?.value || '';
+  const fields = ['name','serial_num','model','manufacturer','location','assigned_to','status','notes','category'];
   const filtered = equipmentData.filter(e =>
-    (!s || e.name.toLowerCase().includes(s) || (e.serial_num||'').toLowerCase().includes(s) || (e.location||'').toLowerCase().includes(s)) &&
+    (!s || fields.some(f => (e[f]||'').toLowerCase().includes(s))) &&
     (!cat || e.category === cat)
   );
   $('eq-tbody').innerHTML = equipmentRows(filtered);
