@@ -429,7 +429,7 @@ const EQ_CATS = ['Hand Tools','Power Tools','Test Equipment','Machinery',
 async function equipmentPage() {
   $('page-actions').innerHTML = `
     ${isAdmin() ? `<button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
-    <a href="/api/csv/equipment/export" download="equipment.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <a href="#" onclick="event.preventDefault();window.open('/api/csv/equipment/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     ${isAdmin() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
   await refreshEquipment();
 }
@@ -1424,7 +1424,7 @@ let maintenanceData = [], equipList = [];
 
 async function maintenancePage() {
   $('page-actions').innerHTML = `
-    <a href="/api/csv/maintenance/export" download="maintenance.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <a href="#" onclick="event.preventDefault();window.open('/api/csv/maintenance/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     ${isAdmin() ? `<button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>` : ''}`;
   [maintenanceData, equipList] = await Promise.all([
     api('GET', '/api/maintenance'),
@@ -1634,7 +1634,7 @@ async function deleteTask(id) {
 let calData = [];
 async function calibrationPage() {
   $('page-actions').innerHTML = `
-    <a href="/api/csv/calibration/export" download="calibration.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <a href="#" onclick="event.preventDefault();window.open('/api/csv/calibration/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
   [calData, equipList] = await Promise.all([
     api('GET', '/api/calibration'),
@@ -1749,7 +1749,7 @@ let inventoryData = [];
 async function inventoryPage() {
   $('page-actions').innerHTML = `
     <button onclick="openCsvImport('inventory')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
-    <a href="/api/csv/inventory/export" download="inventory.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openItemModal()" class="btn-primary">+ Add Item</button>`;
   inventoryData = await api('GET', '/api/inventory');
   renderInventoryTable(inventoryData);
@@ -1941,7 +1941,7 @@ function pmcsCard(t) {
       <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
       <button onclick="openPmcsArchive(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🗂 Archive</button>
       <button onclick="openCsvImport('pmcs-items',${t.id})" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">⬆ Import Items</button>
-      <a href="/api/csv/pmcs/${t.id}/items/export" download="pmcs_items.csv" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Export Items</a>
+      <a href="#" onclick="event.preventDefault();window.open('/api/csv/pmcs/${t.id}/items/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Export Items</a>
       <button onclick="deletePmcsTemplate(${t.id})" style="font-size:0.78rem;padding:0.35rem 0.8rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;cursor:pointer;">✕</button>
     </div>
   </div>`;
