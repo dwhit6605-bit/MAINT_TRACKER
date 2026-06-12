@@ -330,7 +330,10 @@ const EQ_CATS = ['Hand Tools','Power Tools','Test Equipment','Machinery',
                  'Comms','Optics','Electronic / Sensors','Respiratory','Other'];
 
 async function equipmentPage() {
-  $('page-actions').innerHTML = `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>`;
+  $('page-actions').innerHTML = `
+    <button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
+    <a href="/api/csv/equipment/export" download="equipment.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>`;
   await refreshEquipment();
 }
 
@@ -1307,7 +1310,9 @@ function printQR(eqId, eqName) {
 let maintenanceData = [], equipList = [];
 
 async function maintenancePage() {
-  $('page-actions').innerHTML = `<button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>`;
+  $('page-actions').innerHTML = `
+    <a href="/api/csv/maintenance/export" download="maintenance.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>`;
   [maintenanceData, equipList] = await Promise.all([
     api('GET', '/api/maintenance'),
     api('GET', '/api/equipment'),
@@ -1479,7 +1484,9 @@ async function deleteTask(id) {
 // ─── Calibration ──────────────────────────────────────────────────────────────
 let calData = [];
 async function calibrationPage() {
-  $('page-actions').innerHTML = `<button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
+  $('page-actions').innerHTML = `
+    <a href="/api/csv/calibration/export" download="calibration.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
   [calData, equipList] = await Promise.all([
     api('GET', '/api/calibration'),
     api('GET', '/api/equipment'),
@@ -1591,7 +1598,10 @@ async function deleteCal(id) {
 // ─── Inventory ────────────────────────────────────────────────────────────────
 let inventoryData = [];
 async function inventoryPage() {
-  $('page-actions').innerHTML = `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>`;
+  $('page-actions').innerHTML = `
+    <button onclick="openCsvImport('inventory')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
+    <a href="/api/csv/inventory/export" download="inventory.csv" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openItemModal()" class="btn-primary">+ Add Item</button>`;
   inventoryData = await api('GET', '/api/inventory');
   renderInventoryTable(inventoryData);
 }
@@ -1781,6 +1791,8 @@ function pmcsCard(t) {
       <button onclick="openPmcsQR(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">&#9641; QR Code</button>
       <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
       <button onclick="openPmcsArchive(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🗂 Archive</button>
+      <button onclick="openCsvImport('pmcs-items',${t.id})" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">⬆ Import Items</button>
+      <a href="/api/csv/pmcs/${t.id}/items/export" download="pmcs_items.csv" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Export Items</a>
       <button onclick="deletePmcsTemplate(${t.id})" style="font-size:0.78rem;padding:0.35rem 0.8rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;cursor:pointer;">✕</button>
     </div>
   </div>`;
@@ -1961,6 +1973,165 @@ async function openPmcsArchive(tmplId, title) {
           </div>`).join('')}
     </div>
   </div>`);
+}
+
+// ─── CSV Import modal ─────────────────────────────────────────────────────────
+const CSV_CONFIG = {
+  equipment: {
+    label: 'Equipment',
+    uploadUrl: '/api/csv/equipment/import',
+    templateUrl: '/api/csv/equipment/template',
+    refreshFn: () => refreshEquipment(),
+    columns: 'name*, category*, serial_num, model, manufacturer, location, assigned_to, status, notes',
+  },
+  inventory: {
+    label: 'Inventory',
+    uploadUrl: '/api/csv/inventory/import',
+    templateUrl: '/api/csv/inventory/template',
+    refreshFn: () => { inventoryData = []; inventoryPage(); },
+    columns: 'name*, part_number, category, location, unit, quantity, min_stock, unit_cost, supplier, notes',
+  },
+  'pmcs-items': {
+    label: 'PMCS Check Items',
+    uploadUrl: null, // set dynamically
+    templateUrl: '/api/csv/pmcs/items/template',
+    refreshFn: null, // set dynamically
+    columns: 'item_no, interval (B/D/A/W/M)*, check_item*, procedure, not_ready_if, order_index',
+  },
+};
+
+function openCsvImport(type, pmcsTemplateId) {
+  const cfg = CSV_CONFIG[type];
+  if (!cfg) return;
+  if (type === 'pmcs-items') {
+    cfg.uploadUrl = `/api/csv/pmcs/${pmcsTemplateId}/items/import`;
+    cfg.refreshFn = () => { closeModal(); openPmcsItems(pmcsTemplateId); };
+  }
+
+  modal(`<div class="modal" style="max-width:500px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Import ${cfg.label}</h2>
+        <div style="font-size:0.75rem;color:#6b7280;margin-top:0.15rem;">Upload a CSV file to bulk-import records</div>
+      </div>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <div class="px-6 py-4" style="display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Column guide -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:0.5rem;padding:0.75rem 1rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.35rem;">Required columns (* = required)</div>
+        <div style="font-size:0.78rem;color:#374151;font-family:monospace;line-height:1.6;">${cfg.columns}</div>
+      </div>
+
+      <!-- Template download -->
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <a href="${cfg.templateUrl}" download class="btn-secondary" style="font-size:0.78rem;padding:0.4rem 0.9rem;text-decoration:none;">⬇ Download blank template</a>
+        <span style="font-size:0.72rem;color:#9ca3af;">Start from here if importing for the first time</span>
+      </div>
+
+      <!-- File drop zone -->
+      <label id="csv-drop-zone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #d1d5db;border-radius:0.75rem;padding:1.5rem 1rem;cursor:pointer;gap:0.4rem;transition:border-color 200ms;"
+             ondragover="event.preventDefault();this.style.borderColor='#0f4c81'"
+             ondragleave="this.style.borderColor='#d1d5db'"
+             ondrop="csvHandleDrop(event)">
+        <svg style="width:2rem;height:2rem;color:#9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span style="font-size:0.8rem;color:#6b7280;">Drop CSV here or <span style="color:#0f4c81;font-weight:600;">click to browse</span></span>
+        <span id="csv-filename" style="font-size:0.72rem;color:#9ca3af;">No file selected</span>
+        <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="csvFileSelected(this)">
+      </label>
+
+      <!-- Result area -->
+      <div id="csv-result" style="display:none;border-radius:0.5rem;padding:0.75rem 1rem;font-size:0.82rem;"></div>
+
+    </div>
+    <div class="px-6 py-3 border-t flex justify-end gap-3">
+      <button type="button" onclick="closeModal()" class="btn-secondary">Close</button>
+      <button id="csv-submit-btn" onclick="csvSubmit('${type}', ${pmcsTemplateId || 'null'})" class="btn-primary" disabled>Import</button>
+    </div>
+  </div>`);
+
+  // wire label click → hidden input
+  document.getElementById('csv-drop-zone').addEventListener('click', e => {
+    if (e.target.tagName !== 'INPUT') document.getElementById('csv-file-input').click();
+  });
+}
+
+function csvFileSelected(input) {
+  const f = input.files[0];
+  if (!f) return;
+  document.getElementById('csv-filename').textContent = f.name;
+  document.getElementById('csv-submit-btn').disabled = false;
+  document.getElementById('csv-result').style.display = 'none';
+}
+
+function csvHandleDrop(e) {
+  e.preventDefault();
+  document.getElementById('csv-drop-zone').style.borderColor = '#d1d5db';
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  document.getElementById('csv-file-input').files; // can't set directly
+  // manually assign via DataTransfer workaround
+  const dt = new DataTransfer();
+  dt.items.add(f);
+  document.getElementById('csv-file-input').files = dt.files;
+  csvFileSelected(document.getElementById('csv-file-input'));
+}
+
+async function csvSubmit(type, pmcsTemplateId) {
+  const cfg = CSV_CONFIG[type];
+  if (type === 'pmcs-items' && pmcsTemplateId) {
+    cfg.uploadUrl = `/api/csv/pmcs/${pmcsTemplateId}/items/import`;
+    cfg.refreshFn = () => { closeModal(); openPmcsItems(pmcsTemplateId); };
+  }
+  const fileInput = document.getElementById('csv-file-input');
+  if (!fileInput.files.length) return;
+
+  const btn = document.getElementById('csv-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+
+  try {
+    const r = await fetch(cfg.uploadUrl, { method: 'POST', body: fd });
+    const data = await r.json();
+    const resultEl = document.getElementById('csv-result');
+    resultEl.style.display = 'block';
+
+    if (!r.ok) {
+      resultEl.style.background = '#fef2f2';
+      resultEl.style.border = '1px solid #fca5a5';
+      resultEl.innerHTML = `<strong style="color:#dc2626;">Import failed:</strong> ${data.detail || 'Unknown error'}`;
+      btn.disabled = false;
+      btn.textContent = 'Import';
+      return;
+    }
+
+    const hasErrors = data.errors && data.errors.length > 0;
+    resultEl.style.background = hasErrors ? '#fffbeb' : '#f0fdf4';
+    resultEl.style.border = `1px solid ${hasErrors ? '#fcd34d' : '#86efac'}`;
+    resultEl.innerHTML = `
+      <div style="font-weight:600;color:${hasErrors ? '#92400e' : '#15803d'};">
+        ✓ Import complete
+      </div>
+      <div style="margin-top:0.35rem;color:#374151;">
+        ${data.created ? `<span style="margin-right:1rem;">+ ${data.created} created</span>` : ''}
+        ${data.updated ? `<span style="margin-right:1rem;">↻ ${data.updated} updated</span>` : ''}
+        ${data.skipped ? `<span style="color:#b45309;">${data.skipped} skipped</span>` : ''}
+      </div>
+      ${hasErrors ? `<div style="margin-top:0.5rem;font-size:0.72rem;color:#92400e;">${data.errors.slice(0,5).join('<br>')}</div>` : ''}
+    `;
+    btn.textContent = 'Done';
+    if (cfg.refreshFn) cfg.refreshFn();
+  } catch(err) {
+    toast('Import failed: ' + err.message, false);
+    btn.disabled = false;
+    btn.textContent = 'Import';
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

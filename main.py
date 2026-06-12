@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.database import init_db
 from backend.routers import equipment, maintenance, calibration, inventory, dashboard, attachments
-from backend.routers import audit, qr, pmcs
+from backend.routers import audit, qr, pmcs, csv_io
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -42,6 +42,7 @@ app.include_router(attachments.router)
 app.include_router(audit.router)
 app.include_router(qr.router)
 app.include_router(pmcs.router)
+app.include_router(csv_io.router)
 
 
 @app.get("/pmcs/{template_id}", response_class=HTMLResponse)
