@@ -63,10 +63,10 @@ async def auth_middleware(request: Request, call_next):
         except Exception:
             pass  # fall through to unauthenticated handling
 
-    # Unauthenticated
+    # Unauthenticated — only block API calls; HTML pages let client-side auth handle it
     if path.startswith("/api/"):
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
-    return RedirectResponse("/login")
+    return await call_next(request)
 
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
