@@ -14,6 +14,7 @@ from backend.routers import equipment, maintenance, calibration, inventory, dash
 from backend.routers import audit, qr, pmcs, csv_io
 from backend.routers import auth_router
 from backend.routers import sko as sko_router
+from backend.routers import settings as settings_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -89,6 +90,7 @@ app.include_router(qr.router)
 app.include_router(pmcs.router)
 app.include_router(csv_io.router)
 app.include_router(sko_router.router)
+app.include_router(settings_router.router)
 
 
 @app.get("/login", response_class=HTMLResponse)

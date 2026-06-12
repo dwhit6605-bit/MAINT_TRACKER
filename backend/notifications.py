@@ -16,30 +16,55 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 
-DB_PATH   = os.getenv("DB_PATH", "maint.db")
-TO        = os.getenv("NOTIFY_EMAIL_TO", "")
-FROM      = os.getenv("NOTIFY_EMAIL_FROM", "")
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-DAYS      = int(os.getenv("NOTIFY_DAYS_AHEAD", "7"))
+DB_PATH = os.getenv("DB_PATH", "maint.db")
 
 
-def _send(subject: str, html: str):
+async def _load_settings() -> dict:
+    """Merge DB app_settings over env vars — DB values take precedence."""
+    cfg = {
+        "NOTIFY_EMAIL_TO":   os.getenv("NOTIFY_EMAIL_TO", ""),
+        "NOTIFY_EMAIL_FROM": os.getenv("NOTIFY_EMAIL_FROM", ""),
+        "SMTP_HOST":         os.getenv("SMTP_HOST", ""),
+        "SMTP_PORT":         os.getenv("SMTP_PORT", "587"),
+        "SMTP_USER":         os.getenv("SMTP_USER", ""),
+        "SMTP_PASS":         os.getenv("SMTP_PASS", ""),
+        "NOTIFY_DAYS_AHEAD": os.getenv("NOTIFY_DAYS_AHEAD", "7"),
+    }
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT key, value FROM app_settings WHERE value IS NOT NULL") as cur:
+                for row in await cur.fetchall():
+                    cfg[row["key"]] = row["value"]
+    except Exception:
+        pass
+    return cfg
+
+
+def _send(subject: str, html: str, *, to: str, from_: str,
+          host: str, port: int, user: str, password: str):
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"]    = FROM
-    msg["To"]      = TO
+    msg["From"]    = from_
+    msg["To"]      = to
     msg.attach(MIMEText(html, "html"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+    with smtplib.SMTP(host, port) as s:
         s.ehlo()
         s.starttls()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.sendmail(FROM, TO, msg.as_string())
+        s.login(user, password)
+        s.sendmail(from_, to, msg.as_string())
 
 
 async def run_daily_check():
+    cfg   = await _load_settings()
+    TO        = cfg["NOTIFY_EMAIL_TO"]
+    FROM      = cfg["NOTIFY_EMAIL_FROM"]
+    SMTP_HOST = cfg["SMTP_HOST"]
+    SMTP_PORT = int(cfg.get("SMTP_PORT") or 587)
+    SMTP_USER = cfg["SMTP_USER"]
+    SMTP_PASS = cfg["SMTP_PASS"]
+    DAYS      = int(cfg.get("NOTIFY_DAYS_AHEAD") or 7)
+
     if not (TO and FROM and SMTP_HOST):
         return   # not configured — skip silently
 
@@ -114,4 +139,5 @@ async def run_daily_check():
     </body></html>"""
 
     subject = f"MAINT SUPER Alert — {len(maint)} maintenance, {len(cals)} calibration items due"
-    _send(subject, html)
+    _send(subject, html, to=TO, from_=FROM,
+          host=SMTP_HOST, port=SMTP_PORT, user=SMTP_USER, password=SMTP_PASS)

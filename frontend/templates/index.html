@@ -3060,7 +3060,7 @@ async function usersPage() {
 
 function renderUsersTable() {
   $('page-content').innerHTML = `
-    <div class="card overflow-hidden p-0">
+    <div class="card overflow-hidden p-0 mb-6">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
           <tr>
@@ -3085,7 +3085,137 @@ function renderUsersTable() {
           </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No users found.</td></tr>'}
         </tbody>
       </table>
+    </div>
+
+    <!-- SMTP Settings -->
+    <div class="card" id="smtp-card">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="font-semibold text-gray-700">Email Notifications (SMTP)</div>
+          <div class="text-xs text-gray-400 mt-0.5">Used for daily overdue alerts. Compatible with Brevo, SendGrid, Gmail App Passwords, etc.</div>
+        </div>
+        <button onclick="loadSmtpForm()" id="smtp-edit-btn" class="btn-secondary" style="font-size:0.8rem;">Edit</button>
+      </div>
+      <div id="smtp-display" class="text-sm text-gray-500">Loading…</div>
+      <form id="smtp-form" style="display:none;" onsubmit="saveSmtp(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">Recipient Email (TO)</label>
+            <input name="NOTIFY_EMAIL_TO" class="input w-full" placeholder="admin@example.com">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">Sender Email (FROM)</label>
+            <input name="NOTIFY_EMAIL_FROM" class="input w-full" placeholder="alerts@yourdomain.com">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">SMTP Host</label>
+            <input name="SMTP_HOST" class="input w-full" placeholder="smtp-relay.brevo.com">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">SMTP Port</label>
+            <input name="SMTP_PORT" class="input w-full" placeholder="587">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">SMTP Username</label>
+            <input name="SMTP_USER" class="input w-full" placeholder="your-login@brevo.com">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">SMTP Password / API Key</label>
+            <input name="SMTP_PASS" type="password" class="input w-full" placeholder="Leave blank to keep existing">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 block mb-1">Alert Days Ahead</label>
+            <input name="NOTIFY_DAYS_AHEAD" class="input w-full" placeholder="7" style="max-width:100px;">
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button type="submit" class="btn-primary" style="font-size:0.85rem;">Save Settings</button>
+          <button type="button" onclick="testSmtp()" class="btn-secondary" style="font-size:0.85rem;" id="smtp-test-btn">Send Test Email</button>
+          <button type="button" onclick="cancelSmtpEdit()" class="btn-secondary" style="font-size:0.85rem;">Cancel</button>
+        </div>
+        <div id="smtp-result" style="display:none;margin-top:0.75rem;padding:0.6rem 0.9rem;border-radius:0.4rem;font-size:0.82rem;"></div>
+      </form>
     </div>`;
+  loadSmtpDisplay();
+}
+
+async function loadSmtpDisplay() {
+  try {
+    const s = await api('GET', '/api/settings/smtp');
+    const has = s.SMTP_HOST;
+    document.getElementById('smtp-display').innerHTML = has
+      ? `<div class="grid grid-cols-2 gap-2" style="max-width:480px;">
+           <div><span class="text-xs text-gray-400">To:</span> ${esc(s.NOTIFY_EMAIL_TO||'—')}</div>
+           <div><span class="text-xs text-gray-400">Host:</span> ${esc(s.SMTP_HOST||'—')}:${esc(s.SMTP_PORT||'587')}</div>
+           <div><span class="text-xs text-gray-400">From:</span> ${esc(s.NOTIFY_EMAIL_FROM||'—')}</div>
+           <div><span class="text-xs text-gray-400">Days ahead:</span> ${esc(s.NOTIFY_DAYS_AHEAD||'7')}</div>
+         </div>
+         <div class="mt-2"><span class="badge-green">Configured</span></div>`
+      : '<span class="badge-gray">Not configured</span>';
+  } catch(e) {
+    document.getElementById('smtp-display').textContent = 'Unable to load settings.';
+  }
+}
+
+async function loadSmtpForm() {
+  const s = await api('GET', '/api/settings/smtp');
+  const form = document.getElementById('smtp-form');
+  ['NOTIFY_EMAIL_TO','NOTIFY_EMAIL_FROM','SMTP_HOST','SMTP_PORT','SMTP_USER','NOTIFY_DAYS_AHEAD'].forEach(k => {
+    const el = form.elements[k];
+    if (el) el.value = s[k] || '';
+  });
+  // don't pre-fill password (masked)
+  document.getElementById('smtp-display').style.display = 'none';
+  document.getElementById('smtp-edit-btn').style.display = 'none';
+  form.style.display = 'block';
+}
+
+function cancelSmtpEdit() {
+  document.getElementById('smtp-form').style.display = 'none';
+  document.getElementById('smtp-display').style.display = '';
+  document.getElementById('smtp-edit-btn').style.display = '';
+}
+
+async function saveSmtp(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const resultEl = document.getElementById('smtp-result');
+  try {
+    await api('PUT', '/api/settings/smtp', body);
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#f0fdf4';
+    resultEl.style.border = '1px solid #86efac';
+    resultEl.textContent = '✓ Settings saved.';
+    setTimeout(() => { cancelSmtpEdit(); loadSmtpDisplay(); resultEl.style.display = 'none'; }, 1500);
+  } catch(err) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#fef2f2';
+    resultEl.style.border = '1px solid #fca5a5';
+    resultEl.textContent = 'Error: ' + err.message;
+  }
+}
+
+async function testSmtp(e) {
+  const btn = document.getElementById('smtp-test-btn');
+  const resultEl = document.getElementById('smtp-result');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    await api('POST', '/api/settings/smtp/test');
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#f0fdf4';
+    resultEl.style.border = '1px solid #86efac';
+    resultEl.textContent = '✓ Test email sent — check your inbox.';
+  } catch(err) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#fef2f2';
+    resultEl.style.border = '1px solid #fca5a5';
+    resultEl.textContent = 'Failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Test Email';
+  }
 }
 
 function openUserModal(id) {

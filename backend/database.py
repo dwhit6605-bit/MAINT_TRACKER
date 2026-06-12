@@ -214,6 +214,12 @@ async def init_db():
                 notes           TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_sko_checkouts ON sko_checkouts(sko_id);
+
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key        TEXT PRIMARY KEY,
+                value      TEXT,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}
