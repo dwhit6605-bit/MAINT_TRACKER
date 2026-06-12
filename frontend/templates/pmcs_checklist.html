@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PMCS — {{ template.title }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #f1f5f9; color: #1e293b; min-height: 100vh; }
+
+  .header { background: #1e3a5f; color: #fff; padding: 1rem 1.25rem; position: sticky;
+             top: 0; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .header h1 { font-size: 1.05rem; font-weight: 700; }
+  .header .sub { font-size: 0.75rem; color: #93c5fd; margin-top: 0.15rem; }
+  .progress-bar { height: 4px; background: rgba(255,255,255,.2); margin-top: 0.75rem; border-radius: 2px; }
+  .progress-fill { height: 4px; background: #22c55e; border-radius: 2px; transition: width .3s; }
+
+  .operator-section { background: #fff; margin: 0.75rem; border-radius: 0.75rem;
+                       padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .operator-section h2 { font-size: 0.8rem; font-weight: 700; color: #64748b;
+                          text-transform: uppercase; letter-spacing: .05em; margin-bottom: 0.75rem; }
+  .field-row { display: flex; gap: 0.75rem; }
+  .field { flex: 1; }
+  label { font-size: 0.75rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.3rem; }
+  input[type=text] { width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid #e2e8f0;
+                      border-radius: 0.5rem; font-size: 0.9rem; outline: none; transition: border-color .15s; }
+  input[type=text]:focus { border-color: #3b82f6; }
+
+  .items-list { margin: 0 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+
+  .interval-header { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 0.4rem;
+                      padding: 0 0.25rem; }
+  .interval-badge { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 9999px;
+                     color: #fff; letter-spacing: .05em; }
+  .interval-label { font-size: 0.78rem; font-weight: 600; color: #64748b; }
+  .int-B { background: #1d4ed8; }
+  .int-D { background: #0369a1; }
+  .int-A { background: #0f766e; }
+  .int-W { background: #7c3aed; }
+  .int-M { background: #b45309; }
+
+  .check-card { background: #fff; border-radius: 0.75rem; padding: 0.9rem 1rem;
+                 box-shadow: 0 1px 4px rgba(0,0,0,.07); border-left: 4px solid #e2e8f0;
+                 transition: border-color .2s; }
+  .check-card.status-ok    { border-left-color: #22c55e; }
+  .check-card.status-fault { border-left-color: #ef4444; background: #fff5f5; }
+  .check-card.status-na    { border-left-color: #94a3b8; opacity: 0.7; }
+
+  .check-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+  .check-text { flex: 1; }
+  .item-no { font-size: 0.68rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.2rem; }
+  .check-item { font-size: 0.9rem; font-weight: 600; line-height: 1.35; }
+  .procedure { font-size: 0.78rem; color: #64748b; margin-top: 0.3rem; line-height: 1.4; }
+  .not-ready { font-size: 0.72rem; color: #dc2626; margin-top: 0.3rem;
+                background: #fef2f2; padding: 0.3rem 0.5rem; border-radius: 0.35rem; }
+
+  .btn-group { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; }
+  .status-btn { border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 0.5rem;
+                 padding: 0.4rem 0.7rem; font-size: 0.72rem; font-weight: 700;
+                 cursor: pointer; min-width: 58px; text-align: center; transition: all .15s; }
+  .status-btn.active-ok    { background: #22c55e; border-color: #22c55e; color: #fff; }
+  .status-btn.active-fault { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .status-btn.active-na    { background: #94a3b8; border-color: #94a3b8; color: #fff; }
+  .status-btn:active { transform: scale(.96); }
+
+  .fault-notes { margin-top: 0.6rem; display: none; }
+  .fault-notes.show { display: block; }
+  .fault-notes input { width: 100%; padding: 0.45rem 0.7rem; border: 1.5px solid #fca5a5;
+                         border-radius: 0.5rem; font-size: 0.82rem; outline: none; }
+  .fault-notes input:focus { border-color: #ef4444; }
+
+  .submit-section { margin: 0 0.75rem 2rem; }
+  .notes-area { width: 100%; padding: 0.65rem 0.75rem; border: 1.5px solid #e2e8f0;
+                 border-radius: 0.5rem; font-size: 0.875rem; resize: vertical;
+                 min-height: 80px; outline: none; margin-bottom: 0.75rem; }
+  .notes-area:focus { border-color: #3b82f6; }
+
+  .submit-btn { width: 100%; padding: 1rem; background: #1e3a5f; color: #fff;
+                 border: none; border-radius: 0.75rem; font-size: 1rem; font-weight: 700;
+                 cursor: pointer; transition: background .15s; }
+  .submit-btn:hover { background: #1e4d8c; }
+  .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+  .status-summary { display: flex; gap: 0.5rem; margin: 0.6rem 0.75rem 0;
+                     font-size: 0.75rem; font-weight: 600; }
+  .ss-ok    { color: #15803d; }
+  .ss-fault { color: #dc2626; }
+  .ss-na    { color: #64748b; }
+
+  .success-screen { display: none; flex-direction: column; align-items: center; justify-content: center;
+                     min-height: 70vh; padding: 2rem; text-align: center; }
+  .success-screen.show { display: flex; }
+  .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+  .success-screen h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .success-screen p  { color: #64748b; margin-bottom: 1.5rem; }
+  .dl-btn { display: inline-block; padding: 0.75rem 2rem; background: #1e3a5f; color: #fff;
+             border-radius: 0.75rem; font-weight: 700; text-decoration: none; font-size: 0.95rem; }
+  .fault-badge { background: #fef2f2; color: #dc2626; border-radius: 0.5rem;
+                  padding: 0.5rem 1rem; font-weight: 700; margin-bottom: 1rem; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div id="checklist-view">
+  <div class="header">
+    <h1>{{ template.title }}</h1>
+    <div class="sub">
+      {% if template.equipment_name %}{{ template.equipment_name }} · {% endif %}
+      PMCS Checklist · {{ template.items | length }} items
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="operator-section">
+    <h2>Operator Info</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>Rank</label>
+        <input type="text" id="op-rank" placeholder="SGT" autocomplete="off">
+      </div>
+      <div class="field" style="flex:2">
+        <label>Name *</label>
+        <input type="text" id="op-name" placeholder="Last, First MI" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="status-summary">
+    <span class="ss-ok">✓ <span id="cnt-ok">0</span> OK</span>
+    <span class="ss-fault">✕ <span id="cnt-fault">0</span> Fault</span>
+    <span class="ss-na">— <span id="cnt-na">0</span> N/A</span>
+    <span style="color:#94a3b8;">· <span id="cnt-rem">{{ template.items | length }}</span> remaining</span>
+  </div>
+
+  <div class="items-list" id="items-list">
+    {% set ns = namespace(last_interval='') %}
+    {% for item in template.items %}
+      {% if item.interval != ns.last_interval %}
+        {% set ns.last_interval = item.interval %}
+        {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
+        <div class="interval-header">
+          <span class="interval-badge int-{{ item.interval }}">{{ item.interval }}</span>
+          <span class="interval-label">{{ interval_names.get(item.interval, item.interval) }}</span>
+        </div>
+      {% endif %}
+      <div class="check-card" id="card-{{ item.id }}" data-item-id="{{ item.id }}">
+        <div class="check-top">
+          <div class="check-text">
+            <div class="item-no">{{ item.item_no or loop.index }} · {{ item.interval }}</div>
+            <div class="check-item">{{ item.check_item }}</div>
+            {% if item.procedure %}
+              <div class="procedure">{{ item.procedure }}</div>
+            {% endif %}
+            {% if item.not_ready_if %}
+              <div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>
+            {% endif %}
+          </div>
+          <div class="btn-group">
+            <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"   id="btn-ok-{{ item.id }}">OK</button>
+            <button class="status-btn" onclick="setStatus({{ item.id }}, 'fault')" id="btn-fault-{{ item.id }}">FAULT</button>
+            <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
+          </div>
+        </div>
+        <div class="fault-notes" id="notes-{{ item.id }}">
+          <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="submit-section">
+    <div style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.4rem;">Session Notes (optional)</div>
+    <textarea class="notes-area" id="session-notes" placeholder="Any overall notes about this inspection…"></textarea>
+    <button class="submit-btn" id="submit-btn" onclick="submitChecklist()" disabled>
+      Complete &amp; Archive
+    </button>
+    <div style="font-size:0.72rem;color:#94a3b8;text-align:center;margin-top:0.5rem;">
+      All items must be marked before submitting
+    </div>
+  </div>
+</div>
+
+<div class="success-screen" id="success-screen">
+  <div class="success-icon" id="success-icon">✅</div>
+  <h2 id="success-title">Inspection Complete</h2>
+  <p id="success-msg">Your PMCS record has been archived.</p>
+  <div id="fault-notice" style="display:none" class="fault-badge"></div>
+  <a id="dl-link" href="#" class="dl-btn" target="_blank">📄 View / Download PDF</a>
+  <br><br>
+  <a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;">Run another inspection</a>
+</div>
+
+<script>
+const TOTAL = {{ template.items | length }};
+const statuses = {};  // item_id -> 'ok'|'fault'|'na'
+
+function setStatus(itemId, status) {
+  statuses[itemId] = status;
+  const card = document.getElementById('card-' + itemId);
+  card.className = 'check-card status-' + status;
+  ['ok','fault','na'].forEach(s => {
+    const btn = document.getElementById('btn-' + s + '-' + itemId);
+    btn.className = 'status-btn' + (s === status ? ' active-' + s : '');
+  });
+  const notesEl = document.getElementById('notes-' + itemId);
+  notesEl.className = 'fault-notes' + (status === 'fault' ? ' show' : '');
+  updateCounts();
+}
+
+function updateCounts() {
+  const counts = {ok:0, fault:0, na:0};
+  Object.values(statuses).forEach(s => counts[s] = (counts[s]||0) + 1);
+  document.getElementById('cnt-ok').textContent    = counts.ok    || 0;
+  document.getElementById('cnt-fault').textContent = counts.fault || 0;
+  document.getElementById('cnt-na').textContent    = counts.na    || 0;
+  const done = Object.keys(statuses).length;
+  document.getElementById('cnt-rem').textContent   = TOTAL - done;
+  const pct = TOTAL ? (done / TOTAL * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('submit-btn').disabled = done < TOTAL;
+}
+
+async function submitChecklist() {
+  const name = document.getElementById('op-name').value.trim();
+  if (!name) { document.getElementById('op-name').focus(); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Archiving…';
+
+  const results = Object.entries(statuses).map(([itemId, status]) => ({
+    item_id: parseInt(itemId),
+    status,
+    notes: document.getElementById('note-' + itemId)?.value?.trim() || null,
+  }));
+
+  const payload = {
+    operator_name: name,
+    operator_rank: document.getElementById('op-rank').value.trim(),
+    notes: document.getElementById('session-notes').value.trim(),
+    results,
+  };
+
+  // start session then complete it
+  const startRes = await fetch('/api/pmcs/templates/{{ template.id }}/sessions', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ operator_name: payload.operator_name, operator_rank: payload.operator_rank }),
+  }).then(r => r.json());
+
+  const completeRes = await fetch('/api/pmcs/sessions/' + startRes.id + '/complete', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  }).then(r => r.json());
+
+  document.getElementById('checklist-view').style.display = 'none';
+  const ss = document.getElementById('success-screen');
+  ss.classList.add('show');
+
+  if (completeRes.fault_count > 0) {
+    document.getElementById('success-icon').textContent = '⚠️';
+    document.getElementById('success-title').textContent = 'Inspection Complete — Faults Found';
+    document.getElementById('fault-notice').textContent  =
+      completeRes.fault_count + ' fault' + (completeRes.fault_count > 1 ? 's' : '') + ' recorded';
+    document.getElementById('fault-notice').style.display = 'inline-block';
+  }
+
+  document.getElementById('dl-link').href =
+    '/api/pmcs/sessions/' + startRes.id + '/archive';
+}
+</script>
+</body>
+</html>

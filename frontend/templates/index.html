@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAINT SUPER — Maintenance &amp; Calibration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#0f4c81', light: '#1a6bb5', dark: '#0a3460' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak]{display:none!important}
+    .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.625rem 1rem; border-radius:0.5rem; font-size:0.875rem; font-weight:500; transition:background-color 150ms; text-decoration:none; color:inherit; }
+    .nav-link:hover { background-color:rgba(255,255,255,0.12); }
+    .nav-link.active { background-color:#fff; color:#0f4c81; font-weight:600; }
+    .badge-red    { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#fee2e2; color:#b91c1c; white-space:nowrap; }
+    .badge-yellow { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#fef9c3; color:#a16207; white-space:nowrap; }
+    .badge-green  { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#dcfce7; color:#15803d; white-space:nowrap; }
+    .badge-blue   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#dbeafe; color:#1d4ed8; white-space:nowrap; }
+    .badge-gray   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:500; background-color:#f3f4f6; color:#4b5563; white-space:nowrap; }
+    .card { background-color:#fff; border-radius:0.75rem; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #f3f4f6; padding:1.25rem; }
+    .btn-primary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#0f4c81; color:#fff; font-size:0.875rem; font-weight:500; border-radius:0.5rem; border:none; cursor:pointer; transition:background-color 150ms; }
+    .btn-primary:hover { background-color:#1a6bb5; }
+    .btn-secondary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#fff; color:#374151; font-size:0.875rem; font-weight:500; border-radius:0.5rem; border:1px solid #e5e7eb; cursor:pointer; transition:background-color 150ms; }
+    .btn-secondary:hover { background-color:#f9fafb; }
+    .btn-danger { display:inline-flex; align-items:center; gap:0.5rem; padding:0.375rem 0.75rem; background-color:#fef2f2; color:#dc2626; font-size:0.75rem; font-weight:500; border-radius:0.5rem; border:none; cursor:pointer; transition:background-color 150ms; }
+    .btn-danger:hover { background-color:#fee2e2; }
+    .input { display:block; width:100%; border-radius:0.5rem; border:1px solid #d1d5db; padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 2px rgba(0,0,0,0.04); outline:none; box-sizing:border-box; background:#fff; font-family:inherit; }
+    .input:focus { border-color:#0f4c81; box-shadow:0 0 0 2px rgba(15,76,129,0.2); }
+    .label { display:block; font-size:0.875rem; font-weight:500; color:#374151; margin-bottom:0.25rem; }
+    .table-row { transition:background-color 150ms; }
+    .table-row:hover { background-color:#f9fafb; }
+    .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.45); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .modal { background-color:#fff; border-radius:1rem; box-shadow:0 25px 50px rgba(0,0,0,0.25); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
+  </style>
+</head>
+<body class="h-full bg-gray-50 font-sans text-gray-800">
+
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-64 flex-shrink-0 bg-brand text-white flex flex-col">
+    <div class="px-5 py-5 border-b border-white/20">
+      <div class="text-xl font-bold tracking-wide">MAINT SUPER</div>
+      <div class="text-xs text-blue-200 mt-0.5">Maintenance &amp; Calibration</div>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-1" id="sidebar-nav">
+      <a href="/dashboard"   class="nav-link" data-page="dashboard">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </a>
+      <a href="/equipment"   class="nav-link" data-page="equipment">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Equipment
+      </a>
+      <a href="/maintenance" class="nav-link" data-page="maintenance">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Maintenance
+      </a>
+      <a href="/calibration" class="nav-link" data-page="calibration">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Calibration
+      </a>
+      <a href="/inventory"   class="nav-link" data-page="inventory">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        Inventory
+      </a>
+      <a href="/pmcs" class="nav-link" data-page="pmcs">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        PMCS
+      </a>
+    </nav>
+    <div class="px-5 py-3 border-t border-white/20 text-xs text-blue-200 flex items-center justify-between">
+      <span>WHITWERX &copy; 2025</span>
+      <button id="nav-bell" onclick="navigate('dashboard')" title="Alerts" style="background:none;border:none;cursor:pointer;position:relative;padding:0;line-height:1;">
+        <svg style="width:1.1rem;height:1.1rem;color:rgba(255,255,255,0.6);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span id="nav-bell-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#ef4444;color:#fff;font-size:0.6rem;font-weight:700;border-radius:9999px;padding:1px 4px;min-width:16px;text-align:center;"></span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <!-- Top bar -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
+      <div class="flex items-center gap-3" id="page-actions"></div>
+    </header>
+
+    <!-- Page content -->
+    <div class="flex-1 overflow-y-auto p-6" id="page-content">
+      <div class="flex items-center justify-center h-full">
+        <div class="text-gray-400">Loading…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-4 right-4 z-50 hidden">
+  <div id="toast-inner" class="px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white"></div>
+</div>
+
+<!-- Modal container -->
+<div id="modal-container"></div>
+
+<script>
+// ─── Utilities ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
+
+async function api(method, path, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
+  return r.json();
+}
+
+function toast(msg, ok=true) {
+  const t = $('toast'), ti = $('toast-inner');
+  ti.textContent = msg;
+  ti.className = `px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white ${ok?'bg-green-600':'bg-red-600'}`;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+function fmtDate(d) { return d ? new Date(d+'T00:00:00').toLocaleDateString() : '—'; }
+function daysUntil(d) {
+  if (!d) return null;
+  return Math.round((new Date(d+'T00:00:00') - new Date()) / 86400000);
+}
+function dueBadge(d, statusOverride) {
+  if (statusOverride === 'overdue' || statusOverride === 'fail') return `<span class="badge-red">${statusOverride==='fail'?'FAIL':'Overdue'}</span>`;
+  if (statusOverride === 'completed') return `<span class="badge-green">Done</span>`;
+  const days = daysUntil(d);
+  if (days === null) return `<span class="badge-gray">No date</span>`;
+  if (days < 0)  return `<span class="badge-red">Overdue ${Math.abs(days)}d</span>`;
+  if (days <= 7) return `<span class="badge-yellow">Due in ${days}d</span>`;
+  if (days <= 30) return `<span class="badge-blue">Due in ${days}d</span>`;
+  return `<span class="badge-gray">${fmtDate(d)}</span>`;
+}
+
+function modal(html, onload) {
+  const mc = $('modal-container');
+  mc.innerHTML = `<div class="modal-backdrop" id="modal-backdrop">${html}</div>`;
+  if (onload) onload();
+  $('modal-backdrop').addEventListener('click', e => { if(e.target.id==='modal-backdrop') closeModal(); });
+}
+function closeModal() { $('modal-container').innerHTML = ''; }
+
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists' };
+
+function navigate(page) {
+  history.pushState({page}, '', `/${page}`);
+  renderPage(page);
+}
+
+function renderPage(page) {
+  document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.page===page));
+  $('page-title').textContent = TITLES[page] || 'Dashboard';
+  $('page-actions').innerHTML = '';
+  $('page-content').innerHTML = '<div class="flex items-center justify-center h-32"><div class="text-gray-400">Loading…</div></div>';
+  (PAGES[page] || dashboardPage)();
+}
+
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.page); });
+});
+window.addEventListener('popstate', e => renderPage(e.state?.page || 'dashboard'));
+renderPage('{{ page }}');
+
+// Bell: load overdue count
+(async () => {
+  try {
+    const data = await api('GET', '/api/dashboard');
+    const count = (data.counts.overdue_tasks || 0) + (data.counts.cal_overdue || 0);
+    const badge = document.getElementById('nav-bell-badge');
+    if (count > 0 && badge) {
+      badge.textContent = count;
+      badge.style.display = 'block';
+      document.getElementById('nav-bell').querySelector('svg').style.color = '#fbbf24';
+    }
+  } catch(e) {}
+})();
+
+// QR scan: ?open=<equipment_id> → open detail panel
+(async () => {
+  const openId = parseInt(new URLSearchParams(window.location.search).get('open'));
+  if (!openId) return;
+  // ensure equipment data is loaded
+  if (!window.equipmentData || !window.equipmentData.length) {
+    window.equipmentData = await api('GET', '/api/equipment').catch(()=>[]);
+  }
+  navigate('equipment');
+  await new Promise(r => setTimeout(r, 400));
+  openEqDetail(openId);
+})();
+
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function dashboardPage() {
+  const data = await api('GET', '/api/dashboard');
+  const c = data.counts;
+
+  $('page-content').innerHTML = `
+    <!-- Stat cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      ${statCard('Equipment', c.total_equipment, 'bg-blue-50 text-blue-700', 'Active')}
+      ${statCard('Overdue Tasks', c.overdue_tasks, c.overdue_tasks?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Maintenance')}
+      ${statCard('Cal Overdue', c.cal_overdue, c.cal_overdue?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Calibration')}
+      ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Upcoming maintenance -->
+      <div class="card lg:col-span-2">
+        <h2 class="font-semibold text-gray-700 mb-3">Upcoming Maintenance</h2>
+        ${data.upcoming_tasks.length ? `
+        <table class="w-full text-sm">
+          <thead><tr class="text-xs text-gray-500 border-b">
+            <th class="pb-2 text-left">Task</th><th class="pb-2 text-left">Equipment</th><th class="pb-2 text-left">Due</th>
+          </tr></thead>
+          <tbody>${data.upcoming_tasks.map(t=>`
+            <tr class="table-row border-b last:border-0" ondblclick="dashEditTask(${t.id})" title="Double-click to edit" style="cursor:pointer;">
+              <td class="py-2 pr-4 font-medium">${esc(t.title)}</td>
+              <td class="py-2 pr-4 text-gray-500">${esc(t.equipment_name)}</td>
+              <td class="py-2">${dueBadge(t.next_due, t.status)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>` : '<p class="text-sm text-gray-400">No upcoming tasks.</p>'}
+      </div>
+
+      <!-- Upcoming calibrations -->
+      <div class="card">
+        <h2 class="font-semibold text-gray-700 mb-3">Calibration Due</h2>
+        ${data.upcoming_cals.length ? `
+        <div class="space-y-2 text-sm">${data.upcoming_cals.map(c=>`
+          <div class="flex items-start justify-between gap-2 py-1.5 border-b last:border-0" ondblclick="dashEditCal(${c.id})" title="Double-click to edit" style="cursor:pointer;">
+            <div>
+              <div class="font-medium">${esc(c.equipment_name)}</div>
+              <div class="text-xs text-gray-400">${c.serial_num||''}</div>
+            </div>
+            ${dueBadge(c.next_due)}
+          </div>`).join('')}
+        </div>` : '<p class="text-sm text-gray-400">No calibrations due soon.</p>'}
+      </div>
+    </div>
+
+    <!-- Low stock -->
+    ${c.low_stock ? `
+    <div class="card mt-4">
+      <h2 class="font-semibold text-gray-700 mb-3">Low Stock Items</h2>
+      <table class="w-full text-sm">
+        <thead><tr class="text-xs text-gray-500 border-b">
+          <th class="pb-2 text-left">Item</th><th class="pb-2 text-left">Location</th><th class="pb-2 text-right">On Hand</th><th class="pb-2 text-right">Min</th>
+        </tr></thead>
+        <tbody>${data.low_items.map(i=>`
+          <tr class="table-row border-b last:border-0">
+            <td class="py-2 pr-4 font-medium">${esc(i.name)}</td>
+            <td class="py-2 pr-4 text-gray-500">${esc(i.location||'—')}</td>
+            <td class="py-2 text-right ${i.quantity===0?'text-red-600 font-semibold':'text-yellow-600'}">${i.quantity} ${i.unit}</td>
+            <td class="py-2 text-right text-gray-500">${i.min_stock} ${i.unit}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+  `;
+}
+
+function statCard(label, val, cls, sub) {
+  return `<div class="card flex flex-col gap-1">
+    <div class="text-3xl font-bold ${cls}">${val}</div>
+    <div class="text-sm font-medium text-gray-700">${label}</div>
+    <div class="text-xs text-gray-400">${sub}</div>
+  </div>`;
+}
+
+
+// ─── Equipment ────────────────────────────────────────────────────────────────
+let equipmentData = [];
+const EQ_CATS = ['Hand Tools','Power Tools','Test Equipment','Machinery',
+                 'Generators / APU','Protective Equipment','SCBA / Breathing Apparatus',
+                 'Comms','Optics','Electronic / Sensors','Respiratory','Other'];
+
+async function equipmentPage() {
+  $('page-actions').innerHTML = `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>`;
+  await refreshEquipment();
+}
+
+async function refreshEquipment() {
+  equipmentData = await api('GET', '/api/equipment');
+  renderEquipmentTable(equipmentData);
+}
+
+function renderEquipmentTable(rows) {
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex items-center gap-3">
+        <input id="eq-search" class="input max-w-xs" placeholder="Search equipment…" oninput="filterEquipment(this.value)">
+        <select id="eq-cat-filter" class="input w-44" onchange="filterEquipment()">
+          <option value="">All categories</option>
+          ${[...new Set(equipmentData.map(e=>e.category))].sort().map(c=>`<option>${esc(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Name</th>
+              <th class="px-4 py-3 text-left">Category</th>
+              <th class="px-4 py-3 text-left">Serial #</th>
+              <th class="px-4 py-3 text-left">Location</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-left">Maintenance</th>
+              <th class="px-4 py-3 text-left">Cal Due</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="eq-tbody">${equipmentRows(rows)}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function equipmentRows(rows) {
+  const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
+  return rows.map(e=>`
+    <tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3">
+        <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#0f4c81;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
+      </td>
+      <td class="px-4 py-3 text-gray-500">${esc(e.category)}</td>
+      <td class="px-4 py-3 text-gray-500 font-mono text-xs">${esc(e.serial_num||'—')}</td>
+      <td class="px-4 py-3 text-gray-500">${esc(e.location||'—')}</td>
+      <td class="px-4 py-3"><span class="${sc[e.status]||'badge-gray'}">${e.status}</span></td>
+      <td class="px-4 py-3">
+        ${e.overdue_tasks ? `<span class="badge-red">${e.overdue_tasks} overdue</span>` :
+          e.pending_tasks ? `<span class="badge-blue">${e.pending_tasks} pending</span>` :
+          `<span class="badge-green">OK</span>`}
+      </td>
+      <td class="px-4 py-3">${dueBadge(e.cal_next_due)}</td>
+      <td class="px-4 py-3 text-right" style="white-space:nowrap;">
+        <button onclick="openQRModal(${e.id},'${esc(e.name)}')" class="text-gray-400 hover:text-gray-700 text-xs mr-3" title="QR Code">&#9641; QR</button>
+        <button onclick="openEquipmentModal(${e.id})" class="text-brand hover:underline text-xs mr-3">Edit</button>
+        <button onclick="deleteEquipment(${e.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">No equipment found.</td></tr>';
+}
+
+function filterEquipment(search) {
+  const s = (search ?? $('eq-search').value).toLowerCase();
+  const cat = $('eq-cat-filter')?.value || '';
+  const filtered = equipmentData.filter(e =>
+    (!s || e.name.toLowerCase().includes(s) || (e.serial_num||'').toLowerCase().includes(s) || (e.location||'').toLowerCase().includes(s)) &&
+    (!cat || e.category === cat)
+  );
+  $('eq-tbody').innerHTML = equipmentRows(filtered);
+}
+
+// ── Equipment Detail (tabbed) ─────────────────────────────────────────────────
+async function openEqDetail(id) {
+  const eq = equipmentData.find(e=>e.id===id);
+  if (!eq) return;
+
+  const [tasks, cals, atts, hist] = await Promise.all([
+    api('GET', `/api/maintenance?equipment_id=${id}`),
+    api('GET', `/api/calibration?equipment_id=${id}`),
+    api('GET', `/api/attachments/${id}`),
+    api('GET', `/api/audit/equipment/${id}`),
+  ]);
+
+  const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
+
+  modal(`<div class="modal" style="max-width:700px">
+    <div class="px-6 py-4 border-b flex items-start justify-between gap-4">
+      <div>
+        <div class="font-semibold text-lg">${esc(eq.name)}</div>
+        <div class="text-xs text-gray-400 mt-0.5">${esc(eq.category)}${eq.serial_num?' · S/N: '+esc(eq.serial_num):''}</div>
+      </div>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;line-height:1;background:none;border:none;cursor:pointer;flex-shrink:0;">&times;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 1.5rem;" id="eq-detail-tabs">
+      <button onclick="eqTab('details')" id="tab-details" class="eq-tab active-tab">Details</button>
+      <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dbeafe;color:#1d4ed8;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
+      <button onclick="eqTab('calibration')" id="tab-calibration" class="eq-tab">Calibration <span id="cal-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:1px 7px;">${cals.length||''}</span></button>
+      <button onclick="eqTab('attachments')" id="tab-attachments" class="eq-tab">Attachments <span id="att-count-badge" style="margin-left:4px;font-size:0.7rem;background:#f3f4f6;color:#4b5563;border-radius:9999px;padding:1px 7px;">${atts.length||''}</span></button>
+      <button onclick="eqTab('history')" id="tab-history" class="eq-tab">History</button>
+    </div>
+
+    <div id="eq-detail-body" style="padding:1.5rem;min-height:280px;">
+      <!-- filled by eqTab() -->
+    </div>
+  </div>`, () => {
+    // store on window for tab switching
+    window._eqDetail = { id, eq, tasks, cals, atts, hist };
+    eqTab('details');
+  });
+}
+
+// inject tab styles once
+if (!document.getElementById('eq-tab-style')) {
+  const s = document.createElement('style');
+  s.id = 'eq-tab-style';
+  s.textContent = `
+    .eq-tab { background:none; border:none; cursor:pointer; padding:0.6rem 1rem; font-size:0.875rem; font-weight:500; color:#6b7280; border-bottom:2px solid transparent; margin-bottom:-1px; }
+    .eq-tab:hover { color:#0f4c81; }
+    .eq-tab.active-tab { color:#0f4c81; border-bottom-color:#0f4c81; }
+  `;
+  document.head.appendChild(s);
+}
+
+function eqTab(tab) {
+  document.querySelectorAll('.eq-tab').forEach(b => b.classList.toggle('active-tab', b.id===`tab-${tab}`));
+  const { id, eq, tasks, cals, atts } = window._eqDetail;
+  const body = $('eq-detail-body');
+
+  if (tab === 'details') {
+    const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div><div class="label">Status</div><span class="${sc[eq.status]||'badge-gray'}" style="font-size:0.8rem;">${eq.status}</span></div>
+        <div><div class="label">Assigned To</div><div style="font-size:0.875rem;font-weight:${eq.assigned_to?'600':'400'};color:${eq.assigned_to?'#0f4c81':'#9ca3af'};">${esc(eq.assigned_to||'—')}</div></div>
+        <div><div class="label">Location</div><div style="font-size:0.875rem;">${esc(eq.location||'—')}</div></div>
+        <div><div class="label">Manufacturer</div><div style="font-size:0.875rem;">${esc(eq.manufacturer||'—')}</div></div>
+        <div><div class="label">Model</div><div style="font-size:0.875rem;">${esc(eq.model||'—')}</div></div>
+        <div><div class="label">Serial #</div><div style="font-size:0.875rem;font-family:monospace;">${esc(eq.serial_num||'—')}</div></div>
+        <div><div class="label">Category</div><div style="font-size:0.875rem;">${esc(eq.category)}</div></div>
+        ${eq.notes?`<div style="grid-column:1/-1"><div class="label">Notes</div><div style="font-size:0.875rem;color:#4b5563;">${esc(eq.notes)}</div></div>`:''}
+      </div>
+      <div style="display:flex;gap:0.75rem;padding-top:0.5rem;border-top:1px solid #f3f4f6;">
+        <button onclick="openEquipmentModal(${id}); closeModal();" class="btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Edit Details</button>
+        <button onclick="deleteEquipment(${id})" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.9rem;color:#dc2626;border-color:#fca5a5;">Delete Equipment</button>
+      </div>`;
+  }
+
+  else if (tab === 'maintenance') {
+    const activeTasks = tasks.filter(t => t.status !== 'completed');
+    const doneTasks   = tasks.filter(t => t.status === 'completed');
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-weight:600;font-size:0.875rem;">Maintenance Tasks</div>
+        <button onclick="openEqTaskModal(${id})" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Add Task</button>
+      </div>
+      ${activeTasks.length === 0 && doneTasks.length === 0 ? '<p style="font-size:0.875rem;color:#9ca3af;">No maintenance tasks recorded.</p>' : ''}
+      ${activeTasks.map(t => eqTaskRow(t)).join('')}
+      ${doneTasks.length ? `
+        <details style="margin-top:0.75rem;">
+          <summary style="font-size:0.75rem;color:#6b7280;cursor:pointer;padding:0.25rem 0;">${doneTasks.length} completed task${doneTasks.length>1?'s':''}</summary>
+          <div style="margin-top:0.5rem;">${doneTasks.map(t=>eqTaskRow(t)).join('')}</div>
+        </details>` : ''}`;
+  }
+
+  else if (tab === 'calibration') {
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-weight:600;font-size:0.875rem;">Calibration Records</div>
+        <button onclick="openEqCalModal(${id})" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Log Calibration</button>
+      </div>
+      ${cals.length === 0 ? '<p style="font-size:0.875rem;color:#9ca3af;">No calibration records.</p>' : cals.map(c => eqCalRow(c)).join('')}`;
+  }
+
+  else if (tab === 'attachments') {
+    const isImage = t => /^image\//i.test(t);
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-weight:600;font-size:0.875rem;">Attachments</div>
+      </div>
+
+      <!-- Upload zone -->
+      <label id="att-drop" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #d1d5db;border-radius:0.75rem;padding:1.5rem 1rem;cursor:pointer;margin-bottom:1rem;transition:border-color 200ms;gap:0.4rem;"
+             ondragover="event.preventDefault();this.style.borderColor='#0f4c81'"
+             ondragleave="this.style.borderColor='#d1d5db'"
+             ondrop="eqHandleDrop(event,${id})">
+        <svg style="width:2rem;height:2rem;color:#9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <span style="font-size:0.8rem;color:#6b7280;">Drop files here or <span style="color:#0f4c81;font-weight:600;">click to browse</span></span>
+        <span style="font-size:0.7rem;color:#9ca3af;">Photos, PDFs, documents — max 50 MB each</span>
+        <input type="file" id="att-file-input" multiple style="display:none"
+               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+               onchange="eqUploadFiles(this.files,${id})">
+      </label>
+      <div id="att-upload-progress" style="display:none;margin-bottom:0.75rem;">
+        <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;" id="att-progress-label">Uploading…</div>
+        <div style="background:#e5e7eb;border-radius:9999px;height:6px;">
+          <div id="att-progress-bar" style="background:#0f4c81;height:6px;border-radius:9999px;width:0%;transition:width 200ms;"></div>
+        </div>
+      </div>
+
+      <!-- File grid -->
+      <div id="att-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.75rem;">
+        ${atts.length === 0
+          ? '<p style="font-size:0.875rem;color:#9ca3af;grid-column:1/-1;">No attachments yet.</p>'
+          : atts.map(a => eqAttCard(a, id)).join('')}
+      </div>`;
+
+    // wire the label click to the hidden input
+    $('att-drop').addEventListener('click', e => {
+      if (e.target.tagName !== 'INPUT') $('att-file-input').click();
+    });
+  }
+
+  else if (tab === 'history') {
+    const _ACTION_COLORS = { created:'#dcfce7', updated:'#dbeafe', completed:'#f0fdf4', deleted:'#fef2f2', calibrated:'#ede9fe' };
+    const _ACTION_LABELS = { created:'Created', updated:'Updated', completed:'Completed', deleted:'Deleted', calibrated:'Calibrated' };
+    body.innerHTML = `
+      <div style="font-weight:600;font-size:0.875rem;margin-bottom:1rem;">Audit History</div>
+      ${hist.length === 0
+        ? '<p style="font-size:0.875rem;color:#9ca3af;">No history recorded yet.</p>'
+        : `<div style="display:flex;flex-direction:column;gap:0.5rem;">
+            ${hist.map(h => {
+              let detail = '';
+              try { const d = JSON.parse(h.detail||'{}'); detail = Object.entries(d).filter(([,v])=>v).map(([k,v])=>`<span style="color:#6b7280;">${k}:</span> ${esc(String(v))}`).join(' · '); } catch(e){}
+              return `<div style="display:flex;gap:0.75rem;align-items:flex-start;padding:0.5rem 0.75rem;border-radius:0.5rem;background:#f9fafb;border:1px solid #f3f4f6;">
+                <span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:9999px;white-space:nowrap;background:${_ACTION_COLORS[h.action]||'#f3f4f6'};color:#374151;">${_ACTION_LABELS[h.action]||h.action}</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:0.78rem;font-weight:500;text-transform:capitalize;">${h.entity_type} ${h.action}</div>
+                  ${detail ? `<div style="font-size:0.72rem;color:#9ca3af;margin-top:0.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${detail}</div>` : ''}
+                  ${h.actor ? `<div style="font-size:0.72rem;color:#6b7280;">by ${esc(h.actor)}</div>` : ''}
+                </div>
+                <span style="font-size:0.7rem;color:#9ca3af;white-space:nowrap;">${h.created_at.slice(0,16).replace('T',' ')}</span>
+              </div>`;
+            }).join('')}
+          </div>`}`;
+  }
+}
+
+function eqTaskRow(t) {
+  const sc = {pending:'badge-blue',overdue:'badge-red',completed:'badge-green'};
+  const isDone = t.status === 'completed';
+  return `<div style="border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:0.5rem;background:${isDone?'#f9fafb':'#fff'};">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
+      <div style="flex:1;">
+        <div style="font-size:0.875rem;font-weight:600;">${esc(t.title)}</div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.35rem;flex-wrap:wrap;">
+          <span class="${sc[t.status]||'badge-gray'}">${t.status}</span>
+          ${t.task_type !== 'scheduled' ? `<span class="badge-gray">${t.task_type}</span>` : ''}
+          ${t.next_due ? `<span style="font-size:0.75rem;color:#6b7280;">Due: ${fmtDate(t.next_due)}</span>` : ''}
+          ${t.last_done ? `<span style="font-size:0.75rem;color:#6b7280;">Last: ${fmtDate(t.last_done)}</span>` : ''}
+          ${t.interval_days ? `<span style="font-size:0.75rem;color:#6b7280;">Every ${t.interval_days}d</span>` : ''}
+          ${t.assigned_to ? `<span style="font-size:0.75rem;color:#6b7280;">→ ${esc(t.assigned_to)}</span>` : ''}
+        </div>
+        ${t.notes ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">${esc(t.notes)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+        ${!isDone ? `<button onclick="eqCompleteTask(${t.id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✓ Done</button>` : ''}
+        ${isDone ? `<button onclick="openDA2404Modal(${t.id})" style="font-size:0.72rem;background:#fef9c3;color:#854d0e;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">DA 2404</button>` : ''}
+        <button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
+        <button onclick="eqDeleteTask(${t.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function eqCalRow(c) {
+  const overdue = c.next_due && c.next_due < new Date().toISOString().slice(0,10);
+  return `<div style="border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:0.5rem;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
+      <div style="flex:1;">
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+          <span class="${c.result==='pass'?'badge-green':'badge-red'}">${c.result.toUpperCase()}</span>
+          <span style="font-size:0.875rem;font-weight:600;">Calibrated ${fmtDate(c.calibrated_at)}</span>
+          ${c.calibrated_by ? `<span style="font-size:0.75rem;color:#6b7280;">by ${esc(c.calibrated_by)}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:1rem;margin-top:0.35rem;flex-wrap:wrap;">
+          ${c.next_due ? `<span style="font-size:0.75rem;${overdue?'color:#dc2626;font-weight:600;':'color:#6b7280;'}">Next due: ${fmtDate(c.next_due)}${overdue?' ⚠':''}` : ''}
+          ${c.certificate_num ? `<span style="font-size:0.75rem;color:#6b7280;">Cert #: ${esc(c.certificate_num)}</span>` : ''}
+        </div>
+        ${c.notes ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">${esc(c.notes)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+        <button onclick="eqUpdateCalDue(${c.id})" style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>
+        <button onclick="eqDeleteCal(${c.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Task actions from detail panel ────────────────────────────────────────────
+function openEqTaskModal(eqId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Add Maintenance Task</h2>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqSaveTask(event,${eqId})">
+      <div style="grid-column:1/-1"><label class="label">Title *</label><input class="input" name="title" required></div>
+      <div><label class="label">Type</label>
+        <select class="input" name="task_type"><option>scheduled</option><option>corrective</option><option>inspection</option></select>
+      </div>
+      <div><label class="label">Status</label>
+        <select class="input" name="status"><option>pending</option><option>overdue</option></select>
+      </div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1"></div>
+      <div><label class="label">Assigned To</label><input class="input" name="assigned_to"></div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function eqSaveTask(e, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  if (body.interval_days) body.interval_days = parseInt(body.interval_days);
+  try {
+    await api('POST', '/api/maintenance', body);
+    document.getElementById('subtask-backdrop')?.remove();
+    toast('Task added.');
+    await _refreshEqDetail(eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+function eqUpdateTaskDue(taskId) {
+  const task = window._eqDetail.tasks.find(t=>t.id===taskId);
+  if (!task) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Edit Task</h2>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqPutTask(event,${taskId},${window._eqDetail.id})">
+      <div style="grid-column:1/-1"><label class="label">Title *</label><input class="input" name="title" required value="${esc(task.title)}"></div>
+      <div><label class="label">Type</label>
+        <select class="input" name="task_type">
+          ${['scheduled','corrective','inspection'].map(x=>`<option ${task.task_type===x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="label">Status</label>
+        <select class="input" name="status">
+          ${['pending','overdue','completed'].map(x=>`<option ${task.status===x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${task.next_due||''}"></div>
+      <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1" value="${task.interval_days||''}"></div>
+      <div><label class="label">Assigned To</label><input class="input" name="assigned_to" value="${esc(task.assigned_to||'')}"></div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(task.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function eqPutTask(e, taskId, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  if (body.interval_days) body.interval_days = parseInt(body.interval_days);
+  try {
+    await api('PUT', `/api/maintenance/${taskId}`, body);
+    document.getElementById('subtask-backdrop')?.remove();
+    toast('Task updated.');
+    await _refreshEqDetail(eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function eqCompleteTask(taskId) {
+  const eqId = window._eqDetail.id;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Mark Complete</h2>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="eqSubmitComplete(event,${taskId},${eqId})">
+      <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
+      <div><label class="label">Override Next Due Date</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Mark Complete</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function eqSubmitComplete(e, taskId, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    await api('POST', `/api/maintenance/${taskId}/complete`, body);
+    document.getElementById('subtask-backdrop')?.remove();
+    toast('Task completed.');
+    await _refreshEqDetail(eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function eqDeleteTask(taskId) {
+  if (!confirm('Delete this task?')) return;
+  const eqId = window._eqDetail.id;
+  await api('DELETE', `/api/maintenance/${taskId}`);
+  toast('Task deleted.');
+  await _refreshEqDetail(eqId);
+}
+
+// ── Dashboard quick-edit (double-click from dashboard rows) ──────────────────
+async function dashEditTask(taskId) {
+  const tasks = await api('GET', `/api/maintenance?equipment_id=0`).catch(()=>null);
+  // fetch the single task via the full list filtered by nothing, then find it
+  const all = await api('GET', '/api/maintenance');
+  const task = all.find(t => t.id === taskId);
+  if (!task) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'dash-edit-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:600;">Edit Task</h2>
+        <div style="font-size:0.78rem;color:#6b7280;margin-top:0.1rem;">${esc(task.equipment_name)}</div>
+      </div>
+      <button onclick="document.getElementById('dash-edit-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="dashSaveTask(event,${taskId},${task.equipment_id})">
+      <div style="grid-column:1/-1"><label class="label">Title *</label><input class="input" name="title" required value="${esc(task.title)}"></div>
+      <div><label class="label">Status</label>
+        <select class="input" name="status">
+          ${['pending','overdue','completed'].map(x=>`<option ${task.status===x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${task.next_due||''}"></div>
+      <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1" value="${task.interval_days||''}"></div>
+      <div><label class="label">Assigned To</label><input class="input" name="assigned_to" value="${esc(task.assigned_to||'')}"></div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(task.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding-top:0.5rem;">
+        <button type="button" onclick="dashMarkComplete(${taskId},${task.equipment_id})" class="btn-secondary" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;">✓ Mark Complete</button>
+        <div style="display:flex;gap:0.75rem;">
+          <button type="button" onclick="document.getElementById('dash-edit-backdrop').remove()" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function dashSaveTask(e, taskId, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  if (body.interval_days) body.interval_days = parseInt(body.interval_days);
+  try {
+    await api('PUT', `/api/maintenance/${taskId}`, body);
+    document.getElementById('dash-edit-backdrop')?.remove();
+    toast('Task updated.');
+    dashboardPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function dashMarkComplete(taskId, eqId) {
+  document.getElementById('dash-edit-backdrop')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'dash-edit-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:420px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Mark Complete</h2>
+      <button onclick="document.getElementById('dash-edit-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="dashSubmitComplete(event,${taskId})">
+      <div><label class="label">Completed By</label><input class="input" name="completed_by" autofocus></div>
+      <div><label class="label">Override Next Due Date</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('dash-edit-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Mark Complete</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function dashSubmitComplete(e, taskId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    await api('POST', `/api/maintenance/${taskId}/complete`, body);
+    document.getElementById('dash-edit-backdrop')?.remove();
+    toast('Task marked complete.');
+    dashboardPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function dashEditCal(calId) {
+  const all = await api('GET', '/api/calibration');
+  const cal = all.find(c => c.id === calId);
+  if (!cal) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'dash-edit-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:600;">Update Calibration</h2>
+        <div style="font-size:0.78rem;color:#6b7280;margin-top:0.1rem;">${esc(cal.equipment_name)}</div>
+      </div>
+      <button onclick="document.getElementById('dash-edit-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="dashSaveCal(event,${calId},${cal.equipment_id})">
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${cal.next_due||''}"></div>
+      <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cal.calibrated_by||'')}"></div>
+      <div><label class="label">Certificate #</label><input class="input" name="certificate_num" value="${esc(cal.certificate_num||'')}"></div>
+      <div><label class="label">Result</label>
+        <select class="input" name="result">
+          <option value="pass" ${cal.result==='pass'?'selected':''}>Pass</option>
+          <option value="fail" ${cal.result==='fail'?'selected':''}>Fail</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(cal.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('dash-edit-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function dashSaveCal(e, calId, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  try {
+    await api('DELETE', `/api/calibration/${calId}`);
+    await api('POST', '/api/calibration', body);
+    document.getElementById('dash-edit-backdrop')?.remove();
+    toast('Calibration updated.');
+    dashboardPage();
+  } catch(err) { toast(err.message, false); }
+}
+
+// ── DA 2404 export modal ──────────────────────────────────────────────────────
+function openDA2404Modal(taskId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:440px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1.05rem;font-weight:700;">Export DA Form 2404</h3>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Organization</label>
+        <input id="da-org" class="form-input" placeholder="e.g. 1st BN 75th Ranger Regt" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">TM Number</label>
+          <input id="da-tm" class="form-input" placeholder="TM 9-1234-567-10" style="width:100%;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">TM Date</label>
+          <input id="da-tm-date" class="form-input" type="date" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Supervisor Name</label>
+          <input id="da-supervisor" class="form-input" placeholder="Last, First MI" style="width:100%;">
+        </div>
+        <div style="flex:0 0 110px;">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Manhours</label>
+          <input id="da-manhours" class="form-input" placeholder="e.g. 2.5" style="width:100%;">
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-3 border-t flex justify-end gap-3">
+      <button onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+      <button onclick="exportDA2404(${taskId})" class="btn-primary">Open PDF</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => document.getElementById('da-org').focus(), 50);
+}
+
+function exportDA2404(taskId) {
+  const org        = document.getElementById('da-org').value.trim();
+  const tm         = document.getElementById('da-tm').value.trim();
+  const tmDate     = document.getElementById('da-tm-date').value;
+  const supervisor = document.getElementById('da-supervisor').value.trim();
+  const manhours   = document.getElementById('da-manhours').value.trim();
+
+  const params = new URLSearchParams({ organization: org, tm_number: tm, tm_date: tmDate, supervisor, manhours });
+  document.getElementById('subtask-backdrop').remove();
+  window.open(`/api/maintenance/${taskId}/da2404?${params}`, '_blank');
+}
+
+// ── Calibration actions from detail panel ─────────────────────────────────────
+function openEqCalModal(eqId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Log Calibration</h2>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqSaveCal(event,${eqId})">
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required></div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by"></div>
+      <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
+      <div><label class="label">Result</label>
+        <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
+      </div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function eqSaveCal(e, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  try {
+    await api('POST', '/api/calibration', body);
+    document.getElementById('subtask-backdrop')?.remove();
+    toast('Calibration logged.');
+    await _refreshEqDetail(eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+function eqUpdateCalDue(calId) {
+  const cal = window._eqDetail.cals.find(c=>c.id===calId);
+  if (!cal) return;
+  const eqId = window._eqDetail.id;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">Update Calibration</h2>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqPatchCalDue(event,${calId},${eqId})">
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
+      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${cal.next_due||''}"></div>
+      <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cal.calibrated_by||'')}"></div>
+      <div><label class="label">Certificate #</label><input class="input" name="certificate_num" value="${esc(cal.certificate_num||'')}"></div>
+      <div><label class="label">Result</label>
+        <select class="input" name="result">
+          <option value="pass" ${cal.result==='pass'?'selected':''}>Pass</option>
+          <option value="fail" ${cal.result==='fail'?'selected':''}>Fail</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(cal.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function eqPatchCalDue(e, calId, eqId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = eqId;
+  try {
+    // delete old + insert new (no PATCH endpoint — reuse POST)
+    await api('DELETE', `/api/calibration/${calId}`);
+    await api('POST', '/api/calibration', body);
+    document.getElementById('subtask-backdrop')?.remove();
+    toast('Calibration updated.');
+    await _refreshEqDetail(eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function eqDeleteCal(calId) {
+  if (!confirm('Delete this calibration record?')) return;
+  const eqId = window._eqDetail.id;
+  await api('DELETE', `/api/calibration/${calId}`);
+  toast('Record deleted.');
+  await _refreshEqDetail(eqId);
+}
+
+// ── Attachment helpers ────────────────────────────────────────────────────────
+function eqAttCard(a, eqId) {
+  const isImg = /^image\//i.test(a.file_type || '');
+  const isPdf = (a.file_type || '').includes('pdf');
+  const url   = `/api/attachments/${eqId}/file/${a.id}`;
+  const thumb = isImg
+    ? `<img src="${url}" alt="${esc(a.original_name)}" style="width:100%;height:90px;object-fit:cover;border-radius:0.5rem 0.5rem 0 0;">`
+    : `<div style="height:90px;display:flex;align-items:center;justify-content:center;background:#f3f4f6;border-radius:0.5rem 0.5rem 0 0;">
+         <svg style="width:2.5rem;height:2.5rem;color:${isPdf?'#ef4444':'#6b7280'};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+         </svg>
+       </div>`;
+  const kb = a.file_size ? (a.file_size < 1048576 ? Math.round(a.file_size/1024)+'KB' : (a.file_size/1048576).toFixed(1)+'MB') : '';
+  return `<div style="border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;font-size:0.72rem;">
+    <a href="${url}" target="_blank" style="display:block;text-decoration:none;cursor:zoom-in;">${thumb}</a>
+    <div style="padding:0.4rem 0.5rem;">
+      <div style="color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(a.original_name)}">${esc(a.original_name)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;">
+        <span style="color:#9ca3af;">${kb}</span>
+        <button onclick="eqDeleteAtt(${a.id},${eqId})" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:0.7rem;padding:0;">✕ remove</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function eqHandleDrop(e, eqId) {
+  e.preventDefault();
+  $('att-drop').style.borderColor = '#d1d5db';
+  await eqUploadFiles(e.dataTransfer.files, eqId);
+}
+
+async function eqUploadFiles(files, eqId) {
+  if (!files || files.length === 0) return;
+  const prog = $('att-upload-progress');
+  const bar  = $('att-progress-bar');
+  const lbl  = $('att-progress-label');
+  prog.style.display = 'block';
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    lbl.textContent = `Uploading ${i+1}/${files.length}: ${f.name}`;
+    bar.style.width = `${Math.round((i/files.length)*100)}%`;
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const r = await fetch(`/api/attachments/${eqId}`, { method:'POST', body:fd });
+      if (!r.ok) { const e=await r.json().catch(()=>({})); toast(e.detail||'Upload failed', false); }
+    } catch(err) { toast(err.message, false); }
+  }
+  bar.style.width = '100%';
+  setTimeout(() => { prog.style.display = 'none'; bar.style.width='0%'; }, 600);
+  toast(`${files.length} file${files.length>1?'s':''} uploaded.`);
+  await _refreshEqDetail(eqId);
+}
+
+async function eqDeleteAtt(attId, eqId) {
+  if (!confirm('Remove this attachment?')) return;
+  await api('DELETE', `/api/attachments/${eqId}/${attId}`);
+  toast('Attachment removed.');
+  await _refreshEqDetail(eqId);
+}
+
+async function _refreshEqDetail(eqId) {
+  const [tasks, cals, atts, hist, eqList] = await Promise.all([
+    api('GET', `/api/maintenance?equipment_id=${eqId}`),
+    api('GET', `/api/calibration?equipment_id=${eqId}`),
+    api('GET', `/api/attachments/${eqId}`),
+    api('GET', `/api/audit/equipment/${eqId}`),
+    api('GET', '/api/equipment'),
+  ]);
+  equipmentData = eqList;
+  const eq = equipmentData.find(e=>e.id===eqId) || window._eqDetail.eq;
+  const prevTab = document.querySelector('.eq-tab.active-tab')?.id?.replace('tab-','') || 'maintenance';
+  window._eqDetail = { id: eqId, eq, tasks, cals, atts, hist };
+  const mtBadge  = $('mt-count-badge');
+  const calBadge = $('cal-count-badge');
+  const attBadge = $('att-count-badge');
+  if (mtBadge)  mtBadge.textContent  = tasks.filter(t=>t.status!=='completed').length || '';
+  if (calBadge) calBadge.textContent = cals.length || '';
+  if (attBadge) attBadge.textContent = atts.length || '';
+  eqTab(prevTab);
+}
+
+// ── Equipment add/edit modal (separate from detail) ───────────────────────────
+async function openEquipmentModal(id) {
+  let eq = id ? equipmentData.find(e=>e.id===id) : {};
+  eq = eq || {};
+  const cats = EQ_CATS;
+  const existingCat = eq.category && !cats.includes(eq.category) ? eq.category : null;
+  const [locations, units] = await Promise.all([
+    api('GET', '/api/equipment/locations').catch(()=>[]),
+    api('GET', '/api/equipment/assigned-units').catch(()=>['ALPHA','BRAVO','CAGE']),
+  ]);
+  const existingLoc = eq.location && !locations.includes(eq.location) ? eq.location : null;
+
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:600;">${id?'Edit':'Add'} Equipment</h2>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;line-height:1;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form id="eq-form" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="saveEquipment(event, ${id||'null'})">
+      <div style="grid-column:1/-1"><label class="label">Name *</label><input class="input" name="name" required value="${esc(eq.name||'')}"></div>
+
+      <div><label class="label">Category *</label>
+        <select class="input" name="category" required>
+          ${cats.map(c=>`<option ${eq.category===c?'selected':''}>${c}</option>`).join('')}
+          ${existingCat ? `<option selected>${esc(existingCat)}</option>` : ''}
+        </select>
+      </div>
+
+      <div><label class="label">Assigned To</label>
+        <select class="input" name="assigned_select" id="eq-assigned-select" onchange="eqAssignedChange(this)">
+          <option value="" ${!eq.assigned_to?'selected':''}>— Unassigned —</option>
+          ${units.map(u=>`<option ${eq.assigned_to===u?'selected':''}>${esc(u)}</option>`).join('')}
+          <option value="__new__">+ Add new unit…</option>
+        </select>
+        <input class="input" id="eq-assigned-new" name="assigned_new" placeholder="New unit name"
+               style="display:none;margin-top:0.4rem;" oninput="syncNewAssigned(this)">
+        <input type="hidden" name="assigned_to" id="eq-assigned-val" value="${esc(eq.assigned_to||'')}">
+      </div>
+
+      <div><label class="label">Location</label>
+        <select class="input" name="location_select" id="eq-location-select" onchange="eqLocationChange(this)">
+          <option value="" ${!eq.location?'selected':''}>— None —</option>
+          ${locations.map(l=>`<option ${eq.location===l?'selected':''}>${esc(l)}</option>`).join('')}
+          ${existingLoc ? `<option selected>${esc(existingLoc)}</option>` : ''}
+          <option value="__new__">+ Add new location…</option>
+        </select>
+        <input class="input" id="eq-location-new" name="location_new" placeholder="New location name"
+               style="display:none;margin-top:0.4rem;" oninput="syncNewLocation(this)">
+        <input type="hidden" name="location" id="eq-location-val" value="${esc(eq.location||'')}">
+      </div>
+
+      <div><label class="label">Status</label>
+        <select class="input" name="status">
+          ${['active','inactive','retired'].map(s=>`<option ${(eq.status||'active')===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+
+      <div><label class="label">Serial #</label><input class="input" name="serial_num" value="${esc(eq.serial_num||'')}"></div>
+      <div><label class="label">Model</label><input class="input" name="model" value="${esc(eq.model||'')}"></div>
+      <div><label class="label">Manufacturer</label><input class="input" name="manufacturer" value="${esc(eq.manufacturer||'')}"></div>
+      <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(eq.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+function eqLocationChange(sel) {
+  const newInput = document.getElementById('eq-location-new');
+  const hiddenVal = document.getElementById('eq-location-val');
+  if (sel.value === '__new__') {
+    newInput.style.display = 'block';
+    newInput.focus();
+    hiddenVal.value = '';
+  } else {
+    newInput.style.display = 'none';
+    hiddenVal.value = sel.value;
+  }
+}
+
+function syncNewLocation(input) {
+  document.getElementById('eq-location-val').value = input.value.trim();
+}
+
+function eqAssignedChange(sel) {
+  const newInput = document.getElementById('eq-assigned-new');
+  const hiddenVal = document.getElementById('eq-assigned-val');
+  if (sel.value === '__new__') {
+    newInput.style.display = 'block';
+    newInput.focus();
+    hiddenVal.value = '';
+  } else {
+    newInput.style.display = 'none';
+    hiddenVal.value = sel.value;
+  }
+}
+
+function syncNewAssigned(input) {
+  document.getElementById('eq-assigned-val').value = input.value.trim();
+}
+
+async function saveEquipment(e, id) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  // location comes from the hidden field; drop the helper fields
+  delete body.location_select;
+  delete body.location_new;
+  delete body.assigned_select;
+  delete body.assigned_new;
+  try {
+    if (id) await api('PUT', `/api/equipment/${id}`, body);
+    else await api('POST', '/api/equipment', body);
+    closeModal();
+    toast(id ? 'Equipment updated.' : 'Equipment added.');
+    await refreshEquipment();
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteEquipment(id) {
+  if (!confirm('Delete this equipment and all its records?')) return;
+  try {
+    await api('DELETE', `/api/equipment/${id}`);
+    closeModal();
+    toast('Deleted.');
+    await refreshEquipment();
+  } catch(err) { toast(err.message, false); }
+}
+
+
+function openQRModal(eqId, eqName) {
+  const img = `/api/qr/equipment/${eqId}`;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'qr-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:340px;text-align:center;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1rem;font-weight:700;">QR Code</h3>
+      <button onclick="document.getElementById('qr-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div class="px-6 py-5" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+      <img src="${img}" style="width:200px;height:200px;border:1px solid #e5e7eb;border-radius:0.5rem;" alt="QR">
+      <div style="font-size:0.8rem;font-weight:600;color:#374151;">${esc(eqName)}</div>
+      <div style="font-size:0.72rem;color:#9ca3af;">Scan to open this item's detail panel</div>
+      <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
+        <a href="${img}" download="QR_${eqId}.png" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Download</a>
+        <button onclick="printQR(${eqId},'${esc(eqName)}')" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🖨 Print</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function printQR(eqId, eqName) {
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>QR — ${eqName}</title>
+    <style>body{font-family:sans-serif;text-align:center;padding:2rem;}img{width:220px;height:220px;}h2{margin:1rem 0 0.25rem;}p{color:#666;font-size:0.85rem;margin:0;}@media print{button{display:none;}}</style>
+    </head><body>
+    <img src="/api/qr/equipment/${eqId}" alt="QR">
+    <h2>${eqName}</h2>
+    <p>Scan to view maintenance &amp; calibration records</p>
+    <br><button onclick="window.print()">Print</button>
+  </body></html>`);
+  w.document.close();
+}
+
+// ─── Maintenance ──────────────────────────────────────────────────────────────
+let maintenanceData = [], equipList = [];
+
+async function maintenancePage() {
+  $('page-actions').innerHTML = `<button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>`;
+  [maintenanceData, equipList] = await Promise.all([
+    api('GET', '/api/maintenance'),
+    api('GET', '/api/equipment'),
+  ]);
+  renderMaintenanceTable(maintenanceData);
+}
+
+function renderMaintenanceTable(rows) {
+  const sc = {pending:'badge-blue',overdue:'badge-red',completed:'badge-green'};
+  const tc = {scheduled:'badge-gray',corrective:'badge-yellow',inspection:'badge-blue'};
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex flex-wrap items-center gap-3">
+        <input id="mt-search" class="input max-w-xs" placeholder="Search tasks…" oninput="filterMaintenance()">
+        <select id="mt-status-filter" class="input w-36" onchange="filterMaintenance()">
+          <option value="">All statuses</option>
+          <option>overdue</option><option>pending</option><option>completed</option>
+        </select>
+        <button onclick="refreshOverdue()" class="btn-secondary text-xs">Refresh Overdue</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Task</th>
+              <th class="px-4 py-3 text-left">Equipment</th>
+              <th class="px-4 py-3 text-left">Type</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-left">Due</th>
+              <th class="px-4 py-3 text-left">Assigned</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="mt-tbody">
+            ${maintenanceRows(rows)}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function maintenanceRows(rows) {
+  const sc = {pending:'badge-blue',overdue:'badge-red',completed:'badge-green'};
+  const tc = {scheduled:'badge-gray',corrective:'badge-yellow',inspection:'badge-blue'};
+  return rows.map(t=>`
+    <tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3 font-medium">${esc(t.title)}</td>
+      <td class="px-4 py-3 text-gray-500">${esc(t.equipment_name)}</td>
+      <td class="px-4 py-3"><span class="${tc[t.task_type]||'badge-gray'}">${t.task_type}</span></td>
+      <td class="px-4 py-3"><span class="${sc[t.status]||'badge-gray'}">${t.status}</span></td>
+      <td class="px-4 py-3">${dueBadge(t.next_due, t.status==='completed'?'completed':t.status)}</td>
+      <td class="px-4 py-3 text-gray-500">${esc(t.assigned_to||'—')}</td>
+      <td class="px-4 py-3 text-right space-x-2">
+        ${t.status!=='completed'?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
+        <button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No tasks found.</td></tr>';
+}
+
+function filterMaintenance() {
+  const s = $('mt-search').value.toLowerCase();
+  const st = $('mt-status-filter').value;
+  const filtered = maintenanceData.filter(t =>
+    (!s || t.title.toLowerCase().includes(s) || t.equipment_name.toLowerCase().includes(s)) &&
+    (!st || t.status === st)
+  );
+  $('mt-tbody').innerHTML = maintenanceRows(filtered);
+}
+
+async function refreshOverdue() {
+  await api('POST', '/api/maintenance/refresh-overdue');
+  [maintenanceData] = await Promise.all([api('GET', '/api/maintenance')]);
+  renderMaintenanceTable(maintenanceData);
+  toast('Overdue statuses refreshed.');
+}
+
+function openTaskModal() {
+  const eqOptions = equipList.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Add Maintenance Task</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="mt-form" class="px-6 py-4 space-y-4" onsubmit="saveTask(event)">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="label">Equipment *</label>
+          <select class="input" name="equipment_id" required><option value="">Select…</option>${eqOptions}</select>
+        </div>
+        <div class="col-span-2"><label class="label">Task Title *</label><input class="input" name="title" required></div>
+        <div><label class="label">Type</label>
+          <select class="input" name="task_type">
+            <option>scheduled</option><option>corrective</option><option>inspection</option>
+          </select>
+        </div>
+        <div><label class="label">Status</label>
+          <select class="input" name="status">
+            <option>pending</option><option>overdue</option>
+          </select>
+        </div>
+        <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+        <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1"></div>
+        <div><label class="label">Assigned To</label><input class="input" name="assigned_to"></div>
+        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveTask(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  body.equipment_id = parseInt(body.equipment_id);
+  if (body.interval_days) body.interval_days = parseInt(body.interval_days);
+  try {
+    await api('POST', '/api/maintenance', body);
+    closeModal();
+    toast('Task added.');
+    maintenanceData = await api('GET', '/api/maintenance');
+    renderMaintenanceTable(maintenanceData);
+  } catch(err) { toast(err.message, false); }
+}
+
+function completeTaskModal(id) {
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Mark Task Complete</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="complete-form" class="px-6 py-4 space-y-4" onsubmit="submitComplete(event,${id})">
+      <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
+      <div><label class="label">Override Next Due</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Mark Complete</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function submitComplete(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  try {
+    await api('POST', `/api/maintenance/${id}/complete`, body);
+    closeModal();
+    toast('Task completed.');
+    maintenanceData = await api('GET', '/api/maintenance');
+    renderMaintenanceTable(maintenanceData);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  await api('DELETE', `/api/maintenance/${id}`);
+  toast('Deleted.');
+  maintenanceData = await api('GET', '/api/maintenance');
+  renderMaintenanceTable(maintenanceData);
+}
+
+
+// ─── Calibration ──────────────────────────────────────────────────────────────
+let calData = [];
+async function calibrationPage() {
+  $('page-actions').innerHTML = `<button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
+  [calData, equipList] = await Promise.all([
+    api('GET', '/api/calibration'),
+    api('GET', '/api/equipment'),
+  ]);
+  renderCalTable(calData);
+}
+
+function renderCalTable(rows) {
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex items-center gap-3">
+        <input id="cal-search" class="input max-w-xs" placeholder="Search…" oninput="filterCal()">
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Equipment</th>
+              <th class="px-4 py-3 text-left">Calibrated</th>
+              <th class="px-4 py-3 text-left">By</th>
+              <th class="px-4 py-3 text-left">Cert #</th>
+              <th class="px-4 py-3 text-left">Result</th>
+              <th class="px-4 py-3 text-left">Next Due</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="cal-tbody">${calRows(rows)}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function calRows(rows) {
+  return rows.map(c=>`
+    <tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3 font-medium">${esc(c.equipment_name)}</td>
+      <td class="px-4 py-3 text-gray-500">${fmtDate(c.calibrated_at)}</td>
+      <td class="px-4 py-3 text-gray-500">${esc(c.calibrated_by||'—')}</td>
+      <td class="px-4 py-3 font-mono text-xs">${esc(c.certificate_num||'—')}</td>
+      <td class="px-4 py-3"><span class="${c.result==='pass'?'badge-green':'badge-red'}">${c.result.toUpperCase()}</span></td>
+      <td class="px-4 py-3">${dueBadge(c.next_due, c.result==='fail'?'fail':undefined)}</td>
+      <td class="px-4 py-3 text-right">
+        <button onclick="deleteCal(${c.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No records found.</td></tr>';
+}
+
+function filterCal() {
+  const s = $('cal-search').value.toLowerCase();
+  $('cal-tbody').innerHTML = calRows(calData.filter(c=>
+    c.equipment_name.toLowerCase().includes(s) || (c.certificate_num||'').toLowerCase().includes(s)
+  ));
+}
+
+function openCalModal() {
+  const eqOptions = equipList.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Log Calibration</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="cal-form" class="px-6 py-4 space-y-4" onsubmit="saveCal(event)">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="label">Equipment *</label>
+          <select class="input" name="equipment_id" required><option value="">Select…</option>${eqOptions}</select>
+        </div>
+        <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required></div>
+        <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by"></div>
+        <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
+        <div><label class="label">Result</label>
+          <select class="input" name="result">
+            <option value="pass">Pass</option><option value="fail">Fail</option>
+          </select>
+        </div>
+        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveCal(e) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = parseInt(body.equipment_id);
+  try {
+    await api('POST', '/api/calibration', body);
+    closeModal();
+    toast('Calibration logged.');
+    calData = await api('GET', '/api/calibration');
+    renderCalTable(calData);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteCal(id) {
+  if (!confirm('Delete this calibration record?')) return;
+  await api('DELETE', `/api/calibration/${id}`);
+  toast('Deleted.');
+  calData = await api('GET', '/api/calibration');
+  renderCalTable(calData);
+}
+
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+let inventoryData = [];
+async function inventoryPage() {
+  $('page-actions').innerHTML = `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>`;
+  inventoryData = await api('GET', '/api/inventory');
+  renderInventoryTable(inventoryData);
+}
+
+function renderInventoryTable(rows) {
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex flex-wrap items-center gap-3">
+        <input id="inv-search" class="input max-w-xs" placeholder="Search inventory…" oninput="filterInventory()">
+        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" id="inv-low-filter" onchange="filterInventory()"> Low stock only
+        </label>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Name</th>
+              <th class="px-4 py-3 text-left">Part #</th>
+              <th class="px-4 py-3 text-left">Location</th>
+              <th class="px-4 py-3 text-right">Qty</th>
+              <th class="px-4 py-3 text-right">Min</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inv-tbody">${inventoryRows(rows)}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function inventoryRows(rows) {
+  return rows.map(i=>{
+    const low = i.min_stock > 0 && i.quantity <= i.min_stock;
+    return `<tr class="table-row border-b last:border-0">
+      <td class="px-4 py-3 font-medium">${esc(i.name)}</td>
+      <td class="px-4 py-3 font-mono text-xs text-gray-500">${esc(i.part_number||'—')}</td>
+      <td class="px-4 py-3 text-gray-500">${esc(i.location||'—')}</td>
+      <td class="px-4 py-3 text-right font-mono font-medium ${i.quantity===0?'text-red-600':low?'text-yellow-600':''}">${i.quantity} ${i.unit}</td>
+      <td class="px-4 py-3 text-right text-gray-400">${i.min_stock} ${i.unit}</td>
+      <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
+      <td class="px-4 py-3 text-right space-x-2">
+        <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-brand hover:underline text-xs">Adjust</button>
+        <button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>
+        <button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No items found.</td></tr>';
+}
+
+function filterInventory() {
+  const s = $('inv-search').value.toLowerCase();
+  const low = $('inv-low-filter').checked;
+  const filtered = inventoryData.filter(i =>
+    (!s || i.name.toLowerCase().includes(s) || (i.part_number||'').toLowerCase().includes(s) || (i.location||'').toLowerCase().includes(s)) &&
+    (!low || (i.min_stock > 0 && i.quantity <= i.min_stock))
+  );
+  $('inv-tbody').innerHTML = inventoryRows(filtered);
+}
+
+async function openItemModal(id) {
+  const i = id ? inventoryData.find(x=>x.id===id) || {} : {};
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">${id?'Edit':'Add'} Inventory Item</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="inv-form" class="px-6 py-4 space-y-4" onsubmit="saveItem(event,${id||'null'})">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2"><label class="label">Name *</label><input class="input" name="name" required value="${esc(i.name||'')}"></div>
+        <div><label class="label">Part #</label><input class="input" name="part_number" value="${esc(i.part_number||'')}"></div>
+        <div><label class="label">Category</label><input class="input" name="category" value="${esc(i.category||'')}"></div>
+        <div><label class="label">Location</label><input class="input" name="location" value="${esc(i.location||'')}"></div>
+        <div><label class="label">Unit</label><input class="input" name="unit" value="${esc(i.unit||'ea')}"></div>
+        ${!id ? `<div><label class="label">Initial Qty</label><input class="input" type="number" name="quantity" min="0" value="0"></div>` : ''}
+        <div><label class="label">Min Stock</label><input class="input" type="number" name="min_stock" min="0" value="${i.min_stock||0}"></div>
+        <div><label class="label">Unit Cost ($)</label><input class="input" type="number" step="0.01" name="unit_cost" value="${i.unit_cost||''}"></div>
+        <div><label class="label">Supplier</label><input class="input" name="supplier" value="${esc(i.supplier||'')}"></div>
+        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(i.notes||'')}</textarea></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveItem(e, id) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (body.quantity) body.quantity = parseInt(body.quantity);
+  if (body.min_stock) body.min_stock = parseInt(body.min_stock);
+  if (body.unit_cost) body.unit_cost = parseFloat(body.unit_cost);
+  try {
+    if (id) await api('PUT', `/api/inventory/${id}`, body);
+    else await api('POST', '/api/inventory', body);
+    closeModal();
+    toast(id ? 'Item updated.' : 'Item added.');
+    inventoryData = await api('GET', '/api/inventory');
+    renderInventoryTable(inventoryData);
+  } catch(err) { toast(err.message, false); }
+}
+
+function adjustModal(id, name) {
+  modal(`<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Adjust Stock — ${esc(name)}</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="adj-form" class="px-6 py-4 space-y-4" onsubmit="submitAdjust(event,${id})">
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="label">Action</label>
+          <select class="input" name="action">
+            <option value="add">Add</option>
+            <option value="remove">Remove</option>
+            <option value="set">Set Exact</option>
+          </select>
+        </div>
+        <div><label class="label">Quantity *</label><input class="input" type="number" name="quantity" min="0" required></div>
+        <div><label class="label">Reference</label><input class="input" name="reference" placeholder="Work order, PO #…"></div>
+        <div><label class="label">Performed By</label><input class="input" name="performed_by"></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function submitAdjust(e, id) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.quantity = parseInt(body.quantity);
+  try {
+    const res = await api('POST', `/api/inventory/${id}/adjust`, body);
+    closeModal();
+    toast(`Stock updated. New quantity: ${res.quantity}`);
+    inventoryData = await api('GET', '/api/inventory');
+    renderInventoryTable(inventoryData);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function deleteItem(id) {
+  if (!confirm('Delete this item?')) return;
+  await api('DELETE', `/api/inventory/${id}`);
+  toast('Deleted.');
+  inventoryData = await api('GET', '/api/inventory');
+  renderInventoryTable(inventoryData);
+}
+
+
+// ─── PMCS ─────────────────────────────────────────────────────────────────────
+
+async function pmcsPage() {
+  const templates = await api('GET', '/api/pmcs/templates');
+  $('page-actions').innerHTML = `<button onclick="openPmcsTemplateModal()" class="btn-primary">+ New Checklist</button>`;
+  $('page-content').innerHTML = templates.length === 0
+    ? `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem;">📋</div>
+        <div style="font-weight:600;margin-bottom:0.4rem;">No PMCS checklists yet</div>
+        <div style="font-size:0.875rem;">Create a checklist, add check items, then scan the QR code to run an inspection.</div>
+       </div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
+        ${templates.map(pmcsCard).join('')}
+       </div>`;
+}
+
+function pmcsCard(t) {
+  const faultBadge = '';
+  return `<div class="card" style="display:flex;flex-direction:column;gap:0.75rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:1rem;">${esc(t.title)}</div>
+        ${t.equipment_name ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.15rem;">📦 ${esc(t.equipment_name)}</div>` : ''}
+        ${t.description ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:0.25rem;">${esc(t.description)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+        <span style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;border-radius:9999px;padding:2px 10px;font-weight:600;">${t.item_count} items</span>
+        <span style="font-size:0.72rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:2px 10px;font-weight:600;">${t.session_count} runs</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button onclick="openPmcsItems(${t.id})" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Edit Items</button>
+      <button onclick="openPmcsQR(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">&#9641; QR Code</button>
+      <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
+      <button onclick="openPmcsArchive(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🗂 Archive</button>
+      <button onclick="deletePmcsTemplate(${t.id})" style="font-size:0.78rem;padding:0.35rem 0.8rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;cursor:pointer;">✕</button>
+    </div>
+  </div>`;
+}
+
+// ── New/Edit template modal ───────────────────────────────────────────────────
+function openPmcsTemplateModal(t) {
+  t = t || {};
+  modal(`<div class="modal" style="max-width:480px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:700;">${t.id ? 'Edit' : 'New'} PMCS Checklist</h2>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <form class="px-6 py-4" style="display:grid;gap:0.9rem;" onsubmit="savePmcsTemplate(event,${t.id||'null'})">
+      <div><label class="label">Title *</label>
+        <input class="input" name="title" required value="${esc(t.title||'')}" placeholder="e.g. M4 Before Operations PMCS">
+      </div>
+      <div><label class="label">Description</label>
+        <input class="input" name="description" value="${esc(t.description||'')}" placeholder="Optional notes about this checklist">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function savePmcsTemplate(e, id) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (id) await api('PUT', `/api/pmcs/templates/${id}`, body);
+  else    await api('POST', '/api/pmcs/templates', body);
+  closeModal();
+  toast(id ? 'Checklist updated.' : 'Checklist created.');
+  pmcsPage();
+}
+
+async function deletePmcsTemplate(id) {
+  if (!confirm('Delete this checklist and all its sessions?')) return;
+  await api('DELETE', `/api/pmcs/templates/${id}`);
+  toast('Checklist deleted.');
+  pmcsPage();
+}
+
+// ── QR modal (reuse same pattern as equipment) ────────────────────────────────
+function openPmcsQR(tmplId, title) {
+  const img = `/api/qr/pmcs/${tmplId}`;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'subtask-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:340px;text-align:center;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 style="font-size:1rem;font-weight:700;">PMCS QR Code</h3>
+      <button onclick="document.getElementById('subtask-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div class="px-6 py-5" style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+      <img src="${img}" style="width:200px;height:200px;border:1px solid #e5e7eb;border-radius:0.5rem;" alt="QR">
+      <div style="font-size:0.8rem;font-weight:600;color:#374151;">${esc(title)}</div>
+      <div style="font-size:0.72rem;color:#9ca3af;">Scan to open the operator checklist</div>
+      <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
+        <a href="${img}" download="PMCS_QR_${tmplId}.png" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Download</a>
+        <button onclick="(()=>{const w=window.open('','_blank');w.document.write('<html><head><title>PMCS QR</title><style>body{text-align:center;padding:2rem;font-family:sans-serif}img{width:220px}h2{margin:1rem 0 .25rem}@media print{button{display:none}}</style></head><body><img src=/api/qr/pmcs/${tmplId}><h2>${esc(title)}</h2><p>Scan to run PMCS inspection</p><br><button onclick=window.print()>Print</button></body></html>');w.document.close();})()" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🖨 Print</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ── Item editor ───────────────────────────────────────────────────────────────
+async function openPmcsItems(tmplId) {
+  const tmpl = await api('GET', `/api/pmcs/templates/${tmplId}`);
+  const INTERVALS = ['B','D','A','W','M'];
+  const INT_LABELS = {B:'Before',D:'During',A:'After',W:'Weekly',M:'Monthly'};
+  modal(`<div class="modal" style="max-width:680px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">${esc(tmpl.title)}</h2>
+        <div style="font-size:0.75rem;color:#6b7280;margin-top:0.1rem;">Check Items — ${tmpl.items.length} total</div>
+      </div>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:1rem 1.5rem;max-height:420px;overflow-y:auto;" id="pmcs-items-list">
+      ${tmpl.items.length === 0
+        ? '<p style="color:#9ca3af;font-size:0.875rem;text-align:center;padding:1.5rem 0;">No items yet — add one below.</p>'
+        : tmpl.items.map((it,i) => pmcsItemRow(it, i)).join('')}
+    </div>
+    <div style="padding:1rem 1.5rem;border-top:1px solid #e5e7eb;background:#f9fafb;border-radius:0 0 0.75rem 0.75rem;">
+      <div style="font-weight:600;font-size:0.8rem;color:#374151;margin-bottom:0.6rem;">Add Check Item</div>
+      <form id="pmcs-add-item-form" onsubmit="addPmcsItem(event,${tmplId})" style="display:grid;grid-template-columns:50px 70px 1fr;gap:0.5rem;align-items:end;">
+        <div><label class="label" style="font-size:0.68rem;">No.</label>
+          <input class="input" name="item_no" placeholder="1" style="padding:0.4rem 0.5rem;">
+        </div>
+        <div><label class="label" style="font-size:0.68rem;">Interval</label>
+          <select class="input" name="interval" style="padding:0.4rem 0.5rem;">
+            ${INTERVALS.map(v=>`<option value="${v}">${v} — ${INT_LABELS[v]}</option>`).join('')}
+          </select>
+        </div>
+        <div><label class="label" style="font-size:0.68rem;">Check Item *</label>
+          <input class="input" name="check_item" required placeholder="What the operator checks…" style="padding:0.4rem 0.6rem;">
+        </div>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+          <div><label class="label" style="font-size:0.68rem;">Procedure (optional)</label>
+            <input class="input" name="procedure" placeholder="How to check it…" style="padding:0.4rem 0.6rem;">
+          </div>
+          <div><label class="label" style="font-size:0.68rem;">Not Ready If (optional)</label>
+            <input class="input" name="not_ready_if" placeholder="Equipment NMC condition…" style="padding:0.4rem 0.6rem;">
+          </div>
+        </div>
+        <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+          <button type="submit" class="btn-primary" style="font-size:0.8rem;padding:0.4rem 1rem;">+ Add Item</button>
+        </div>
+      </form>
+    </div>
+  </div>`);
+}
+
+function pmcsItemRow(it, idx) {
+  const INT_COLORS = {B:'#1d4ed8',D:'#0369a1',A:'#0f766e',W:'#7c3aed',M:'#b45309'};
+  const c = INT_COLORS[it.interval] || '#64748b';
+  return `<div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.65rem 0;border-bottom:1px solid #f3f4f6;" id="pmcs-row-${it.id}">
+    <span style="font-size:0.68rem;font-weight:800;padding:2px 8px;border-radius:9999px;background:${c};color:#fff;white-space:nowrap;margin-top:2px;">${it.interval}</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:0.85rem;font-weight:600;">${esc(it.check_item)}</div>
+      ${it.procedure ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.15rem;">${esc(it.procedure)}</div>` : ''}
+      ${it.not_ready_if ? `<div style="font-size:0.72rem;color:#dc2626;margin-top:0.1rem;">NMC: ${esc(it.not_ready_if)}</div>` : ''}
+    </div>
+    <button onclick="deletePmcsItem(${it.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;padding:0.2rem 0.5rem;cursor:pointer;flex-shrink:0;">✕</button>
+  </div>`;
+}
+
+async function addPmcsItem(e, tmplId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.order_index = document.querySelectorAll('[id^="pmcs-row-"]').length;
+  await api('POST', `/api/pmcs/templates/${tmplId}/items`, body);
+  toast('Item added.');
+  closeModal();
+  openPmcsItems(tmplId);
+}
+
+async function deletePmcsItem(itemId) {
+  if (!confirm('Delete this check item?')) return;
+  await api('DELETE', `/api/pmcs/items/${itemId}`);
+  document.getElementById('pmcs-row-' + itemId)?.remove();
+  toast('Item removed.');
+}
+
+// ── Archive viewer ────────────────────────────────────────────────────────────
+async function openPmcsArchive(tmplId, title) {
+  const sessions = await api('GET', `/api/pmcs/sessions?template_id=${tmplId}`);
+  modal(`<div class="modal" style="max-width:620px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Archive — ${esc(title)}</h2>
+        <div style="font-size:0.75rem;color:#6b7280;margin-top:0.1rem;">${sessions.length} completed inspection${sessions.length!==1?'s':''}</div>
+      </div>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:1rem 1.5rem;max-height:480px;overflow-y:auto;">
+      ${sessions.length === 0
+        ? '<p style="color:#9ca3af;font-size:0.875rem;text-align:center;padding:2rem 0;">No completed inspections yet.</p>'
+        : sessions.map(s => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.65rem 0;border-bottom:1px solid #f3f4f6;">
+            <div style="flex:1;">
+              <div style="font-size:0.85rem;font-weight:600;">${esc(s.operator_rank||'')} ${esc(s.operator_name||'Unknown')}</div>
+              <div style="font-size:0.75rem;color:#6b7280;">${(s.completed_at||'').slice(0,16).replace('T',' ')}</div>
+              ${s.notes ? `<div style="font-size:0.72rem;color:#9ca3af;margin-top:0.1rem;">${esc(s.notes)}</div>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              ${s.fault_count > 0
+                ? `<span style="font-size:0.72rem;font-weight:700;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:9999px;">${s.fault_count} fault${s.fault_count>1?'s':''}</span>`
+                : `<span style="font-size:0.72rem;font-weight:700;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:9999px;">All Clear</span>`}
+              <a href="/api/pmcs/sessions/${s.id}/archive" target="_blank"
+                 style="font-size:0.75rem;background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:0.375rem;text-decoration:none;font-weight:600;">PDF</a>
+            </div>
+          </div>`).join('')}
+    </div>
+  </div>`);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
