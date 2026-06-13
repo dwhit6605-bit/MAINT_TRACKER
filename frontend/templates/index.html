@@ -128,6 +128,10 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         PMCS
       </a>
+      <a href="/rolling-stock" class="nav-link" data-page="rolling-stock">
+        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        Rolling Stock
+      </a>
       <a href="/readiness" class="nav-link" data-page="readiness">
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         Readiness
@@ -282,8 +286,8 @@ function closeSidebar() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -3366,6 +3370,327 @@ async function deleteUser(id, username) {
     usersData = await api('GET', '/api/auth/users');
     renderUsersTable();
   } catch(err) { toast(err.message, false); }
+}
+
+// ─── Rolling Stock ────────────────────────────────────────────────────────────
+let rsData = [];
+
+const RS_CHECKLIST = [
+  {section:'At Dispatch', items:[
+    {key:'dispatch_window',  label:'Window'},
+    {key:'dispatch_license', label:'License'},
+    {key:'dispatch_cc_key',  label:'Credit Card & Key'},
+  ]},
+  {section:'Lights', items:[
+    {key:'lights_headlights',label:'Headlights — High & Low Beam'},
+    {key:'lights_brake',     label:'Brake Lights'},
+    {key:'lights_tail',      label:'Tail Lights'},
+    {key:'lights_backup',    label:'Backup Lights'},
+    {key:'lights_plate',     label:'License Plate Lights'},
+    {key:'lights_turn',      label:'Turn Signals'},
+    {key:'lights_flasher',   label:'Emergency Flasher'},
+    {key:'lights_dome',      label:'Dome Light & Panel Lights'},
+  ]},
+  {section:'Glass and Mirrors', items:[
+    {key:'glass_windows', label:'A. All Windows'},
+    {key:'glass_mirrors', label:'B. Side & Rearview Mirrors'},
+    {key:'glass_wipers',  label:'C. Windshield Wipers'},
+  ]},
+  {section:'Tires and Spare', items:[
+    {key:'tire_inflation',label:'A. Proper Inflation'},
+    {key:'tire_cuts',     label:'B. Cuts, Gouges, or Bulges'},
+    {key:'tire_tread',    label:'C. Tread Wear Left'},
+    {key:'tire_lugnuts',  label:'D. Lug Nuts Present & Tight'},
+    {key:'tire_jack',     label:'E. Jack & Lug Wrench'},
+    {key:'tire_wheels',   label:'F. Wheels / Wheel Covers'},
+  ]},
+  {section:'Brakes', items:[
+    {key:'brake_parking',   label:'A. Emergency / Parking Brake'},
+    {key:'brake_operation', label:'B. Braking Operation (No Pull / No Metal-on-Metal Noise)'},
+  ]},
+  {section:'Steering', items:[
+    {key:'steering_op',label:'Steering Operation with Engine Running'},
+  ]},
+  {section:'Under the Hood', items:[
+    {key:'hood_ps_fluid',    label:'A. Power Steering Fluid'},
+    {key:'hood_brake_fluid', label:'B. Brake Fluid'},
+    {key:'hood_trans_fluid', label:'C. Transmission Fluid'},
+    {key:'hood_engine_oil',  label:'D. Engine Oil'},
+    {key:'hood_belts',       label:'E. Belts For Wear & Tightness'},
+    {key:'hood_leaks',       label:'F. Fluid / Oil Leaks'},
+    {key:'hood_washer',      label:'G. Windshield Washer Fluid'},
+  ]},
+  {section:'Battery', items:[
+    {key:'batt_cables', label:'A. Ensure Cables are Tight'},
+    {key:'batt_visual', label:'B. Visually Check Battery'},
+  ]},
+  {section:'Exterior', items:[
+    {key:'ext_chrome',   label:'A. Chrome / Body Molding & Grill'},
+    {key:'ext_bumpers',  label:'B. Front & Rear Bumper'},
+    {key:'ext_doors',    label:'C. Doors'},
+    {key:'ext_fenders',  label:'D. Fenders'},
+    {key:'ext_hood',     label:'E. Hood / Trunk Lid'},
+    {key:'ext_roof',     label:'F. Roof / Vehicle Sides'},
+    {key:'ext_exhaust',  label:'G. Muffler / Exhaust System'},
+    {key:'ext_antenna',  label:'H. Antenna'},
+    {key:'ext_clean',    label:'I. Exterior Cleanliness'},
+  ]},
+  {section:'Interior', items:[
+    {key:'int_carpet',     label:'A. Carpet'},
+    {key:'int_doors',      label:'B. Door Panels & Hardware'},
+    {key:'int_headliner',  label:'C. Headliner'},
+    {key:'int_upholstery', label:'D. Upholstery'},
+    {key:'int_hvac',       label:'E. Heater / Air Conditioning'},
+    {key:'int_radio',      label:'F. Radio'},
+    {key:'int_horn',       label:'G. Horn'},
+    {key:'int_instruments',label:'H. Instruments & Gages'},
+    {key:'int_form1627',   label:'I. GSA Form 1627 (Accident Envelope in Glove Box)'},
+    {key:'int_clean',      label:'J. Interior Cleanliness'},
+  ]},
+];
+
+async function rollingStockPage() {
+  $('page-actions').innerHTML = `${isAdmin()?'<button onclick="openRsModal()" class="btn-primary">+ Add Vehicle</button>':''}`;
+  rsData = await api('GET', '/api/rolling-stock');
+  renderRsTable();
+}
+
+function renderRsTable() {
+  const statusColor = {available:'#22c55e', dispatched:'#3b82f6', maintenance:'#f59e0b', retired:'#9ca3af'};
+  $('page-content').innerHTML = rsData.length === 0
+    ? `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🚗</div>
+        <div style="font-weight:600;">No vehicles registered</div>
+        ${isAdmin()?'<button onclick="openRsModal()" class="btn-primary" style="margin-top:1rem;">Add First Vehicle</button>':''}
+      </div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+        ${rsData.map(v => `
+        <div class="card" style="display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-weight:700;font-size:1rem;">${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}</div>
+              <div style="font-size:0.75rem;color:#6b7280;">${v.color?esc(v.color)+' · ':''}${v.license_plate?'Plate: '+esc(v.license_plate):'No plate'}</div>
+            </div>
+            <span style="font-size:0.7rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${(statusColor[v.status]||'#9ca3af')}22;color:${statusColor[v.status]||'#9ca3af'};white-space:nowrap;">${v.status}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem;font-size:0.78rem;color:#6b7280;">
+            ${v.tag_number?`<div>Tag: <span style="font-weight:600;color:#374151;">${esc(v.tag_number)}</span></div>`:''}
+            ${v.key_number?`<div>Key: <span style="font-weight:600;color:#374151;">${esc(v.key_number)}</span></div>`:''}
+          </div>
+          <div style="font-size:0.72rem;color:#9ca3af;">${v.inspection_count||0} inspection${v.inspection_count!==1?'s':''} · Last: ${v.last_dispatched||'Never'}</div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.25rem;flex-wrap:wrap;">
+            <button onclick="openDispatchForm(${v.id})" class="btn-primary" style="font-size:0.78rem;flex:1;">📋 Dispatch / Inspect</button>
+            <button onclick="openRsHistory(${v.id},'${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}')" class="btn-secondary" style="font-size:0.78rem;">History</button>
+            ${isAdmin()?`<button onclick="openRsModal(${v.id})" class="btn-secondary" style="font-size:0.78rem;">Edit</button>`:''}
+          </div>
+        </div>`).join('')}
+      </div>`;
+}
+
+// ── Vehicle modal (add/edit) ───────────────────────────────────────────────────
+function openRsModal(id) {
+  const v = id ? rsData.find(x=>x.id===id) : {};
+  modal(`<div class="modal" style="max-width:520px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:700;">${id?'Edit Vehicle':'Add Vehicle'}</h2>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveRs(event,${id||'null'})" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div style="grid-column:1/-1;display:grid;grid-template-columns:80px 1fr 1fr;gap:0.75rem;">
+        <div><label class="label">Year</label><input name="year" class="input w-full" value="${esc(v.year||'')}" placeholder="2022"></div>
+        <div><label class="label">Make *</label><input name="make" class="input w-full" value="${esc(v.make||'')}" required placeholder="Ford"></div>
+        <div><label class="label">Model *</label><input name="model" class="input w-full" value="${esc(v.model||'')}" required placeholder="F-150"></div>
+      </div>
+      <div><label class="label">Color</label><input name="color" class="input w-full" value="${esc(v.color||'')}" placeholder="White"></div>
+      <div><label class="label">License Plate</label><input name="license_plate" class="input w-full" value="${esc(v.license_plate||'')}"></div>
+      <div><label class="label">Tag #</label><input name="tag_number" class="input w-full" value="${esc(v.tag_number||'')}"></div>
+      <div><label class="label">Key #</label><input name="key_number" class="input w-full" value="${esc(v.key_number||'')}"></div>
+      <div style="grid-column:1/-1"><label class="label">VIN</label><input name="vin" class="input w-full" value="${esc(v.vin||'')}" placeholder="Vehicle Identification Number"></div>
+      <div><label class="label">Status</label>
+        <select name="status" class="input w-full">
+          ${['available','dispatched','maintenance','retired'].map(s=>`<option ${(v.status||'available')===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="label">Notes</label><input name="notes" class="input w-full" value="${esc(v.notes||'')}"></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;border-top:1px solid #e5e7eb;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveRs(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  if (id) await api('PUT', `/api/rolling-stock/${id}`, body);
+  else await api('POST', '/api/rolling-stock', body);
+  closeModal();
+  rsData = await api('GET', '/api/rolling-stock');
+  renderRsTable();
+}
+
+// ── Dispatch / Inspection form ────────────────────────────────────────────────
+function openDispatchForm(vid) {
+  const v = rsData.find(x=>x.id===vid);
+  if (!v) return;
+  const today = new Date().toISOString().slice(0,10);
+
+  const checkRows = RS_CHECKLIST.map(sec => `
+    <tr><td colspan="3" style="background:#dce8f5;font-weight:700;font-size:0.78rem;padding:5px 8px;">${esc(sec.section)}</td></tr>
+    ${sec.items.map(item => `
+    <tr>
+      <td style="padding:5px 8px;font-size:0.82rem;">${esc(item.label)}</td>
+      <td style="text-align:center;padding:4px;">
+        <div style="display:flex;gap:4px;justify-content:center;">
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="SAT" style="accent-color:#22c55e;"> SAT
+          </label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="UNSAT" style="accent-color:#ef4444;"> UNSAT
+          </label>
+        </div>
+      </td>
+      <td style="padding:4px;"><input class="form-input" name="rem_${item.key}" placeholder="Remark" style="font-size:0.75rem;padding:3px 6px;width:100%;"></td>
+    </tr>`).join('')}
+  `).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'dispatch-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:700px;max-height:92vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="position:sticky;top:0;background:#fff;z-index:10;">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">FK Form 5105 — Dispatch Inspection</div>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}${v.tag_number?' · Tag '+esc(v.tag_number):''}</div>
+      </div>
+      <button onclick="document.getElementById('dispatch-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form onsubmit="submitDispatch(event,${vid})" class="px-6 py-4">
+      <!-- Header fields -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
+        <div><label class="label">Date Out</label><input name="date_out" type="date" class="form-input" style="width:100%;" value="${today}" required></div>
+        <div><label class="label">Beginning Mileage</label><input name="beginning_mileage" type="number" class="form-input" style="width:100%;" placeholder="0"></div>
+        <div><label class="label">Accident Card on File?</label>
+          <select name="accident_card" class="form-input" style="width:100%;">
+            <option value="0">No</option><option value="1">Yes</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+          <div><label class="label">Operator Name</label><input name="operator_name" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${currentUser?.sub||''}"></div>
+          <div><label class="label">Unit Phone</label><input name="operator_phone" class="form-input" style="width:100%;" placeholder="DSN or commercial"></div>
+          <div><label class="label">Dispatcher (Print)</label><input name="dispatcher_name" class="form-input" style="width:100%;" placeholder="Dispatcher name"></div>
+        </div>
+      </div>
+
+      <!-- Checklist table -->
+      <div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:0.5rem;margin-bottom:1rem;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#1e3a5f;color:#fff;font-size:0.75rem;">
+            <th style="text-align:left;padding:6px 8px;min-width:200px;">Item</th>
+            <th style="padding:6px 8px;width:130px;">SAT / UNSAT</th>
+            <th style="text-align:left;padding:6px 8px;">Remark</th>
+          </tr></thead>
+          <tbody id="rs-checklist-body">${checkRows}</tbody>
+        </table>
+      </div>
+
+      <!-- UNSAT warning counter -->
+      <div id="rs-unsat-banner" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:0.4rem;padding:0.5rem 0.75rem;font-size:0.82rem;color:#dc2626;font-weight:600;margin-bottom:0.75rem;"></div>
+
+      <div style="margin-bottom:0.75rem;">
+        <label class="label">Notes</label>
+        <textarea name="notes" class="form-input" style="width:100%;min-height:60px;" placeholder="Any overall notes…"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="document.getElementById('dispatch-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Complete &amp; Generate FK5105</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  // Live UNSAT counter
+  overlay.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => {
+    const unsats = overlay.querySelectorAll('input[value="UNSAT"]:checked').length;
+    const banner = document.getElementById('rs-unsat-banner');
+    if (unsats > 0) {
+      banner.style.display = 'block';
+      banner.textContent = `⚠ ${unsats} UNSAT item${unsats>1?'s':''} — vehicle requires attention`;
+    } else {
+      banner.style.display = 'none';
+    }
+  }));
+}
+
+async function submitDispatch(e, vid) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const results = {}, remarks = {};
+  RS_CHECKLIST.forEach(sec => sec.items.forEach(item => {
+    const v = fd.get(`chk_${item.key}`);
+    if (v) results[item.key] = v;
+    const r = fd.get(`rem_${item.key}`);
+    if (r) remarks[item.key] = r;
+  }));
+
+  const body = {
+    date_out: fd.get('date_out'),
+    beginning_mileage: parseInt(fd.get('beginning_mileage')) || null,
+    accident_card: fd.get('accident_card') === '1',
+    operator_name: fd.get('operator_name') || null,
+    operator_phone: fd.get('operator_phone') || null,
+    dispatcher_name: fd.get('dispatcher_name') || null,
+    notes: fd.get('notes') || null,
+    results, remarks, status: 'complete',
+  };
+  const resp = await api('POST', `/api/rolling-stock/${vid}/inspections`, body);
+  document.getElementById('dispatch-backdrop').remove();
+  toast('Inspection saved — opening FK5105…');
+  rsData = await api('GET', '/api/rolling-stock');
+  renderRsTable();
+  setTimeout(() => window.open(`/api/rolling-stock/inspections/${resp.id}/print?token=${getToken()}`, '_blank'), 300);
+}
+
+// ── Inspection history panel ───────────────────────────────────────────────────
+async function openRsHistory(vid, vname) {
+  const inspections = await api('GET', `/api/rolling-stock/${vid}/inspections`);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'rs-history-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:600px;max-height:88vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">Inspection History</div>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(vname)}</div>
+      </div>
+      <button onclick="document.getElementById('rs-history-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div class="px-6 py-4">
+      ${inspections.length === 0
+        ? '<p style="color:#9ca3af;font-size:0.85rem;">No inspections recorded.</p>'
+        : `<div style="display:flex;flex-direction:column;gap:0.5rem;">
+            ${inspections.map(i => {
+              const unsats = Object.values(i.results||{}).filter(v=>v==='UNSAT').length;
+              const color = unsats===0?'#22c55e':unsats<=2?'#f59e0b':'#ef4444';
+              return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.55rem 0.75rem;border-radius:0.5rem;background:#f9fafb;border:1px solid #f3f4f6;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:0.82rem;font-weight:600;">${i.date_out||'—'} ${i.date_in?'→ '+i.date_in:''}</div>
+                  <div style="font-size:0.72rem;color:#6b7280;">${esc(i.operator_name||'—')} · ${i.beginning_mileage?i.beginning_mileage+' mi':''}</div>
+                </div>
+                <span style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${color}22;color:${color};white-space:nowrap;">
+                  ${unsats===0?'✓ All SAT':unsats+' UNSAT'}
+                </span>
+                <a href="/api/rolling-stock/inspections/${i.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">FK5105</a>
+              </div>`;}).join('')}
+          </div>`}
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 // ─── Readiness Page ───────────────────────────────────────────────────────────
