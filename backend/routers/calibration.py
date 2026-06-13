@@ -1,7 +1,8 @@
 import os, shutil
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from backend.database import get_db
 from backend.models import CalibrationCreate
+from backend.auth import require_tech
 from backend import audit
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
@@ -44,7 +45,8 @@ async def due_soon(days: int = 30, db=Depends(get_db)):
 
 
 @router.post("", status_code=201)
-async def create_record(data: CalibrationCreate, db=Depends(get_db)):
+async def create_record(data: CalibrationCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
     async with db.execute("""
         INSERT INTO calibration_records
             (equipment_id, calibrated_by, calibrated_at, next_due, certificate_num, result, notes)

@@ -215,6 +215,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) 
 let currentUser = null;
 function getToken() { return localStorage.getItem('auth_token'); }
 function isAdmin() { return currentUser?.role === 'admin'; }
+function isTech()  { return currentUser?.role === 'admin' || currentUser?.role === 'tech'; }
 function logout() {
   ['auth_token','auth_username','auth_role'].forEach(k => localStorage.removeItem(k));
   window.location.href = '/login';
@@ -232,7 +233,9 @@ async function initAuth() {
       $('user-name').textContent = currentUser.username;
       const roleEl = $('user-role-badge');
       roleEl.textContent = currentUser.role;
-      roleEl.style.cssText = `font-size:0.65rem;padding:1px 6px;border-radius:9999px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:${currentUser.role==='admin'?'#fee2e2':'#dce8f5'};color:${currentUser.role==='admin'?'#b91c1c':'#1e3a5f'};`;
+      const roleBg  = {admin:'#fee2e2', tech:'#fef3c7', operator:'#dce8f5'}[currentUser.role] || '#dce8f5';
+      const roleClr = {admin:'#b91c1c', tech:'#92400e', operator:'#1e3a5f'}[currentUser.role] || '#1e3a5f';
+      roleEl.style.cssText = `font-size:0.65rem;padding:1px 6px;border-radius:9999px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:${roleBg};color:${roleClr};`;
     }
     if (isAdmin()) document.querySelectorAll('.admin-nav').forEach(el => el.style.display = '');
     return true;
@@ -823,13 +826,13 @@ function eqTaskRow(t) {
           ${t.task_type !== 'scheduled' ? `<span class="badge-gray">${t.task_type}</span>` : ''}
           ${t.next_due ? `<span style="font-size:0.75rem;color:#6b7280;">Due: ${fmtDate(t.next_due)}</span>` : ''}
           ${t.last_done ? `<span style="font-size:0.75rem;color:#6b7280;">Last: ${fmtDate(t.last_done)}</span>` : ''}
-          ${t.interval_days ? `<span style="font-size:0.75rem;color:#6b7280;">Every ${t.interval_days}d</span>` : ''}
+          ${t.interval_days ? `<span style="font-size:0.75rem;color:#059669;font-weight:600;">🔁 Every ${t.interval_days}d</span>` : ''}
           ${t.assigned_to ? `<span style="font-size:0.75rem;color:#6b7280;">→ ${esc(t.assigned_to)}</span>` : ''}
         </div>
         ${t.notes ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">${esc(t.notes)}</div>` : ''}
       </div>
       <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-        ${!isDone ? `<button onclick="eqCompleteTask(${t.id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✓ Done</button>` : ''}
+        ${!isDone && isTech() ? `<button onclick="eqCompleteTask(${t.id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✓ Done</button>` : ''}
         ${isDone ? `<button onclick="openDA2404Modal(${t.id})" style="font-size:0.72rem;background:#fef9c3;color:#854d0e;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">DA 2404</button>` : ''}
         ${isAdmin() ? `<button onclick="eqUpdateTaskDue(${t.id})" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Edit</button>` : ''}
         ${isAdmin() ? `<button onclick="eqDeleteTask(${t.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">✕</button>` : ''}
@@ -1606,7 +1609,7 @@ function maintenanceRows(rows) {
       <td class="px-4 py-3">${dueBadge(t.next_due, t.status==='completed'?'completed':t.status)}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.assigned_to||'—')}</td>
       <td class="px-4 py-3 text-right space-x-2">
-        ${t.status!=='completed'?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
+        ${t.status!=='completed' && isTech() ?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
         ${isAdmin() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
     </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No tasks found.</td></tr>';
@@ -1687,14 +1690,25 @@ let _inventoryForComplete = [];
 async function completeTaskModal(id) {
   _completePartsRows = [];
   _inventoryForComplete = await api('GET', '/api/inventory').catch(() => []);
+  const tasks = maintenanceData || [];
+  const task = tasks.find(t => t.id === id) || {};
+  let recurringHint = '';
+  if (task.interval_days) {
+    const nxt = new Date();
+    nxt.setDate(nxt.getDate() + task.interval_days);
+    recurringHint = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.375rem;padding:0.6rem 0.9rem;font-size:0.8rem;color:#15803d;">
+      🔁 Recurring task — next will auto-schedule for <strong>${nxt.toISOString().slice(0,10)}</strong> (${task.interval_days}d interval). Override below if needed.
+    </div>`;
+  }
   modal(`<div class="modal" style="max-width:36rem;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">Mark Task Complete</h2>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
     <form id="complete-form" class="px-6 py-4 space-y-4" onsubmit="submitComplete(event,${id})">
+      ${recurringHint}
       <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
-      <div><label class="label">Override Next Due</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">${task.interval_days ? 'Override Next Due (optional)' : 'Next Due'}</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
 
       <div style="border-top:1px solid #f3f4f6;padding-top:1rem;">
@@ -1763,7 +1777,7 @@ async function calibrationPage() {
   $('page-actions').innerHTML = `
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/calibration/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openCsvImport('calibration')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
-    <button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>`;
+    ${isTech() ? `<button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>` : ''}`;
   [calData, equipList] = await Promise.all([
     api('GET', '/api/calibration'),
     api('GET', '/api/equipment'),
@@ -1945,7 +1959,7 @@ function inventoryRows(rows) {
       <td class="px-4 py-3 text-right text-gray-400 col-m-hide">${i.min_stock} ${i.unit}</td>
       <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
       <td class="px-4 py-3 text-right space-x-2">
-        <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>
+        ${isTech() ? `<button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
         <button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>
         <button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>
       </td>
@@ -3161,7 +3175,7 @@ function renderUsersTable() {
           ${usersData.map(u=>`
           <tr class="table-row border-b last:border-0">
             <td class="px-4 py-3 font-medium">${esc(u.username)}</td>
-            <td class="px-4 py-3"><span class="${u.role==='admin'?'badge-red':'badge-blue'}">${u.role}</span></td>
+            <td class="px-4 py-3"><span class="${u.role==='admin'?'badge-red':u.role==='tech'?'badge-yellow':'badge-blue'}">${u.role}</span></td>
             <td class="px-4 py-3 text-gray-500 col-m-hide">${u.created_at ? fmtDate(u.created_at.slice(0,10)) : '—'}</td>
             <td class="px-4 py-3 text-gray-500 col-m-hide">${u.last_login ? fmtDate(u.last_login.slice(0,10)) : 'Never'}</td>
             <td class="px-4 py-3 text-right space-x-2">
@@ -3343,8 +3357,9 @@ function openUserModal(id) {
       </div>` : ''}
       <div><label class="label">Role</label>
         <select class="input" name="role">
-          <option value="operator" ${(u?.role||'operator')==='operator'?'selected':''}>operator</option>
-          <option value="admin" ${u?.role==='admin'?'selected':''}>admin</option>
+          <option value="operator" ${(u?.role||'operator')==='operator'?'selected':''}>operator — view only</option>
+          <option value="tech" ${u?.role==='tech'?'selected':''}>tech — can complete tasks, dispatch vehicles, adjust inventory</option>
+          <option value="admin" ${u?.role==='admin'?'selected':''}>admin — full access</option>
         </select>
       </div>
       <div class="flex justify-end gap-3 pt-2">
@@ -3504,9 +3519,9 @@ function renderRsTable() {
           </div>
           <div style="font-size:0.72rem;color:#9ca3af;">${v.inspection_count||0} inspection${v.inspection_count!==1?'s':''} · Last: ${v.last_dispatched||'Never'}</div>
           <div style="display:flex;gap:0.5rem;margin-top:0.25rem;flex-wrap:wrap;">
-            ${v.status==='dispatched'
+            ${isTech() ? (v.status==='dispatched'
               ? `<button onclick="openReturnModal(${v.id})" class="btn-primary" style="font-size:0.78rem;flex:1;background:#ef4444;">🔄 Return Vehicle</button>`
-              : `<button onclick="openDispatchForm(${v.id})" class="btn-primary" style="font-size:0.78rem;flex:1;">📋 Dispatch / Inspect</button>`}
+              : `<button onclick="openDispatchForm(${v.id})" class="btn-primary" style="font-size:0.78rem;flex:1;">📋 Dispatch / Inspect</button>`) : ''}
             <button onclick="openRsHistory(${v.id},'${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}')" class="btn-secondary" style="font-size:0.78rem;">History</button>
             ${isAdmin()?`<button onclick="openRsModal(${v.id})" class="btn-secondary" style="font-size:0.78rem;">Edit</button>`:''}
           </div>

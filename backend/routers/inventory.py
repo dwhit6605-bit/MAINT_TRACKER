@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import InventoryItemCreate, InventoryAdjust
+from backend.auth import require_tech
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -62,7 +63,8 @@ async def update_item(item_id: int, data: InventoryItemCreate, db=Depends(get_db
 
 
 @router.post("/{item_id}/adjust")
-async def adjust_stock(item_id: int, data: InventoryAdjust, db=Depends(get_db)):
+async def adjust_stock(item_id: int, data: InventoryAdjust, request: Request, db=Depends(get_db)):
+    require_tech(request)
     async with db.execute("SELECT quantity FROM inventory_items WHERE id=?", (item_id,)) as cur:
         row = await cur.fetchone()
     if not row:

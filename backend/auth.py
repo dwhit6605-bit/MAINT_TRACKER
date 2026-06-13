@@ -36,3 +36,11 @@ def require_admin(request: Request):
     if not user or user.get("role") != "admin":
         raise HTTPException(403, "Admin access required")
     return user
+
+
+def require_tech(request: Request):
+    """Allows admin and tech roles. Operators get 403."""
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") not in ("admin", "tech"):
+        raise HTTPException(403, "Tech access required")
+    return user

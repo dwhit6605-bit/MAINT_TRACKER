@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 from backend.database import get_db
-from backend.auth import require_admin
+from backend.auth import require_admin, require_tech
 
 router = APIRouter(prefix="/api/rolling-stock", tags=["rolling_stock"])
 
@@ -109,7 +109,8 @@ async def list_inspections(vid: int, db=Depends(get_db)):
 
 
 @router.post("/{vid}/inspections", status_code=201)
-async def create_inspection(vid: int, data: InspectionCreate, db=Depends(get_db)):
+async def create_inspection(vid: int, data: InspectionCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
     async with db.execute("""
         INSERT INTO vehicle_inspections
             (vehicle_id,date_out,date_in,beginning_mileage,ending_mileage,
@@ -131,7 +132,8 @@ async def create_inspection(vid: int, data: InspectionCreate, db=Depends(get_db)
 
 
 @router.patch("/inspections/{iid}/return")
-async def return_inspection(iid: int, data: InspectionReturn, db=Depends(get_db)):
+async def return_inspection(iid: int, data: InspectionReturn, request: Request, db=Depends(get_db)):
+    require_tech(request)
     async with db.execute("SELECT vehicle_id FROM vehicle_inspections WHERE id=?", (iid,)) as cur:
         row = await cur.fetchone()
     if not row:
