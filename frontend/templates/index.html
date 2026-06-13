@@ -2521,11 +2521,15 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
       <div style="flex:1;overflow-y:auto;" id="pmcs-eq-list">
         ${linked.length === 0
           ? '<p style="font-size:0.78rem;color:#9ca3af;padding:1rem;text-align:center;">No equipment yet</p>'
-          : linked.map(e => `
-            <div onclick="pmcsSelectEq(${e.id})" style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 0.75rem;cursor:pointer;border-bottom:1px solid #f9fafb;${e.id===selectedEqId?'background:#dce8f5;font-weight:600;':''}">
+          : linked.map((e,ei) => `
+            <div onclick="pmcsSelectEq(${e.id})" style="display:flex;align-items:center;gap:0.25rem;padding:0.45rem 0.5rem 0.45rem 0.75rem;cursor:pointer;border-bottom:1px solid #f9fafb;${e.id===selectedEqId?'background:#dce8f5;font-weight:600;':''}">
               <div style="flex:1;min-width:0;">
                 <div style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.name)}</div>
                 <div style="font-size:0.68rem;color:#9ca3af;">${(tmpl.items.filter(i=>i.equipment_id===e.id).length)} items</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;" onclick="event.stopPropagation()">
+                <button onclick="movePmcsEq(${tmplId},${ei},-1)" style="font-size:0.6rem;line-height:1;background:${ei===0?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${ei===0?'disabled':''}>▲</button>
+                <button onclick="movePmcsEq(${tmplId},${ei},1)" style="font-size:0.6rem;line-height:1;background:${ei===linked.length-1?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${ei===linked.length-1?'disabled':''}>▼</button>
               </div>
               <button onclick="event.stopPropagation();removePmcsEquipment(${tmplId},${e.id})" style="font-size:0.65rem;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 4px;flex-shrink:0;" title="Remove">✕</button>
             </div>`).join('')}
@@ -2552,7 +2556,7 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
           ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">Select an equipment entry on the left to view and add check items.</p>'
           : eqItems.length === 0
             ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">No items yet for this equipment. Add one below.</p>'
-            : eqItems.map((it,i) => pmcsItemRow(it, i)).join('')}
+            : eqItems.map((it,i) => pmcsItemRow(it, i, eqItems.length)).join('')}
       </div>
       ${selectedEqId ? `
       <div style="padding:0.75rem 1rem;border-top:1px solid #e5e7eb;background:#f9fafb;">
@@ -2647,7 +2651,7 @@ async function removePmcsEquipment(tmplId, eqId) {
   await _reloadPmcsEditor(tmplId, null);
 }
 
-function pmcsItemRow(it, idx) {
+function pmcsItemRow(it, idx, total) {
   const INT_COLORS = {B:'#1d4ed8',D:'#0369a1',A:'#0f766e',W:'#7c3aed',M:'#b45309'};
   const c = INT_COLORS[it.interval] || '#64748b';
   return `<div style="display:flex;align-items:flex-start;gap:0.6rem;padding:0.55rem 0;border-bottom:1px solid #f3f4f6;" id="pmcs-row-${it.id}">
@@ -2658,8 +2662,32 @@ function pmcsItemRow(it, idx) {
       ${it.not_ready_if ? `<div style="font-size:0.68rem;color:#dc2626;margin-top:0.1rem;">NMC: ${esc(it.not_ready_if)}</div>` : ''}
       ${it.creates_task ? `<div style="font-size:0.65rem;color:#d97706;margin-top:0.1rem;">⚡ Auto-task on fault</div>` : ''}
     </div>
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;">
+      <button onclick="movePmcsItem(${it.id},${idx},-1)" style="font-size:0.6rem;line-height:1;background:${idx===0?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${idx===0?'disabled':''}>▲</button>
+      <button onclick="movePmcsItem(${it.id},${idx},1)" style="font-size:0.6rem;line-height:1;background:${idx===total-1?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${idx===total-1?'disabled':''}>▼</button>
+    </div>
     <button onclick="deletePmcsItem(${it.id})" style="font-size:0.68rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;padding:0.2rem 0.45rem;cursor:pointer;flex-shrink:0;">✕</button>
   </div>`;
+}
+
+async function movePmcsEq(tmplId, idx, dir) {
+  const s = _pmcsEditorState;
+  const linked = s.tmpl.linked_equipment;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= linked.length) return;
+  [linked[idx], linked[newIdx]] = [linked[newIdx], linked[idx]];
+  await api('PUT', `/api/pmcs/templates/${tmplId}/equipment/reorder`, linked.map(e => e.id));
+  await _reloadPmcsEditor(tmplId, s.selectedEqId);
+}
+
+async function movePmcsItem(itemId, idx, dir) {
+  const s = _pmcsEditorState;
+  const eqItems = s.tmpl.items.filter(i => i.equipment_id === s.selectedEqId);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= eqItems.length) return;
+  [eqItems[idx], eqItems[newIdx]] = [eqItems[newIdx], eqItems[idx]];
+  await api('PUT', `/api/pmcs/templates/${s.tmplId}/items/reorder`, eqItems.map(i => i.id));
+  await _reloadPmcsEditor(s.tmplId, s.selectedEqId);
 }
 
 function togglePmcsMultiEq(checked) {

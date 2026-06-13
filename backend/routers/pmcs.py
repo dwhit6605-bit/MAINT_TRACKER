@@ -241,6 +241,32 @@ async def remove_template_equipment(tmpl_id: int, eq_id: int, db=Depends(get_db)
     return {"ok": True}
 
 
+# ── Reorder ──────────────────────────────────────────────────────────────────
+
+@router.put("/templates/{tmpl_id}/equipment/reorder")
+async def reorder_equipment(tmpl_id: int, eq_ids: List[int], db=Depends(get_db)):
+    """Accept an ordered list of equipment IDs and update their order_index."""
+    for idx, eq_id in enumerate(eq_ids):
+        await db.execute(
+            "UPDATE pmcs_template_equipment SET order_index=? WHERE template_id=? AND equipment_id=?",
+            (idx, tmpl_id, eq_id)
+        )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.put("/templates/{tmpl_id}/items/reorder")
+async def reorder_items(tmpl_id: int, item_ids: List[int], db=Depends(get_db)):
+    """Accept an ordered list of item IDs and update their order_index."""
+    for idx, item_id in enumerate(item_ids):
+        await db.execute(
+            "UPDATE pmcs_items SET order_index=? WHERE id=? AND template_id=?",
+            (idx, item_id, tmpl_id)
+        )
+    await db.commit()
+    return {"ok": True}
+
+
 # ── Items ─────────────────────────────────────────────────────────────────────
 
 @router.post("/templates/{tmpl_id}/items", status_code=201)
