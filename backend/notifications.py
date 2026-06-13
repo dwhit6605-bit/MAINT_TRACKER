@@ -84,7 +84,6 @@ async def run_daily_check():
         """, (horizon,)) as cur:
             maint = [dict(r) for r in await cur.fetchall()]
 
-        # Latest cal record per equipment — flag if overdue or due within horizon
         async with db.execute("""
             SELECT c.next_due, c.result, e.name as equipment_name, e.serial_num, e.location,
                    CASE WHEN c.next_due < ? THEN 'overdue' ELSE 'due_soon' END as cal_status
@@ -100,44 +99,106 @@ async def run_daily_check():
         """, (today, horizon)) as cur:
             cals = [dict(r) for r in await cur.fetchall()]
 
-    if not maint and not cals:
+        async with db.execute("""
+            SELECT v.year, v.make, v.model, v.tag_number, v.license_plate,
+                   i.operator_name, i.date_out, i.beginning_mileage
+            FROM rolling_stock v
+            LEFT JOIN vehicle_inspections i ON i.id = (
+                SELECT id FROM vehicle_inspections WHERE vehicle_id=v.id
+                ORDER BY created_at DESC LIMIT 1
+            )
+            WHERE v.status = 'dispatched'
+            ORDER BY i.date_out ASC
+        """) as cur:
+            dispatched = [dict(r) for r in await cur.fetchall()]
+
+    if not maint and not cals and not dispatched:
         return
 
-    def _row_color(due):
-        if not due or due < today:
-            return "#fef2f2"
-        return "#fffbeb"
+    def _td(val, color=None, bold=False):
+        s = f"padding:6px 10px;border-bottom:1px solid #e5e7eb;"
+        if color: s += f"color:{color};"
+        if bold:  s += "font-weight:700;"
+        return f'<td style="{s}">{val}</td>'
 
-    maint_rows = "".join(f"""
-        <tr style="background:{_row_color(r['next_due'])}">
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['equipment_name']}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['title']}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['next_due'] or '—'}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['status'].upper()}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['location'] or '—'}</td>
-        </tr>""" for r in maint)
+    def _row_bg(due):
+        return "#fef2f2" if (not due or due < today) else "#fffbeb"
 
-    cal_rows = "".join(f"""
-        <tr style="background:{_row_color(r['next_due'])}">
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['equipment_name']}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['serial_num'] or '—'}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['next_due']}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;color:{'#dc2626' if r['cal_status']=='overdue' else '#92400e'};">{r['cal_status'].upper().replace('_',' ')}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">{r['location'] or '—'}</td>
-        </tr>""" for r in cals)
+    def _table(headers, rows_html):
+        ths = "".join(f'<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:#fff;">{h}</th>' for h in headers)
+        return f'<table style="width:100%;border-collapse:collapse;font-size:0.875rem;margin-top:0.5rem;"><thead><tr>{ths}</tr></thead><tbody>{rows_html}</tbody></table>'
 
-    html = f"""
-    <html><body style="font-family:sans-serif;color:#111;">
-    <h2 style="color:#1e3a5f;">MAINT SUPER — Daily Alert Digest</h2>
-    <p style="color:#6b7280;">{datetime.utcnow().strftime('%B %d, %Y')} · Items overdue or due within {DAYS} days</p>
+    maint_rows = "".join(
+        f'<tr style="background:{_row_bg(r["next_due"])}">'
+        + _td(r["equipment_name"])
+        + _td(r["title"])
+        + _td(r["next_due"] or "No date")
+        + _td(r["status"].upper(), color="#dc2626" if r["status"]=="overdue" else "#92400e", bold=True)
+        + _td(r["location"] or "—")
+        + "</tr>"
+        for r in maint
+    )
 
-    {'<h3 style="margin-top:1.5rem;">⚙️ Maintenance</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px 10px;text-align:left;">Equipment</th><th style="padding:8px 10px;text-align:left;">Task</th><th style="padding:8px 10px;text-align:left;">Due</th><th style="padding:8px 10px;text-align:left;">Status</th><th style="padding:8px 10px;text-align:left;">Location</th></tr></thead><tbody>' + maint_rows + '</tbody></table>' if maint else ''}
+    cal_rows = "".join(
+        f'<tr style="background:{_row_bg(r["next_due"])}">'
+        + _td(r["equipment_name"])
+        + _td(r["serial_num"] or "—")
+        + _td(r["next_due"])
+        + _td(r["cal_status"].upper().replace("_"," "), color="#dc2626" if r["cal_status"]=="overdue" else "#92400e", bold=True)
+        + _td(r["location"] or "—")
+        + "</tr>"
+        for r in cals
+    )
 
-    {'<h3 style="margin-top:1.5rem;">🔬 Calibration</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1e3a5f;color:#fff;"><th style="padding:8px 10px;text-align:left;">Equipment</th><th style="padding:8px 10px;text-align:left;">Serial #</th><th style="padding:8px 10px;text-align:left;">Due</th><th style="padding:8px 10px;text-align:left;">Status</th><th style="padding:8px 10px;text-align:left;">Location</th></tr></thead><tbody>' + cal_rows + '</tbody></table>' if cals else ''}
+    rs_rows = "".join(
+        f'<tr style="background:#f0f9ff">'
+        + _td(f"{r['year'] or ''} {r['make']} {r['model']}".strip())
+        + _td(r["tag_number"] or "—")
+        + _td(r["license_plate"] or "—")
+        + _td(r["operator_name"] or "—")
+        + _td(r["date_out"] or "—")
+        + "</tr>"
+        for r in dispatched
+    )
 
-    <p style="margin-top:2rem;font-size:0.8rem;color:#9ca3af;">Sent by MAINT SUPER · maint.whitwerx.net</p>
-    </body></html>"""
+    date_str = datetime.utcnow().strftime("%B %d, %Y")
+    summary_parts = []
+    if maint:      summary_parts.append(f"{len(maint)} maintenance")
+    if cals:       summary_parts.append(f"{len(cals)} calibration")
+    if dispatched: summary_parts.append(f"{len(dispatched)} vehicle{'s' if len(dispatched)!=1 else ''} out")
+    subject = f"MAINT SUPER — {', '.join(summary_parts)}"
 
-    subject = f"MAINT SUPER Alert — {len(maint)} maintenance, {len(cals)} calibration items due"
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+
+  <!-- Header -->
+  <tr><td style="background:#1e3a5f;padding:24px 32px;">
+    <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:.5px;">MAINT SUPER</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">Daily Alert Digest · {date_str}</div>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:24px 32px;">
+
+    {'<h3 style="margin:0 0 8px;color:#1e3a5f;font-size:15px;">⚙️ Maintenance — ' + str(len(maint)) + ' item' + ('s' if len(maint)!=1 else '') + ' due</h3>' + _table(['Equipment','Task','Due Date','Status','Location'], maint_rows) if maint else ''}
+
+    {'<h3 style="margin:24px 0 8px;color:#1e3a5f;font-size:15px;">🔬 Calibration — ' + str(len(cals)) + ' item' + ('s' if len(cals)!=1 else '') + ' due</h3>' + _table(['Equipment','Serial #','Due Date','Status','Location'], cal_rows) if cals else ''}
+
+    {'<h3 style="margin:24px 0 8px;color:#1e3a5f;font-size:15px;">🚗 Rolling Stock — ' + str(len(dispatched)) + ' vehicle' + ('s' if len(dispatched)!=1 else '') + ' currently dispatched</h3>' + _table(['Vehicle','Tag #','Plate','Operator','Date Out'], rs_rows) if dispatched else ''}
+
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
+      Sent automatically by MAINT SUPER &nbsp;·&nbsp;
+      <a href="https://maint.whitwerx.net" style="color:#1e3a5f;">maint.whitwerx.net</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>"""
+
     _send(subject, html, to=TO, from_=FROM,
           host=SMTP_HOST, port=SMTP_PORT, user=SMTP_USER, password=SMTP_PASS)

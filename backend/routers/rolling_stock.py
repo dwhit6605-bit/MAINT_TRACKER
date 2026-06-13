@@ -37,7 +37,14 @@ class InspectionCreate(BaseModel):
     results: dict = {}
     remarks: dict = {}
     notes: Optional[str] = None
-    status: str = "complete"
+    status: str = "dispatched"
+
+
+class InspectionReturn(BaseModel):
+    date_in: str
+    ending_mileage: Optional[int] = None
+    dispatcher_in_name: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
@@ -115,8 +122,33 @@ async def create_inspection(vid: int, data: InspectionCreate, db=Depends(get_db)
           json.dumps(data.results), json.dumps(data.remarks),
           data.notes, data.status)) as cur:
         iid = cur.lastrowid
+    # Auto-set vehicle status to dispatched
+    await db.execute(
+        "UPDATE rolling_stock SET status='dispatched', updated_at=datetime('now') WHERE id=?", (vid,)
+    )
     await db.commit()
     return {"id": iid}
+
+
+@router.patch("/inspections/{iid}/return")
+async def return_inspection(iid: int, data: InspectionReturn, db=Depends(get_db)):
+    async with db.execute("SELECT vehicle_id FROM vehicle_inspections WHERE id=?", (iid,)) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Inspection not found")
+    vid = row["vehicle_id"]
+    await db.execute("""
+        UPDATE vehicle_inspections
+        SET date_in=?, ending_mileage=?, dispatcher_name=COALESCE(?,dispatcher_name),
+            notes=COALESCE(?,notes), status='returned', updated_at=datetime('now')
+        WHERE id=?
+    """, (data.date_in, data.ending_mileage, data.dispatcher_in_name, data.notes, iid))
+    # Auto-set vehicle back to available
+    await db.execute(
+        "UPDATE rolling_stock SET status='available', updated_at=datetime('now') WHERE id=?", (vid,)
+    )
+    await db.commit()
+    return {"ok": True}
 
 
 @router.get("/inspections/{iid}")

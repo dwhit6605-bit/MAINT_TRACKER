@@ -77,6 +77,10 @@ async def dashboard_summary(db=Depends(get_db)):
     """) as cur:
         low_items = [dict(r) for r in await cur.fetchall()]
 
+    rs_total      = await scalar("SELECT COUNT(*) FROM rolling_stock WHERE status != 'retired'")
+    rs_dispatched = await scalar("SELECT COUNT(*) FROM rolling_stock WHERE status = 'dispatched'")
+    rs_maint      = await scalar("SELECT COUNT(*) FROM rolling_stock WHERE status = 'maintenance'")
+
     async with db.execute("""
         SELECT id, name, serial_num, warranty_expiry, end_of_life_date,
                CASE
@@ -106,6 +110,9 @@ async def dashboard_summary(db=Depends(get_db)):
             "low_stock": low_stock,
             "warranty_soon": warranty_soon,
             "eol_soon": eol_soon,
+            "rs_total": rs_total,
+            "rs_dispatched": rs_dispatched,
+            "rs_maint": rs_maint,
         },
         "upcoming_tasks": upcoming_tasks,
         "upcoming_cals": upcoming_cals,
