@@ -636,7 +636,7 @@ async function openEqDetail(id) {
 
   const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
 
-  modal(`<div class="modal" style="max-width:700px">
+  modal(`<div class="modal" style="max-width:700px;max-height:92vh;overflow-y:auto;">
     <div class="px-6 py-4 border-b flex items-start justify-between gap-4">
       <div>
         <div class="font-semibold text-lg">${esc(eq.name)}</div>
@@ -645,8 +645,8 @@ async function openEqDetail(id) {
       <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;line-height:1;background:none;border:none;cursor:pointer;flex-shrink:0;">&times;</button>
     </div>
 
-    <!-- Tabs -->
-    <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 1.5rem;" id="eq-detail-tabs">
+    <!-- Tabs — scrollable on mobile -->
+    <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 1rem;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;" id="eq-detail-tabs">
       <button onclick="eqTab('details')" id="tab-details" class="eq-tab active-tab">Details</button>
       <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dce8f5;color:#141414;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
       <button onclick="eqTab('calibration')" id="tab-calibration" class="eq-tab">Calibration <span id="cal-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:1px 7px;">${cals.length||''}</span></button>
@@ -755,7 +755,7 @@ async function eqTab(tab) {
         <span style="font-size:0.8rem;color:#6b7280;">Drop files here or <span style="color:#141414;font-weight:600;">click to browse</span></span>
         <span style="font-size:0.7rem;color:#9ca3af;">Photos, PDFs, documents — max 50 MB each</span>
         <input type="file" id="att-file-input" multiple style="display:none"
-               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
                onchange="eqUploadFiles(this.files,${id})">
       </label>
       <div id="att-upload-progress" style="display:none;margin-bottom:0.75rem;">
@@ -1899,7 +1899,7 @@ function renderTaskAttModal(taskId, taskTitle, atts) {
       <div style="font-size:0.72rem;color:#9ca3af;margin-top:0.25rem;">Images, PDF, Office docs · max 50 MB each</div>
     </div>
     <input id="task-att-input" type="file" multiple style="display:none"
-           accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
            onchange="uploadTaskAtts(${taskId},'${esc(taskTitle)}',this.files)">
     <div id="task-att-progress" style="display:none;margin-top:0.75rem;">
       <div style="height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;">
