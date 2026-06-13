@@ -269,6 +269,17 @@ async def init_db():
                 updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_reorder_item ON reorder_requests(item_id);
+
+            CREATE TABLE IF NOT EXISTS task_attachments (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id       INTEGER NOT NULL REFERENCES maintenance_tasks(id) ON DELETE CASCADE,
+                filename      TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_type     TEXT,
+                file_size     INTEGER,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_att_task ON task_attachments(task_id);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}

@@ -18,6 +18,7 @@ from backend.routers import settings as settings_router
 from backend.routers import readiness as readiness_router
 from backend.routers import reorder as reorder_router
 from backend.routers import rolling_stock as rolling_stock_router
+from backend.routers import task_attachments as task_attachments_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -97,6 +98,7 @@ app.include_router(settings_router.router)
 app.include_router(readiness_router.router)
 app.include_router(reorder_router.router)
 app.include_router(rolling_stock_router.router)
+app.include_router(task_attachments_router.router)
 
 
 @app.get("/login", response_class=HTMLResponse)

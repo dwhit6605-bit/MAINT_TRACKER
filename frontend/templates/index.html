@@ -157,6 +157,16 @@
         Users
       </a>
     </nav>
+    <!-- PWA install button — shown when browser fires beforeinstallprompt or on iOS -->
+    <div id="pwa-install-bar" style="display:none;padding:0.6rem 1rem;border-top:1px solid rgba(241,228,208,0.15);">
+      <button id="pwa-install-btn" onclick="pwaInstall()"
+        style="width:100%;padding:0.5rem 0.75rem;background:#1e3a5f;color:#a8c8e8;border:1px solid rgba(168,200,232,0.3);border-radius:0.375rem;font-size:0.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+        <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <span id="pwa-install-label">Install App</span>
+      </button>
+    </div>
     <div class="px-5 py-3 flex items-center justify-between text-xs" style="border-top:1px solid rgba(241,228,208,0.15);color:rgba(241,228,208,0.45);">
       <span>WHITWERX &copy; 2025</span>
       <button id="nav-bell" onclick="navigate('dashboard')" title="Alerts" style="background:none;border:none;cursor:pointer;position:relative;padding:0;line-height:1;">
@@ -1608,8 +1618,9 @@ function maintenanceRows(rows) {
       <td class="px-4 py-3"><span class="${sc[t.status]||'badge-gray'}">${t.status}</span></td>
       <td class="px-4 py-3">${dueBadge(t.next_due, t.status==='completed'?'completed':t.status)}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.assigned_to||'—')}</td>
-      <td class="px-4 py-3 text-right space-x-2">
+      <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
         ${t.status!=='completed' && isTech() ?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
+        <button onclick="openTaskAttachments(${t.id},'${esc(t.title)}')" class="text-blue-500 hover:underline text-xs">📎</button>
         ${isAdmin() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
     </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No tasks found.</td></tr>';
@@ -1853,6 +1864,112 @@ async function deleteTask(id) {
   renderMaintenanceTable(maintenanceData);
 }
 
+
+// ── Task Attachments ──────────────────────────────────────────────────────────
+async function openTaskAttachments(taskId, taskTitle) {
+  let atts = await api('GET', `/api/task-attachments/${taskId}`).catch(() => []);
+  renderTaskAttModal(taskId, taskTitle, atts);
+}
+
+function renderTaskAttModal(taskId, taskTitle, atts) {
+  const isImg = t => t && t.startsWith('image/');
+  const fmtSize = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(0)+'KB' : (b/1048576).toFixed(1)+'MB';
+  const fileUrl = a => `/api/task-attachments/${taskId}/file/${a.id}?token=${getToken()}`;
+
+  const attList = atts.length ? atts.map(a => `
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid #f3f4f6;">
+      ${isImg(a.file_type)
+        ? `<img src="${fileUrl(a)}" style="width:3rem;height:3rem;object-fit:cover;border-radius:0.375rem;flex-shrink:0;" loading="lazy">`
+        : `<div style="width:3rem;height:3rem;background:#f3f4f6;border-radius:0.375rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">📄</div>`}
+      <div style="flex:1;min-width:0;">
+        <a href="${fileUrl(a)}" target="_blank" style="font-size:0.8rem;font-weight:600;color:#1e3a5f;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
+        <div style="font-size:0.72rem;color:#9ca3af;">${fmtSize(a.file_size||0)} · ${a.created_at?.slice(0,10)||''}</div>
+      </div>
+      ${isTech() ? `<button onclick="deleteTaskAtt(${taskId},'${esc(taskTitle)}',${a.id})" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;padding:0.25rem;">✕</button>` : ''}
+    </div>`).join('')
+    : `<p style="font-size:0.875rem;color:#9ca3af;text-align:center;padding:1.5rem 0;">No attachments yet.</p>`;
+
+  const uploadSection = isTech() ? `
+    <div id="task-att-drop" style="border:2px dashed #d1d5db;border-radius:0.5rem;padding:1.25rem;text-align:center;cursor:pointer;margin-top:1rem;"
+         onclick="document.getElementById('task-att-input').click()"
+         ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
+         ondragleave="this.style.borderColor='#d1d5db'"
+         ondrop="event.preventDefault();this.style.borderColor='#d1d5db';uploadTaskAtts(${taskId},'${esc(taskTitle)}',event.dataTransfer.files)">
+      <div style="font-size:0.85rem;color:#6b7280;">Drop files here or <span style="color:#1e3a5f;font-weight:600;">browse</span></div>
+      <div style="font-size:0.72rem;color:#9ca3af;margin-top:0.25rem;">Images, PDF, Office docs · max 50 MB each</div>
+    </div>
+    <input id="task-att-input" type="file" multiple style="display:none"
+           accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+           onchange="uploadTaskAtts(${taskId},'${esc(taskTitle)}',this.files)">
+    <div id="task-att-progress" style="display:none;margin-top:0.75rem;">
+      <div style="height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;">
+        <div id="task-att-bar" style="height:100%;background:#1e3a5f;width:0%;transition:width 0.3s;"></div>
+      </div>
+      <div id="task-att-status" style="font-size:0.75rem;color:#6b7280;margin-top:0.35rem;text-align:center;"></div>
+    </div>` : '';
+
+  modal(`<div class="modal" style="max-width:34rem;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 class="font-semibold">Attachments</h2>
+        <div style="font-size:0.75rem;color:#6b7280;margin-top:1px;">${esc(taskTitle)}</div>
+      </div>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div class="px-6 py-4">
+      <div id="task-att-list">${attList}</div>
+      ${uploadSection}
+    </div>
+  </div>`);
+}
+
+async function uploadTaskAtts(taskId, taskTitle, files) {
+  if (!files || !files.length) return;
+  const prog = document.getElementById('task-att-progress');
+  const bar  = document.getElementById('task-att-bar');
+  const stat = document.getElementById('task-att-status');
+  if (prog) prog.style.display = '';
+  let done = 0;
+  for (const file of Array.from(files)) {
+    if (stat) stat.textContent = `Uploading ${file.name}…`;
+    const fd = new FormData();
+    fd.append('file', file);
+    await fetch(`/api/task-attachments/${taskId}`, {
+      method: 'POST', body: fd,
+      headers: { 'Authorization': 'Bearer ' + (getToken() || '') }
+    }).catch(() => {});
+    done++;
+    if (bar) bar.style.width = `${Math.round(done / files.length * 100)}%`;
+  }
+  if (prog) prog.style.display = 'none';
+  toast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded.`);
+  const atts = await api('GET', `/api/task-attachments/${taskId}`).catch(() => []);
+  document.getElementById('task-att-list').innerHTML = atts.length
+    ? atts.map(a => {
+        const isImg = a.file_type?.startsWith('image/');
+        const fmtSize = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(0)+'KB' : (b/1048576).toFixed(1)+'MB';
+        const fileUrl = `/api/task-attachments/${taskId}/file/${a.id}?token=${getToken()}`;
+        return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid #f3f4f6;">
+          ${isImg ? `<img src="${fileUrl}" style="width:3rem;height:3rem;object-fit:cover;border-radius:0.375rem;flex-shrink:0;" loading="lazy">`
+                  : `<div style="width:3rem;height:3rem;background:#f3f4f6;border-radius:0.375rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">📄</div>`}
+          <div style="flex:1;min-width:0;">
+            <a href="${fileUrl}" target="_blank" style="font-size:0.8rem;font-weight:600;color:#1e3a5f;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
+            <div style="font-size:0.72rem;color:#9ca3af;">${fmtSize(a.file_size||0)} · ${a.created_at?.slice(0,10)||''}</div>
+          </div>
+          ${isTech() ? `<button onclick="deleteTaskAtt(${taskId},'${esc(taskTitle)}',${a.id})" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;padding:0.25rem;">✕</button>` : ''}
+        </div>`;
+      }).join('')
+    : `<p style="font-size:0.875rem;color:#9ca3af;text-align:center;padding:1.5rem 0;">No attachments yet.</p>`;
+  const inp = document.getElementById('task-att-input');
+  if (inp) inp.value = '';
+}
+
+async function deleteTaskAtt(taskId, taskTitle, attId) {
+  if (!confirm('Remove this attachment?')) return;
+  await api('DELETE', `/api/task-attachments/${taskId}/${attId}`);
+  const atts = await api('GET', `/api/task-attachments/${taskId}`).catch(() => []);
+  renderTaskAttModal(taskId, taskTitle, atts);
+}
 
 // ─── Calibration ──────────────────────────────────────────────────────────────
 let calData = [];
@@ -4273,16 +4390,68 @@ function esc(s) {
 }
 </script>
 <script>
+// ── PWA install ───────────────────────────────────────────────────────────────
+let _pwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  const bar = document.getElementById('pwa-install-bar');
+  if (bar) bar.style.display = '';
+});
+
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  const bar = document.getElementById('pwa-install-bar');
+  if (bar) bar.style.display = 'none';
+});
+
+function pwaInstall() {
+  if (_pwaPrompt) {
+    _pwaPrompt.prompt();
+    _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; });
+  } else {
+    // iOS / browsers that don't support beforeinstallprompt
+    modal(`<div class="modal" style="max-width:22rem;">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h2 class="font-semibold">Install MAINT SUPER</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
+        <p><strong>iPhone / iPad (Safari):</strong></p>
+        <ol style="padding-left:1.25rem;line-height:1.8;">
+          <li>Tap the <strong>Share</strong> button <span style="font-size:1rem;">⬆</span> at the bottom of Safari</li>
+          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+          <li>Tap <strong>Add</strong></li>
+        </ol>
+        <p style="color:#6b7280;font-size:0.78rem;">The app will appear on your home screen and open full-screen without the browser bar.</p>
+      </div>
+      <div class="px-6 pb-5 flex justify-end">
+        <button onclick="closeModal()" class="btn-primary">Got it</button>
+      </div>
+    </div>`);
+  }
+}
+
+// ── Service Worker ─────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
-  // Unregister any existing SWs first (clears reload-loop bug), then re-register
   window.addEventListener('load', () => {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      Promise.all(regs.map(r => r.unregister())).then(() => {
-        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
-      });
-    });
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
   });
 }
+
+// Show install bar on iOS (beforeinstallprompt never fires there)
+window.addEventListener('load', () => {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (isIos && !isStandalone) {
+    const bar = document.getElementById('pwa-install-bar');
+    const lbl = document.getElementById('pwa-install-label');
+    if (bar) bar.style.display = '';
+    if (lbl) lbl.textContent = 'Add to Home Screen';
+  }
+});
 </script>
 </body>
 </html>
