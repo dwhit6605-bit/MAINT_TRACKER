@@ -1309,7 +1309,7 @@ async function eqDeleteCal(calId) {
 function eqAttCard(a, eqId) {
   const isImg = /^image\//i.test(a.file_type || '');
   const isPdf = (a.file_type || '').includes('pdf');
-  const url   = `/api/attachments/${eqId}/file/${a.id}`;
+  const url   = `/api/attachments/${eqId}/file/${a.id}?token=${getToken()}`;
   const thumb = isImg
     ? `<img src="${url}" alt="${esc(a.original_name)}" style="width:100%;height:90px;object-fit:cover;border-radius:0.5rem 0.5rem 0 0;">`
     : `<div style="height:90px;display:flex;align-items:center;justify-content:center;background:#f3f4f6;border-radius:0.5rem 0.5rem 0 0;">
