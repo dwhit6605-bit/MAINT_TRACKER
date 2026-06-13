@@ -221,6 +221,42 @@ async def init_db():
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS rolling_stock (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                year         TEXT,
+                make         TEXT NOT NULL,
+                model        TEXT NOT NULL,
+                tag_number   TEXT,
+                key_number   TEXT,
+                license_plate TEXT,
+                vin          TEXT,
+                color        TEXT,
+                status       TEXT NOT NULL DEFAULT 'available',
+                notes        TEXT,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS vehicle_inspections (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                vehicle_id        INTEGER NOT NULL REFERENCES rolling_stock(id) ON DELETE CASCADE,
+                date_out          TEXT NOT NULL DEFAULT (date('now')),
+                date_in           TEXT,
+                beginning_mileage INTEGER,
+                ending_mileage    INTEGER,
+                operator_name     TEXT,
+                operator_phone    TEXT,
+                dispatcher_name   TEXT,
+                accident_card     INTEGER NOT NULL DEFAULT 0,
+                results           TEXT NOT NULL DEFAULT '{}',
+                remarks           TEXT NOT NULL DEFAULT '{}',
+                notes             TEXT,
+                status            TEXT NOT NULL DEFAULT 'open',
+                created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_insp_vehicle ON vehicle_inspections(vehicle_id);
+
             CREATE TABLE IF NOT EXISTS reorder_requests (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_id      INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
