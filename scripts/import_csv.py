@@ -1,5 +1,5 @@
 """
-Import equipment/calibration/inventory CSV exports into the MAINT SUPER database.
+Import equipment/calibration/inventory CSV exports into the GEAR GUARD database.
 Vehicle tracking CSVs are excluded — this system focuses on equipment, calibration, and inventory.
 Run from project root:  python scripts/import_csv.py [--db maint.db]
 """

@@ -1,4 +1,4 @@
-# MAINT SUPER — Ubuntu 22.04 Deployment Guide
+# GEAR GUARD — Ubuntu 22.04 Deployment Guide
 
 Target: Ubuntu 22.04 LTS, domain `maint.whitwerx.net`
 
@@ -102,7 +102,7 @@ Paste:
 
 ```ini
 [Unit]
-Description=MAINT SUPER
+Description=GEAR GUARD
 After=network.target
 
 [Service]

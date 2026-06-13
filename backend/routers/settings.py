@@ -65,7 +65,7 @@ async def test_smtp(request: Request, db=Depends(get_db)):
         raise HTTPException(400, "SMTP not configured — save settings first")
     try:
         _send(
-            "MAINT SUPER — Test Email",
+            "GEAR GUARD — Test Email",
             "<p>If you received this, your SMTP settings are working correctly.</p>",
             to=cfg["NOTIFY_EMAIL_TO"], from_=cfg["NOTIFY_EMAIL_FROM"],
             host=cfg["SMTP_HOST"], port=int(cfg.get("SMTP_PORT") or 587),

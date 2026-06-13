@@ -166,7 +166,7 @@ async def run_daily_check():
     if maint:      summary_parts.append(f"{len(maint)} maintenance")
     if cals:       summary_parts.append(f"{len(cals)} calibration")
     if dispatched: summary_parts.append(f"{len(dispatched)} vehicle{'s' if len(dispatched)!=1 else ''} out")
-    subject = f"MAINT SUPER — {', '.join(summary_parts)}"
+    subject = f"GEAR GUARD — {', '.join(summary_parts)}"
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
@@ -177,7 +177,7 @@ async def run_daily_check():
 
   <!-- Header -->
   <tr><td style="background:#1e3a5f;padding:24px 32px;">
-    <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:.5px;">MAINT SUPER</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:.5px;">GEAR GUARD</div>
     <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">Daily Alert Digest · {date_str}</div>
   </td></tr>
 
@@ -191,7 +191,7 @@ async def run_daily_check():
     {'<h3 style="margin:24px 0 8px;color:#1e3a5f;font-size:15px;">🚗 Rolling Stock — ' + str(len(dispatched)) + ' vehicle' + ('s' if len(dispatched)!=1 else '') + ' currently dispatched</h3>' + _table(['Vehicle','Tag #','Plate','Operator','Date Out'], rs_rows) if dispatched else ''}
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
-      Sent automatically by MAINT SUPER &nbsp;·&nbsp;
+      Sent automatically by GEAR GUARD &nbsp;·&nbsp;
       <a href="https://maint.whitwerx.net" style="color:#1e3a5f;">maint.whitwerx.net</a>
     </div>
   </td></tr>

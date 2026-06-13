@@ -1,6 +1,6 @@
 {
-  "name": "MAINT SUPER",
-  "short_name": "MAINT",
+  "name": "GEAR GUARD",
+  "short_name": "GEAR",
   "description": "Military maintenance management — equipment, PMCS, calibration, inventory",
   "start_url": "/dashboard",
   "display": "standalone",

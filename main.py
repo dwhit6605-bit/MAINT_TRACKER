@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="MAINT SUPER", lifespan=lifespan)
+app = FastAPI(title="GEAR GUARD", lifespan=lifespan)
 
 
 @app.middleware("http")

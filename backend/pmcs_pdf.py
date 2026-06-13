@@ -79,7 +79,7 @@ def generate_pmcs_pdf(template_title: str, equipment_name: str,
     c.drawString(M + 10, y - 22, "PMCS COMPLETION RECORD")
     c.setFont("Helvetica", 8)
     c.drawRightString(W - M - 10, y - 14, f"Generated: {completed_at[:16].replace('T',' ')}")
-    c.drawRightString(W - M - 10, y - 24, "MAINT SUPER · maint.whitwerx.net")
+    c.drawRightString(W - M - 10, y - 24, "GEAR GUARD · maint.whitwerx.net")
     y -= 36
 
     # Info grid
@@ -254,7 +254,7 @@ def generate_pmcs_pdf(template_title: str, equipment_name: str,
     # ── Footer ────────────────────────────────────────────────────────────────
     c.setFont("Helvetica", 7)
     c.setFillColor(colors.HexColor("#94a3b8"))
-    c.drawString(M, M - 4, "PMCS Completion Record — MAINT SUPER")
+    c.drawString(M, M - 4, "PMCS Completion Record — GEAR GUARD")
     c.drawRightString(W - M, M - 4, completed_at[:10])
 
     c.save()
