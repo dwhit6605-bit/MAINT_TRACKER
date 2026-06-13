@@ -114,6 +114,53 @@ async def get_template(tmpl_id: int, db=Depends(get_db)):
     return tmpl
 
 
+@router.post("/templates/{tmpl_id}/duplicate", status_code=201)
+async def duplicate_template(tmpl_id: int, db=Depends(get_db)):
+    """Clone a template with all its linked equipment and check items."""
+    async with db.execute("SELECT * FROM pmcs_templates WHERE id=?", (tmpl_id,)) as cur:
+        src = await cur.fetchone()
+    if not src:
+        raise HTTPException(404, "Template not found")
+    src = dict(src)
+
+    async with db.execute("""
+        INSERT INTO pmcs_templates (title, description, equipment_id)
+        VALUES (?, ?, ?)
+    """, (f"Copy of {src['title']}", src["description"], src["equipment_id"])) as cur:
+        new_id = cur.lastrowid
+
+    # Clone linked equipment
+    async with db.execute(
+        "SELECT equipment_id, order_index FROM pmcs_template_equipment WHERE template_id=?",
+        (tmpl_id,)
+    ) as cur:
+        eq_rows = await cur.fetchall()
+    for eq in eq_rows:
+        await db.execute(
+            "INSERT OR IGNORE INTO pmcs_template_equipment (template_id, equipment_id, order_index) VALUES (?,?,?)",
+            (new_id, eq["equipment_id"], eq["order_index"])
+        )
+
+    # Clone items
+    async with db.execute(
+        "SELECT * FROM pmcs_items WHERE template_id=? ORDER BY order_index, id",
+        (tmpl_id,)
+    ) as cur:
+        items = await cur.fetchall()
+    for it in items:
+        await db.execute("""
+            INSERT INTO pmcs_items
+                (template_id, item_no, interval, check_item, procedure,
+                 not_ready_if, order_index, equipment_id, creates_task)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (new_id, it["item_no"], it["interval"], it["check_item"],
+              it["procedure"], it["not_ready_if"], it["order_index"],
+              it["equipment_id"], it["creates_task"]))
+
+    await db.commit()
+    return {"id": new_id}
+
+
 @router.post("/templates", status_code=201)
 async def create_template(data: TemplateCreate, db=Depends(get_db)):
     async with db.execute("""
@@ -230,6 +277,75 @@ async def delete_item(item_id: int, db=Depends(get_db)):
     await db.execute("DELETE FROM pmcs_items WHERE id=?", (item_id,))
     await db.commit()
     return {"ok": True}
+
+
+class ItemBulkCreate(BaseModel):
+    """Create the same check item for multiple equipment IDs at once."""
+    equipment_ids: List[int]
+    item_no: Optional[str] = None
+    interval: str = "B"
+    check_item: str
+    procedure: Optional[str] = None
+    not_ready_if: Optional[str] = None
+    creates_task: bool = False
+
+
+@router.post("/templates/{tmpl_id}/items/bulk", status_code=201)
+async def bulk_add_items(tmpl_id: int, data: ItemBulkCreate, db=Depends(get_db)):
+    """Create the same check item for each of the supplied equipment IDs."""
+    if not data.equipment_ids:
+        raise HTTPException(400, "No equipment IDs supplied")
+    async with db.execute(
+        "SELECT COUNT(*) FROM pmcs_templates WHERE id=?", (tmpl_id,)
+    ) as cur:
+        if not (await cur.fetchone())[0]:
+            raise HTTPException(404, "Template not found")
+    created = 0
+    for eq_id in data.equipment_ids:
+        async with db.execute(
+            "SELECT MAX(order_index) FROM pmcs_items WHERE template_id=? AND equipment_id=?",
+            (tmpl_id, eq_id)
+        ) as cur:
+            row = await cur.fetchone()
+            order_index = (row[0] or 0) + 1
+        await db.execute("""
+            INSERT INTO pmcs_items
+                (template_id, item_no, interval, check_item, procedure,
+                 not_ready_if, order_index, equipment_id, creates_task)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (tmpl_id, data.item_no, data.interval, data.check_item,
+              data.procedure, data.not_ready_if, order_index,
+              eq_id, 1 if data.creates_task else 0))
+        created += 1
+    await db.commit()
+    return {"created": created}
+
+
+@router.post("/templates/{tmpl_id}/equipment/{eq_id}/copy-from/{src_eq_id}", status_code=201)
+async def copy_items_between_equipment(tmpl_id: int, eq_id: int, src_eq_id: int, db=Depends(get_db)):
+    """Copy all check items from src_eq_id to eq_id within the same template."""
+    async with db.execute(
+        "SELECT * FROM pmcs_items WHERE template_id=? AND equipment_id=? ORDER BY order_index, id",
+        (tmpl_id, src_eq_id)
+    ) as cur:
+        src_items = [dict(i) for i in await cur.fetchall()]
+    async with db.execute(
+        "SELECT MAX(order_index) FROM pmcs_items WHERE template_id=? AND equipment_id=?",
+        (tmpl_id, eq_id)
+    ) as cur:
+        row = await cur.fetchone()
+        base_index = (row[0] or 0) + 1
+    for i, it in enumerate(src_items):
+        await db.execute("""
+            INSERT INTO pmcs_items
+                (template_id, item_no, interval, check_item, procedure,
+                 not_ready_if, order_index, equipment_id, creates_task)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (tmpl_id, it["item_no"], it["interval"], it["check_item"],
+              it["procedure"], it["not_ready_if"], base_index + i,
+              eq_id, it["creates_task"]))
+    await db.commit()
+    return {"copied": len(src_items)}
 
 
 # ── Sessions ──────────────────────────────────────────────────────────────────
