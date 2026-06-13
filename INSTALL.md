@@ -1,6 +1,6 @@
 # GEAR GUARD — Ubuntu 22.04 Deployment Guide
 
-Target: Ubuntu 22.04 LTS, domain `maint.whitwerx.net`
+Target: Ubuntu 22.04 LTS, domain `gear.whitwerx.net`
 
 ---
 
@@ -52,7 +52,7 @@ Minimum required values:
 
 ```
 DB_PATH=maint.db
-BASE_URL=https://maint.whitwerx.net
+BASE_URL=https://gear.whitwerx.net
 
 # Brevo SMTP (optional — comment out to disable email alerts)
 NOTIFY_EMAIL_TO=you@example.com
@@ -143,7 +143,7 @@ Paste:
 ```nginx
 server {
     listen 80;
-    server_name maint.whitwerx.net;
+    server_name gear.whitwerx.net;
 
     client_max_body_size 55M;
 
@@ -177,7 +177,7 @@ sudo systemctl reload nginx
 ## 9. HTTPS with Certbot
 
 ```bash
-sudo certbot --nginx -d maint.whitwerx.net
+sudo certbot --nginx -d gear.whitwerx.net
 ```
 
 Certbot auto-edits the nginx config and sets up renewal.
@@ -187,7 +187,7 @@ Certbot auto-edits the nginx config and sets up renewal.
 ## 10. Verify
 
 ```bash
-curl -I https://maint.whitwerx.net/api/dashboard
+curl -I https://gear.whitwerx.net/api/dashboard
 # expect HTTP/2 200
 ```
 

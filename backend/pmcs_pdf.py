@@ -79,7 +79,7 @@ def generate_pmcs_pdf(template_title: str, equipment_name: str,
     c.drawString(M + 10, y - 22, "PMCS COMPLETION RECORD")
     c.setFont("Helvetica", 8)
     c.drawRightString(W - M - 10, y - 14, f"Generated: {completed_at[:16].replace('T',' ')}")
-    c.drawRightString(W - M - 10, y - 24, "GEAR GUARD · maint.whitwerx.net")
+    c.drawRightString(W - M - 10, y - 24, "GEAR GUARD · gear.whitwerx.net")
     y -= 36
 
     # Info grid

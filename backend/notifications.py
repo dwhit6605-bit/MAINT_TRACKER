@@ -192,7 +192,7 @@ async def run_daily_check():
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
       Sent automatically by GEAR GUARD &nbsp;·&nbsp;
-      <a href="https://maint.whitwerx.net" style="color:#1e3a5f;">maint.whitwerx.net</a>
+      <a href="https://gear.whitwerx.net" style="color:#1e3a5f;">gear.whitwerx.net</a>
     </div>
   </td></tr>
 
