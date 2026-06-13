@@ -31,10 +31,18 @@ async def upload_attachment(eq_id: int, file: UploadFile = File(...), db=Depends
     # safe filename: strip path chars, keep extension
     original = os.path.basename(file.filename or "upload")
     ext = os.path.splitext(original)[1].lower()
-    allowed_exts = {".jpg",".jpeg",".png",".gif",".webp",".pdf",".doc",".docx",
-                    ".xls",".xlsx",".csv",".txt",".zip"}
+    allowed_exts = {".jpg",".jpeg",".png",".gif",".webp",".heic",".heif",".pdf",
+                    ".doc",".docx",".xls",".xlsx",".csv",".txt",".zip"}
+    # Fall back to content-type when iOS sends a file with no extension
+    if not ext and file.content_type:
+        ct_map = {"image/jpeg":".jpg","image/png":".png","image/heic":".heic",
+                  "image/heif":".heif","image/gif":".gif","image/webp":".webp",
+                  "application/pdf":".pdf"}
+        ext = ct_map.get(file.content_type, "")
+        if ext:
+            original = original + ext
     if ext not in allowed_exts:
-        raise HTTPException(400, f"File type {ext} not allowed")
+        raise HTTPException(400, f"File type '{ext or file.content_type}' not allowed")
 
     # unique stored filename
     import uuid

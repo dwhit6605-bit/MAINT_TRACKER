@@ -772,10 +772,7 @@ async function eqTab(tab) {
           : atts.map(a => eqAttCard(a, id)).join('')}
       </div>`;
 
-    // wire the label click to the hidden input
-    $('att-drop').addEventListener('click', e => {
-      if (e.target.tagName !== 'INPUT') $('att-file-input').click();
-    });
+    // input is inside the label — native label click triggers it; no JS needed
   }
 
   else if (tab === 'pmcs-history') {
