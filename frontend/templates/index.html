@@ -1719,10 +1719,10 @@ function setTaskMode(mode) {
 function updateTaskPreview() {
   const preview = document.getElementById('mt-bulk-preview');
   if (!preview) return;
-  const cat  = document.querySelector('[name="category"]')?.value?.toLowerCase() || '';
-  const name = document.querySelector('[name="name_contains"]')?.value?.toLowerCase() || '';
+  const form = document.getElementById('mt-form');
+  const cat  = form?.querySelector('[name="category"]')?.value?.toLowerCase() || '';
+  const name = form?.querySelector('[name="name_contains"]')?.value?.toLowerCase() || '';
   const matches = equipList.filter(e =>
-    e.status === 'active' &&
     (!cat  || (e.category||'').toLowerCase() === cat) &&
     (!name || (e.name||'').toLowerCase().includes(name))
   );
@@ -1730,8 +1730,8 @@ function updateTaskPreview() {
   if (window._taskMode !== 'bulk') { if (btn) btn.textContent = 'Save Task'; return; }
   preview.innerHTML = matches.length
     ? `<span style="color:#15803d;font-weight:600;">✓ ${matches.length} equipment matched</span>: ${matches.slice(0,5).map(e=>esc(e.name)).join(', ')}${matches.length>5?' …':''}`
-    : `<span style="color:#dc2626;">No active equipment matched.</span>`;
-  if (btn) btn.textContent = matches.length ? `Create ${matches.length} Task${matches.length!==1?'s':''}` : 'No Matches';
+    : `<span style="color:#dc2626;">No equipment matched — check your filters.</span>`;
+  if (btn) btn.textContent = matches.length ? `Create Tasks for ${matches.length}` : 'No Matches';
 }
 
 async function saveTask(e) {
