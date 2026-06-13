@@ -2522,7 +2522,7 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
         <div style="display:flex;gap:0.4rem;">
           <select id="pmcs-eq-picker" class="input" style="padding:0.3rem 0.4rem;font-size:0.75rem;flex:1;">
             <option value="">— select —</option>
-            ${available.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+            ${available.map(e=>`<option value="${e.id}">${esc(e.name)}${e.serial_num?' — '+esc(e.serial_num):''}</option>`).join('')}
           </select>
           <button onclick="addPmcsEquipment(${tmplId})" class="btn-primary" style="font-size:0.72rem;padding:0.3rem 0.6rem;white-space:nowrap;">Add</button>
         </div>
