@@ -2368,8 +2368,10 @@ async function deleteItem(id) {
 
 // ─── PMCS ─────────────────────────────────────────────────────────────────────
 
+let pmcsTemplateCache = [];
 async function pmcsPage() {
   const templates = await api('GET', '/api/pmcs/templates');
+  pmcsTemplateCache = templates;
   $('page-actions').innerHTML = `<button onclick="openPmcsTemplateModal()" class="btn-primary">+ New Checklist</button>`;
   $('page-content').innerHTML = templates.length === 0
     ? `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
@@ -2397,6 +2399,7 @@ function pmcsCard(t) {
       </div>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button onclick="openPmcsTemplateModal(pmcsTemplateCache.find(x=>x.id===${t.id}))" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Rename</button>
       <button onclick="openPmcsItems(${t.id})" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Edit Items</button>
       <button onclick="openPmcsQR(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">&#9641; QR Code</button>
       <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
