@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from backend.database import get_db
-from backend.models import MaintenanceTaskCreate, MaintenanceComplete
+from backend.models import MaintenanceTaskCreate, MaintenanceComplete, MaintenanceBulkCreate
 from backend.da2404 import generate_da2404
 from backend.auth import require_admin, require_tech
 from backend import audit
@@ -221,6 +221,35 @@ async def export_da2404(
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{original_name}"'},
     )
+
+
+@router.post("/bulk", status_code=201)
+async def bulk_create_tasks(data: MaintenanceBulkCreate, request: Request, db=Depends(get_db)):
+    require_admin(request)
+    query = "SELECT id FROM equipment WHERE status='active'"
+    params = []
+    if data.category:
+        query += " AND LOWER(category)=LOWER(?)"
+        params.append(data.category)
+    if data.name_contains:
+        query += " AND LOWER(name) LIKE LOWER(?)"
+        params.append(f"%{data.name_contains}%")
+    async with db.execute(query, params) as cur:
+        equipment_ids = [r[0] for r in await cur.fetchall()]
+    if not equipment_ids:
+        raise HTTPException(400, "No active equipment matched the filter")
+    created = 0
+    for eid in equipment_ids:
+        await db.execute("""
+            INSERT INTO maintenance_tasks
+                (equipment_id, title, description, task_type, interval_days, next_due, status, assigned_to, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (eid, data.title, data.description, data.task_type,
+              data.interval_days, data.next_due, data.status,
+              data.assigned_to, data.notes))
+        created += 1
+    await db.commit()
+    return {"created": created}
 
 
 @router.post("/refresh-overdue")

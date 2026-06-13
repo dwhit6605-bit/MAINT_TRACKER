@@ -77,6 +77,28 @@ class InventoryAdjust(BaseModel):
     performed_by: Optional[str] = None
 
 
+class CalibrationBulkEdit(BaseModel):
+    ids: list[int]
+    calibrated_at: Optional[str] = None
+    next_due: Optional[str] = None
+    calibrated_by: Optional[str] = None
+    result: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MaintenanceBulkCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    task_type: str = "scheduled"
+    interval_days: Optional[int] = None
+    next_due: Optional[str] = None
+    status: str = "pending"
+    assigned_to: Optional[str] = None
+    notes: Optional[str] = None
+    category: Optional[str] = None       # filter by equipment category
+    name_contains: Optional[str] = None  # filter by equipment name substring
+
+
 class SkoCreate(BaseModel):
     name: str
     nsn: Optional[str] = None

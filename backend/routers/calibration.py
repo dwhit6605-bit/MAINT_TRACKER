@@ -1,7 +1,7 @@
 import os, shutil
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from backend.database import get_db
-from backend.models import CalibrationCreate
+from backend.models import CalibrationCreate, CalibrationBulkEdit
 from backend.auth import require_tech
 from backend import audit
 
@@ -61,6 +61,34 @@ async def create_record(data: CalibrationCreate, request: Request, db=Depends(ge
                             "calibrated_at": data.calibrated_at})
     await db.commit()
     return {"id": rec_id}
+
+
+@router.patch("/bulk")
+async def bulk_edit(data: CalibrationBulkEdit, request: Request, db=Depends(get_db)):
+    require_tech(request)
+    if not data.ids:
+        raise HTTPException(400, "No IDs provided")
+    sets, params = [], []
+    if data.calibrated_at is not None:
+        sets.append("calibrated_at=?"); params.append(data.calibrated_at)
+    if data.next_due is not None:
+        sets.append("next_due=?"); params.append(data.next_due)
+    if data.calibrated_by is not None:
+        sets.append("calibrated_by=?"); params.append(data.calibrated_by)
+    if data.result is not None:
+        sets.append("result=?"); params.append(data.result)
+    if data.notes is not None:
+        sets.append("notes=?"); params.append(data.notes)
+    if not sets:
+        raise HTTPException(400, "No fields to update")
+    placeholders = ",".join("?" * len(data.ids))
+    params += data.ids
+    await db.execute(
+        f"UPDATE calibration_records SET {', '.join(sets)} WHERE id IN ({placeholders})",
+        params
+    )
+    await db.commit()
+    return {"updated": len(data.ids)}
 
 
 @router.post("/{rec_id}/upload-cert")

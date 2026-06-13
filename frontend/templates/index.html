@@ -1634,16 +1634,44 @@ async function refreshOverdue() {
 
 function openTaskModal() {
   const eqOptions = equipList.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
-  modal(`<div class="modal">
+  const categories = [...new Set(equipList.map(e=>e.category).filter(Boolean))].sort();
+  const catOptions = categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  modal(`<div class="modal" style="max-width:42rem;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">Add Maintenance Task</h2>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
+    <div class="px-6 pt-4">
+      <div style="display:flex;gap:0;border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;width:fit-content;">
+        <button type="button" id="mt-mode-single" onclick="setTaskMode('single')"
+          style="padding:0.4rem 1rem;font-size:0.8rem;font-weight:600;border:none;cursor:pointer;background:#1e3a5f;color:#fff;">Single Equipment</button>
+        <button type="button" id="mt-mode-bulk" onclick="setTaskMode('bulk')"
+          style="padding:0.4rem 1rem;font-size:0.8rem;font-weight:600;border:none;cursor:pointer;background:#f3f4f6;color:#374151;">Apply to Multiple</button>
+      </div>
+    </div>
     <form id="mt-form" class="px-6 py-4 space-y-4" onsubmit="saveTask(event)">
       <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2">
+        <div class="col-span-2" id="mt-single-target">
           <label class="label">Equipment *</label>
-          <select class="input" name="equipment_id" required><option value="">Select…</option>${eqOptions}</select>
+          <select class="input" name="equipment_id"><option value="">Select…</option>${eqOptions}</select>
+        </div>
+        <div class="col-span-2" id="mt-bulk-target" style="display:none;">
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:0.75rem;font-size:0.8rem;color:#92400e;">
+            Task will be created for every <strong>active</strong> equipment matching the filters below. Leave both blank to apply to <em>all</em> active equipment.
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="label">Category</label>
+              <select class="input" name="category" onchange="updateTaskPreview()">
+                <option value="">— Any category —</option>${catOptions}
+              </select>
+            </div>
+            <div>
+              <label class="label">Name contains</label>
+              <input class="input" name="name_contains" placeholder="e.g. M4, Radio…" oninput="updateTaskPreview()">
+            </div>
+          </div>
+          <div id="mt-bulk-preview" style="margin-top:0.5rem;font-size:0.8rem;color:#374151;"></div>
         </div>
         <div class="col-span-2"><label class="label">Task Title *</label><input class="input" name="title" required></div>
         <div><label class="label">Type</label>
@@ -1663,25 +1691,80 @@ function openTaskModal() {
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
-        <button type="submit" class="btn-primary">Save</button>
+        <button type="submit" id="mt-submit-btn" class="btn-primary">Save Task</button>
       </div>
     </form>
   </div>`);
+  window._taskMode = 'single';
+  updateTaskPreview();
+}
+
+function setTaskMode(mode) {
+  window._taskMode = mode;
+  const single = document.getElementById('mt-single-target');
+  const bulk   = document.getElementById('mt-bulk-target');
+  const btnS   = document.getElementById('mt-mode-single');
+  const btnB   = document.getElementById('mt-mode-bulk');
+  const eqSel  = single?.querySelector('select');
+  single.style.display = mode === 'single' ? '' : 'none';
+  bulk.style.display   = mode === 'bulk'   ? '' : 'none';
+  if (eqSel) eqSel.required = mode === 'single';
+  btnS.style.background = mode === 'single' ? '#1e3a5f' : '#f3f4f6';
+  btnS.style.color      = mode === 'single' ? '#fff'    : '#374151';
+  btnB.style.background = mode === 'bulk'   ? '#1e3a5f' : '#f3f4f6';
+  btnB.style.color      = mode === 'bulk'   ? '#fff'    : '#374151';
+  updateTaskPreview();
+}
+
+function updateTaskPreview() {
+  const preview = document.getElementById('mt-bulk-preview');
+  if (!preview) return;
+  const cat  = document.querySelector('[name="category"]')?.value?.toLowerCase() || '';
+  const name = document.querySelector('[name="name_contains"]')?.value?.toLowerCase() || '';
+  const matches = equipList.filter(e =>
+    e.status === 'active' &&
+    (!cat  || (e.category||'').toLowerCase() === cat) &&
+    (!name || (e.name||'').toLowerCase().includes(name))
+  );
+  const btn = document.getElementById('mt-submit-btn');
+  if (window._taskMode !== 'bulk') { if (btn) btn.textContent = 'Save Task'; return; }
+  preview.innerHTML = matches.length
+    ? `<span style="color:#15803d;font-weight:600;">✓ ${matches.length} equipment matched</span>: ${matches.slice(0,5).map(e=>esc(e.name)).join(', ')}${matches.length>5?' …':''}`
+    : `<span style="color:#dc2626;">No active equipment matched.</span>`;
+  if (btn) btn.textContent = matches.length ? `Create ${matches.length} Task${matches.length!==1?'s':''}` : 'No Matches';
 }
 
 async function saveTask(e) {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = Object.fromEntries(fd);
-  body.equipment_id = parseInt(body.equipment_id);
-  if (body.interval_days) body.interval_days = parseInt(body.interval_days);
-  try {
-    await api('POST', '/api/maintenance', body);
-    closeModal();
-    toast('Task added.');
-    maintenanceData = await api('GET', '/api/maintenance');
-    renderMaintenanceTable(maintenanceData);
-  } catch(err) { toast(err.message, false); }
+  if (body.interval_days) body.interval_days = parseInt(body.interval_days) || null;
+  if (window._taskMode === 'bulk') {
+    if (!body.category && !body.name_contains) {
+      if (!confirm('No filters set — this will create a task for ALL active equipment. Continue?')) return;
+    }
+    const payload = { title: body.title, description: body.description||null,
+      task_type: body.task_type, interval_days: body.interval_days||null,
+      next_due: body.next_due||null, status: body.status,
+      assigned_to: body.assigned_to||null, notes: body.notes||null,
+      category: body.category||null, name_contains: body.name_contains||null };
+    try {
+      const res = await api('POST', '/api/maintenance/bulk', payload);
+      closeModal();
+      toast(`Created ${res.created} task${res.created!==1?'s':''}.`);
+      maintenanceData = await api('GET', '/api/maintenance');
+      renderMaintenanceTable(maintenanceData);
+    } catch(err) { toast(err.message, false); }
+  } else {
+    body.equipment_id = parseInt(body.equipment_id);
+    try {
+      await api('POST', '/api/maintenance', body);
+      closeModal();
+      toast('Task added.');
+      maintenanceData = await api('GET', '/api/maintenance');
+      renderMaintenanceTable(maintenanceData);
+    } catch(err) { toast(err.message, false); }
+  }
 }
 
 let _completePartsRows = [];
@@ -1773,6 +1856,7 @@ async function deleteTask(id) {
 
 // ─── Calibration ──────────────────────────────────────────────────────────────
 let calData = [];
+let calSelected = new Set();
 async function calibrationPage() {
   $('page-actions').innerHTML = `
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/calibration/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
@@ -1782,12 +1866,20 @@ async function calibrationPage() {
     api('GET', '/api/calibration'),
     api('GET', '/api/equipment'),
   ]);
+  calSelected.clear();
   renderCalTable(calData);
 }
 
 function renderCalTable(rows) {
+  const bulkBar = isTech() ? `
+    <div id="cal-bulk-bar" style="display:none;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;display:flex;align-items:center;gap:1rem;font-size:0.85rem;">
+      <span id="cal-bulk-count">0 selected</span>
+      <button onclick="openCalBulkEdit()" style="background:#fff;color:#1e3a5f;border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;font-size:0.8rem;font-weight:600;cursor:pointer;">✏️ Bulk Edit</button>
+      <button onclick="calClearSelection()" style="background:transparent;color:rgba(255,255,255,.7);border:none;cursor:pointer;font-size:0.8rem;">✕ Clear</button>
+    </div>` : '';
   $('page-content').innerHTML = `
     <div class="card overflow-hidden p-0">
+      ${bulkBar}
       <div class="px-5 py-4 border-b flex items-center gap-3">
         <input id="cal-search" class="input max-w-xs" placeholder="Search…" oninput="filterCal()">
       </div>
@@ -1795,6 +1887,7 @@ function renderCalTable(rows) {
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
+              ${isTech() ? `<th class="px-4 py-3"><input type="checkbox" id="cal-check-all" onchange="calToggleAll(this.checked)" style="cursor:pointer;"></th>` : ''}
               <th class="px-4 py-3 text-left">Equipment</th>
               <th class="px-4 py-3 text-left">Calibrated</th>
               <th class="px-4 py-3 text-left col-m-hide">By</th>
@@ -1808,11 +1901,13 @@ function renderCalTable(rows) {
         </table>
       </div>
     </div>`;
+  updateCalBulkBar();
 }
 
 function calRows(rows) {
   return rows.map(c=>`
     <tr class="table-row border-b last:border-0">
+      ${isTech() ? `<td class="px-4 py-3"><input type="checkbox" class="cal-row-check" data-id="${c.id}" ${calSelected.has(c.id)?'checked':''} onchange="calToggleRow(${c.id},this.checked)" style="cursor:pointer;"></td>` : ''}
       <td class="px-4 py-3 font-medium">${esc(c.equipment_name)}</td>
       <td class="px-4 py-3 text-gray-500">${fmtDate(c.calibrated_at)}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(c.calibrated_by||'—')}</td>
@@ -1822,7 +1917,88 @@ function calRows(rows) {
       <td class="px-4 py-3 text-right">
         <button onclick="deleteCal(${c.id})" class="text-red-500 hover:underline text-xs">Delete</button>
       </td>
-    </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No records found.</td></tr>';
+    </tr>`).join('') || `<tr><td colspan="${isTech()?8:7}" class="px-4 py-8 text-center text-gray-400">No records found.</td></tr>`;
+}
+
+function calToggleRow(id, checked) {
+  checked ? calSelected.add(id) : calSelected.delete(id);
+  updateCalBulkBar();
+}
+
+function calToggleAll(checked) {
+  document.querySelectorAll('.cal-row-check').forEach(cb => {
+    const id = parseInt(cb.dataset.id);
+    cb.checked = checked;
+    checked ? calSelected.add(id) : calSelected.delete(id);
+  });
+  updateCalBulkBar();
+}
+
+function calClearSelection() {
+  calSelected.clear();
+  document.querySelectorAll('.cal-row-check').forEach(cb => cb.checked = false);
+  const ca = document.getElementById('cal-check-all');
+  if (ca) ca.checked = false;
+  updateCalBulkBar();
+}
+
+function updateCalBulkBar() {
+  const bar = document.getElementById('cal-bulk-bar');
+  if (!bar) return;
+  const n = calSelected.size;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  const cnt = document.getElementById('cal-bulk-count');
+  if (cnt) cnt.textContent = `${n} record${n!==1?'s':''} selected`;
+}
+
+function openCalBulkEdit() {
+  const ids = [...calSelected];
+  if (!ids.length) return;
+  modal(`<div class="modal" style="max-width:34rem;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Bulk Edit — ${ids.length} Calibration Record${ids.length!==1?'s':''}</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form id="cal-bulk-form" class="px-6 py-4 space-y-4" onsubmit="submitCalBulkEdit(event)">
+      <p style="font-size:0.8rem;color:#6b7280;">Only filled fields will be applied. Leave blank to keep existing values.</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="label">Calibrated At</label><input class="input" type="date" name="calibrated_at"></div>
+        <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" placeholder="Leave blank to keep"></div>
+        <div><label class="label">Result</label>
+          <select class="input" name="result">
+            <option value="">— keep existing —</option>
+            <option value="pass">Pass</option>
+            <option value="fail">Fail</option>
+          </select>
+        </div>
+        <div class="col-span-2"><label class="label">Notes (appends / overwrites)</label><textarea class="input" name="notes" rows="2" placeholder="Leave blank to keep"></textarea></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Apply to ${ids.length} Record${ids.length!==1?'s':''}</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function submitCalBulkEdit(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = { ids: [...calSelected] };
+  if (fd.get('calibrated_at')) body.calibrated_at = fd.get('calibrated_at');
+  if (fd.get('next_due'))      body.next_due      = fd.get('next_due');
+  if (fd.get('calibrated_by')) body.calibrated_by = fd.get('calibrated_by');
+  if (fd.get('result'))        body.result        = fd.get('result');
+  if (fd.get('notes'))         body.notes         = fd.get('notes');
+  try {
+    const res = await api('PATCH', '/api/calibration/bulk', body);
+    closeModal();
+    calSelected.clear();
+    toast(`Updated ${res.updated} record${res.updated!==1?'s':''}.`);
+    calData = await api('GET', '/api/calibration');
+    renderCalTable(calData);
+  } catch(err) { toast(err.message, false); }
 }
 
 function filterCal() {
