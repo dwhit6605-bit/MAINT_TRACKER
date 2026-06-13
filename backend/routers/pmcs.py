@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from backend.database import get_db
 from backend.pmcs_pdf import generate_pmcs_pdf
+from backend.da2404 import generate_da2404
 
 router = APIRouter(prefix="/api/pmcs", tags=["pmcs"])
 
@@ -48,6 +49,11 @@ class SessionComplete(BaseModel):
     operator_name: Optional[str] = None
     operator_rank: Optional[str] = None
     notes: Optional[str] = None
+    organization: Optional[str] = None
+    tm_number: Optional[str] = None
+    tm_date: Optional[str] = None
+    supervisor_name: Optional[str] = None
+    manhours: Optional[str] = None
     results: List[ResultSubmit]
 
 
@@ -516,6 +522,78 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
             operator_name=?, operator_rank=?, notes=?, completed_at=?
         WHERE id=?
     """, (fault_count, filepath, op_name, op_rank, data.notes, now, session_id))
+
+    # ── Auto-generate a DA 2404 per linked equipment and attach to equipment history ──
+    async with db.execute("""
+        SELECT e.id, e.name, e.serial_num, e.model
+        FROM pmcs_template_equipment te
+        JOIN equipment e ON e.id = te.equipment_id
+        WHERE te.template_id=?
+        ORDER BY te.order_index, e.name
+    """, (session["template_id"],)) as cur:
+        linked_equipment = [dict(r) for r in await cur.fetchall()]
+
+    results_by_item = {r.item_id: r for r in data.results}
+    inspection_date = now[:10]
+
+    for eq in linked_equipment:
+        eq_items = [it for it in items if it.get("equipment_id") == eq["id"]]
+        if not eq_items:
+            continue
+
+        STATUS_MAP = {"ok": "/", "fault": "X", "na": "(-)"}
+        line_items_2404 = []
+        for idx, it in enumerate(eq_items):
+            res = results_by_item.get(it["id"])
+            line_items_2404.append({
+                "item_no": it.get("item_no") or str(idx + 1),
+                "status": STATUS_MAP.get(res.status if res else "na", "(-)"),
+                "deficiency": it["check_item"] + (f" — {res.notes}" if res and res.notes else "") if (res and res.status == "fault") else "",
+                "corrective_action": "",
+                "initial": "",
+            })
+
+        nomenclature = eq["name"]
+        if eq.get("model"):
+            nomenclature += f" / {eq['model']}"
+
+        da_bytes = generate_da2404(
+            organization=data.organization or "",
+            nomenclature=nomenclature,
+            serial_nsn=eq.get("serial_num") or "",
+            inspection_date=inspection_date,
+            inspection_type="PMCS",
+            tm_number=data.tm_number or "",
+            tm_date=data.tm_date or "",
+            line_items=line_items_2404,
+            inspector_name=f"{op_rank} {op_name}".strip(),
+            inspector_time="",
+            supervisor_name=data.supervisor_name or "",
+            supervisor_time="",
+            manhours=data.manhours or "",
+        )
+
+        eq_upload_dir = os.path.join("uploads", "equipment", str(eq["id"]))
+        os.makedirs(eq_upload_dir, exist_ok=True)
+        da_stored = f"DA2404_PMCS{session_id}_{inspection_date}.pdf"
+        da_path = os.path.join(eq_upload_dir, da_stored)
+        with open(da_path, "wb") as f:
+            f.write(da_bytes)
+
+        title_safe = session["title"].replace(" ", "_")
+        da_original = f"DA2404_PMCS_{title_safe}_{inspection_date}.pdf"
+        async with db.execute(
+            "SELECT id FROM equipment_attachments WHERE equipment_id=? AND filename=?",
+            (eq["id"], da_stored)
+        ) as cur:
+            existing = await cur.fetchone()
+        if not existing:
+            await db.execute("""
+                INSERT INTO equipment_attachments
+                    (equipment_id, filename, original_name, file_type, file_size)
+                VALUES (?, ?, ?, 'application/pdf', ?)
+            """, (eq["id"], da_stored, da_original, len(da_bytes)))
+
     await db.commit()
     return {
         "ok": True,

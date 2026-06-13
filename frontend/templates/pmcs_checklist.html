@@ -158,6 +158,30 @@
         <input type="text" id="op-name" placeholder="Last, First MI" autocomplete="off">
       </div>
     </div>
+    <div class="field-row" style="margin-top:0.5rem;">
+      <div class="field" style="flex:2">
+        <label>Organization</label>
+        <input type="text" id="da-org" placeholder="Unit / Organization" autocomplete="off">
+      </div>
+      <div class="field" style="flex:2">
+        <label>Supervisor Name</label>
+        <input type="text" id="da-supervisor" placeholder="Supervisor Last, First" autocomplete="off">
+      </div>
+    </div>
+    <div class="field-row" style="margin-top:0.5rem;">
+      <div class="field" style="flex:2">
+        <label>TM Number</label>
+        <input type="text" id="da-tm-number" placeholder="TM 9-XXXX-XXX-10" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>TM Date</label>
+        <input type="text" id="da-tm-date" placeholder="Jan 2024" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Man-Hours</label>
+        <input type="text" id="da-manhours" placeholder="2.5" autocomplete="off">
+      </div>
+    </div>
   </div>
 
   <div class="status-summary">
@@ -361,6 +385,11 @@ async function submitChecklist() {
     operator_name: name,
     operator_rank: document.getElementById('op-rank').value.trim(),
     notes: document.getElementById('session-notes').value.trim(),
+    organization: document.getElementById('da-org').value.trim(),
+    supervisor_name: document.getElementById('da-supervisor').value.trim(),
+    tm_number: document.getElementById('da-tm-number').value.trim(),
+    tm_date: document.getElementById('da-tm-date').value.trim(),
+    manhours: document.getElementById('da-manhours').value.trim(),
     results,
   };
 
