@@ -17,7 +17,7 @@ ARCHIVE_DIR = os.path.join("uploads", "pmcs")
 class TemplateCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    equipment_id: Optional[int] = None
+    equipment_id: Optional[int] = None  # legacy single-equipment field (kept for compat)
 
 class ItemCreate(BaseModel):
     item_no: Optional[str] = None
@@ -26,9 +26,14 @@ class ItemCreate(BaseModel):
     procedure: Optional[str] = None
     not_ready_if: Optional[str] = None
     order_index: int = 0
+    equipment_id: Optional[int] = None  # which equipment this check belongs to
+    creates_task: bool = False          # if true, a fault auto-creates a maintenance task
 
 class ItemUpdate(ItemCreate):
     pass
+
+class TemplateEquipmentAdd(BaseModel):
+    equipment_id: int
 
 class SessionStart(BaseModel):
     operator_name: Optional[str] = None
@@ -60,7 +65,20 @@ async def list_templates(db=Depends(get_db)):
         ORDER BY t.title
     """) as cur:
         rows = await cur.fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for row in rows:
+        r = dict(row)
+        # Fetch linked equipment list
+        async with db.execute("""
+            SELECT e.id, e.name, e.category, e.serial_num
+            FROM pmcs_template_equipment te
+            JOIN equipment e ON e.id = te.equipment_id
+            WHERE te.template_id = ?
+            ORDER BY te.order_index, e.name
+        """, (r["id"],)) as cur2:
+            r["linked_equipment"] = [dict(eq) for eq in await cur2.fetchall()]
+        result.append(r)
+    return result
 
 
 @router.get("/templates/{tmpl_id}")
@@ -74,12 +92,26 @@ async def get_template(tmpl_id: int, db=Depends(get_db)):
         tmpl = await cur.fetchone()
     if not tmpl:
         raise HTTPException(404, "Template not found")
-    async with db.execute(
-        "SELECT * FROM pmcs_items WHERE template_id=? ORDER BY order_index, id",
-        (tmpl_id,)
-    ) as cur:
-        items = await cur.fetchall()
-    return {**dict(tmpl), "items": [dict(i) for i in items]}
+    tmpl = dict(tmpl)
+    # Items with equipment details
+    async with db.execute("""
+        SELECT pi.*, e.name as equipment_name
+        FROM pmcs_items pi
+        LEFT JOIN equipment e ON e.id = pi.equipment_id
+        WHERE pi.template_id=?
+        ORDER BY pi.equipment_id NULLS LAST, pi.order_index, pi.id
+    """, (tmpl_id,)) as cur:
+        tmpl["items"] = [dict(i) for i in await cur.fetchall()]
+    # Linked equipment
+    async with db.execute("""
+        SELECT e.id, e.name, e.category, e.serial_num
+        FROM pmcs_template_equipment te
+        JOIN equipment e ON e.id = te.equipment_id
+        WHERE te.template_id = ?
+        ORDER BY te.order_index, e.name
+    """, (tmpl_id,)) as cur:
+        tmpl["linked_equipment"] = [dict(eq) for eq in await cur.fetchall()]
+    return tmpl
 
 
 @router.post("/templates", status_code=201)
@@ -111,16 +143,69 @@ async def delete_template(tmpl_id: int, db=Depends(get_db)):
     return {"ok": True}
 
 
+# ── Template Equipment (multi-equipment PMCS) ──────────────────────────────────
+
+@router.get("/templates/{tmpl_id}/equipment")
+async def list_template_equipment(tmpl_id: int, db=Depends(get_db)):
+    async with db.execute("""
+        SELECT e.id, e.name, e.category, e.serial_num, te.order_index,
+               (SELECT COUNT(*) FROM pmcs_items WHERE template_id=? AND equipment_id=e.id) as item_count
+        FROM pmcs_template_equipment te
+        JOIN equipment e ON e.id = te.equipment_id
+        WHERE te.template_id = ?
+        ORDER BY te.order_index, e.name
+    """, (tmpl_id, tmpl_id)) as cur:
+        rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.post("/templates/{tmpl_id}/equipment", status_code=201)
+async def add_template_equipment(tmpl_id: int, data: TemplateEquipmentAdd, db=Depends(get_db)):
+    async with db.execute("SELECT id FROM pmcs_templates WHERE id=?", (tmpl_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Template not found")
+    async with db.execute("SELECT id FROM equipment WHERE id=?", (data.equipment_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Equipment not found")
+    try:
+        async with db.execute("""
+            INSERT INTO pmcs_template_equipment (template_id, equipment_id)
+            VALUES (?, ?)
+        """, (tmpl_id, data.equipment_id)) as cur:
+            row_id = cur.lastrowid
+        await db.commit()
+        return {"id": row_id}
+    except Exception:
+        raise HTTPException(409, "Equipment already added to this PMCS template")
+
+
+@router.delete("/templates/{tmpl_id}/equipment/{eq_id}")
+async def remove_template_equipment(tmpl_id: int, eq_id: int, db=Depends(get_db)):
+    await db.execute(
+        "DELETE FROM pmcs_template_equipment WHERE template_id=? AND equipment_id=?",
+        (tmpl_id, eq_id)
+    )
+    # Optionally remove items scoped to this equipment from this template
+    await db.execute(
+        "DELETE FROM pmcs_items WHERE template_id=? AND equipment_id=?",
+        (tmpl_id, eq_id)
+    )
+    await db.commit()
+    return {"ok": True}
+
+
 # ── Items ─────────────────────────────────────────────────────────────────────
 
 @router.post("/templates/{tmpl_id}/items", status_code=201)
 async def add_item(tmpl_id: int, data: ItemCreate, db=Depends(get_db)):
     async with db.execute("""
         INSERT INTO pmcs_items (template_id, item_no, interval, check_item,
-                                procedure, not_ready_if, order_index)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+                                procedure, not_ready_if, order_index,
+                                equipment_id, creates_task)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (tmpl_id, data.item_no, data.interval, data.check_item,
-          data.procedure, data.not_ready_if, data.order_index)) as cur:
+          data.procedure, data.not_ready_if, data.order_index,
+          data.equipment_id, 1 if data.creates_task else 0)) as cur:
         item_id = cur.lastrowid
     await db.commit()
     return {"id": item_id}
@@ -130,10 +215,12 @@ async def add_item(tmpl_id: int, data: ItemCreate, db=Depends(get_db)):
 async def update_item(item_id: int, data: ItemUpdate, db=Depends(get_db)):
     await db.execute("""
         UPDATE pmcs_items SET item_no=?, interval=?, check_item=?,
-               procedure=?, not_ready_if=?, order_index=?
+               procedure=?, not_ready_if=?, order_index=?,
+               equipment_id=?, creates_task=?
         WHERE id=?
     """, (data.item_no, data.interval, data.check_item,
-          data.procedure, data.not_ready_if, data.order_index, item_id))
+          data.procedure, data.not_ready_if, data.order_index,
+          data.equipment_id, 1 if data.creates_task else 0, item_id))
     await db.commit()
     return {"ok": True}
 
@@ -196,9 +283,22 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
         raise HTTPException(404, "Session not found")
     session = dict(session)
 
-    # persist results
+    # Fetch all items for this template (with equipment info)
+    async with db.execute("""
+        SELECT pi.*, e.name as eq_name
+        FROM pmcs_items pi
+        LEFT JOIN equipment e ON e.id = pi.equipment_id
+        WHERE pi.template_id=?
+        ORDER BY pi.equipment_id NULLS LAST, pi.order_index, pi.id
+    """, (session["template_id"],)) as cur:
+        items = [dict(i) for i in await cur.fetchall()]
+
+    items_by_id = {i["id"]: i for i in items}
+
+    # Persist results
     await db.execute("DELETE FROM pmcs_results WHERE session_id=?", (session_id,))
     fault_count = 0
+    tasks_created = 0
     for r in data.results:
         if r.status == "fault":
             fault_count += 1
@@ -207,26 +307,46 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
             VALUES (?, ?, ?, ?)
         """, (session_id, r.item_id, r.status, r.notes))
 
-    # fetch full items for PDF
-    async with db.execute(
-        "SELECT * FROM pmcs_items WHERE template_id=? ORDER BY order_index, id",
-        (session["template_id"],)
-    ) as cur:
-        items = [dict(i) for i in await cur.fetchall()]
+        # Auto-create maintenance task for faults on items that have creates_task set
+        if r.status == "fault":
+            item = items_by_id.get(r.item_id)
+            if item and item.get("creates_task") and item.get("equipment_id"):
+                await db.execute("""
+                    INSERT INTO maintenance_tasks
+                        (equipment_id, title, description, task_type, status, notes)
+                    VALUES (?, ?, ?, 'inspection', 'pending', ?)
+                """, (
+                    item["equipment_id"],
+                    f"PMCS Fault: {item['check_item']}",
+                    f"Fault identified during PMCS session: {session['title']}",
+                    r.notes or ""
+                ))
+                tasks_created += 1
 
+    # Build items+results for PDF (grouped by equipment)
     results_by_item = {r.item_id: r for r in data.results}
     items_results = []
     for it in items:
         res = results_by_item.get(it["id"])
         items_results.append({
-            "item_no":     it.get("item_no") or str(items.index(it) + 1),
-            "interval":    it.get("interval", "B"),
-            "check_item":  it.get("check_item", ""),
-            "procedure":   it.get("procedure") or "",
+            "item_no":      it.get("item_no") or str(items.index(it) + 1),
+            "interval":     it.get("interval", "B"),
+            "check_item":   it.get("check_item", ""),
+            "procedure":    it.get("procedure") or "",
             "not_ready_if": it.get("not_ready_if") or "",
-            "status":      res.status if res else "na",
-            "notes":       res.notes if res else "",
+            "status":       res.status if res else "na",
+            "notes":        res.notes if res else "",
+            "equipment_name": it.get("eq_name") or "",
         })
+
+    # Fetch linked equipment names for PDF header
+    async with db.execute("""
+        SELECT e.name FROM pmcs_template_equipment te
+        JOIN equipment e ON e.id = te.equipment_id
+        WHERE te.template_id=? ORDER BY te.order_index, e.name
+    """, (session["template_id"],)) as cur:
+        linked_eq_names = [r[0] for r in await cur.fetchall()]
+    equipment_display = session.get("equipment_name") or (", ".join(linked_eq_names) if linked_eq_names else "")
 
     now = datetime.utcnow().isoformat()
     op_name = data.operator_name or session.get("operator_name") or ""
@@ -234,7 +354,7 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
 
     pdf_bytes = generate_pmcs_pdf(
         template_title=session["title"],
-        equipment_name=session.get("equipment_name") or "",
+        equipment_name=equipment_display,
         operator_name=op_name,
         operator_rank=op_rank,
         completed_at=now,
@@ -255,7 +375,13 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
         WHERE id=?
     """, (fault_count, filepath, op_name, op_rank, data.notes, now, session_id))
     await db.commit()
-    return {"ok": True, "session_id": session_id, "fault_count": fault_count, "filename": filename}
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "fault_count": fault_count,
+        "tasks_created": tasks_created,
+        "filename": filename,
+    }
 
 
 @router.get("/sessions/{session_id}/archive")
@@ -277,7 +403,7 @@ async def download_archive(session_id: int, db=Depends(get_db)):
 
 @router.get("/equipment/{equipment_id}/sessions")
 async def equipment_pmcs_sessions(equipment_id: int, db=Depends(get_db)):
-    """All PMCS sessions for an equipment record, across all its templates."""
+    """All PMCS sessions for an equipment record — direct assignment or multi-equipment template."""
     async with db.execute("""
         SELECT s.id, s.started_at, s.completed_at, s.status,
                s.operator_name, s.operator_rank, s.fault_count, s.notes,
@@ -285,7 +411,11 @@ async def equipment_pmcs_sessions(equipment_id: int, db=Depends(get_db)):
         FROM pmcs_sessions s
         JOIN pmcs_templates t ON t.id = s.template_id
         WHERE t.equipment_id = ?
+           OR t.id IN (
+               SELECT template_id FROM pmcs_template_equipment WHERE equipment_id = ?
+           )
         ORDER BY s.started_at DESC
         LIMIT 100
-    """, (equipment_id,)) as cur:
-        return [dict(r) for r in await cur.fetchall()]
+    """, (equipment_id, equipment_id)) as cur:
+        rows = [dict(r) for r in await cur.fetchall()]
+    return rows

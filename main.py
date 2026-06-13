@@ -123,14 +123,28 @@ async def pmcs_checklist(request: Request, template_id: int):
             tmpl = await cur.fetchone()
         if not tmpl:
             return HTMLResponse("<h2>Checklist not found</h2>", status_code=404)
-        async with db.execute(
-            "SELECT * FROM pmcs_items WHERE template_id=? ORDER BY order_index, id",
-            (template_id,)
-        ) as cur:
+        # Items with equipment names
+        async with db.execute("""
+            SELECT pi.*, e.name as equipment_name, e.serial_num as equipment_serial
+            FROM pmcs_items pi
+            LEFT JOIN equipment e ON e.id = pi.equipment_id
+            WHERE pi.template_id=?
+            ORDER BY pi.equipment_id NULLS LAST, pi.order_index, pi.id
+        """, (template_id,)) as cur:
             items = [dict(i) for i in await cur.fetchall()]
+        # Linked equipment list (for grouping)
+        async with db.execute("""
+            SELECT e.id, e.name, e.serial_num, e.category
+            FROM pmcs_template_equipment te
+            JOIN equipment e ON e.id = te.equipment_id
+            WHERE te.template_id=?
+            ORDER BY te.order_index, e.name
+        """, (template_id,)) as cur:
+            linked_equipment = [dict(r) for r in await cur.fetchall()]
     return templates.TemplateResponse(
         "pmcs_checklist.html",
-        {"request": request, "template": dict(tmpl), "items": items}
+        {"request": request, "template": dict(tmpl), "items": items,
+         "linked_equipment": linked_equipment}
     )
 
 

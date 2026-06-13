@@ -27,9 +27,21 @@
                       border-radius: 0.5rem; font-size: 0.9rem; outline: none; transition: border-color .15s; }
   input[type=text]:focus { border-color: #3b82f6; }
 
-  .items-list { margin: 0 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  /* Equipment section header */
+  .eq-section { margin: 0.75rem 0.75rem 0; }
+  .eq-section-header { background: #1e3a5f; color: #fff; border-radius: 0.6rem 0.6rem 0 0;
+                         padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
+  .eq-section-header .eq-name { font-size: 0.9rem; font-weight: 700; }
+  .eq-section-header .eq-serial { font-size: 0.72rem; color: rgba(255,255,255,.6); }
+  .eq-section-header .eq-count { font-size: 0.72rem; background:rgba(255,255,255,.15); padding:2px 8px;
+                                   border-radius:9999px; margin-left:auto; }
+  .eq-section-body { background:#fff; border-radius:0 0 0.6rem 0.6rem; border:1px solid #e2e8f0;
+                      border-top:none; padding:0.5rem 0.5rem 0.75rem; }
 
-  .interval-header { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 0.4rem;
+  /* Ungrouped items (no equipment) */
+  .items-list { margin: 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.6rem; }
+
+  .interval-header { display: flex; align-items: center; gap: 0.6rem; margin: 0.75rem 0 0.4rem;
                       padding: 0 0.25rem; }
   .interval-badge { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 9999px;
                      color: #fff; letter-spacing: .05em; }
@@ -40,9 +52,10 @@
   .int-W { background: #7c3aed; }
   .int-M { background: #b45309; }
 
-  .check-card { background: #fff; border-radius: 0.75rem; padding: 0.9rem 1rem;
-                 box-shadow: 0 1px 4px rgba(0,0,0,.07); border-left: 4px solid #e2e8f0;
-                 transition: border-color .2s; }
+  .check-card { background: #fff; border-radius: 0.6rem; padding: 0.75rem 0.85rem;
+                 box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid #e2e8f0;
+                 transition: border-color .2s; margin: 0 0 0.5rem; }
+  .eq-section-body .check-card { box-shadow: none; border-radius: 0.45rem; margin: 0.35rem 0 0; }
   .check-card.status-ok    { border-left-color: #22c55e; }
   .check-card.status-fault { border-left-color: #ef4444; background: #fff5f5; }
   .check-card.status-na    { border-left-color: #94a3b8; opacity: 0.7; }
@@ -54,6 +67,7 @@
   .procedure { font-size: 0.78rem; color: #64748b; margin-top: 0.3rem; line-height: 1.4; }
   .not-ready { font-size: 0.72rem; color: #dc2626; margin-top: 0.3rem;
                 background: #fef2f2; padding: 0.3rem 0.5rem; border-radius: 0.35rem; }
+  .creates-task-hint { font-size: 0.68rem; color: #d97706; margin-top: 0.2rem; }
 
   .btn-group { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; }
   .status-btn { border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 0.5rem;
@@ -65,15 +79,14 @@
   .status-btn.active-na    { background: #94a3b8; border-color: #94a3b8; color: #fff; }
   .status-btn:active { transform: scale(.96); }
 
-  /* ── Mobile optimisations ── */
   @media (max-width: 480px) {
     .header h1 { font-size: 0.95rem; }
     .operator-section { margin: 0.5rem; padding: 0.75rem; }
     .field-row { flex-direction: column; gap: 0.5rem; }
-    .items-list { margin: 0 0.5rem 1rem; gap: 0.5rem; }
+    .eq-section { margin: 0.5rem 0.5rem 0; }
+    .items-list { margin: 0.5rem 0.5rem 0; gap: 0.5rem; }
     .check-card { padding: 0.75rem; border-radius: 0.6rem; }
     .check-item { font-size: 0.85rem; }
-    /* Bigger tap targets on mobile */
     .btn-group { flex-direction: row; gap: 0.4rem; margin-top: 0.65rem; }
     .status-btn { flex: 1; min-width: 0; padding: 0.55rem 0.25rem; font-size: 0.75rem; border-radius: 0.4rem; }
     .check-top { flex-direction: column; gap: 0.35rem; }
@@ -88,7 +101,7 @@
                          border-radius: 0.5rem; font-size: 0.82rem; outline: none; }
   .fault-notes input:focus { border-color: #ef4444; }
 
-  .submit-section { margin: 0 0.75rem 2rem; }
+  .submit-section { margin: 0.75rem 0.75rem 2rem; }
   .notes-area { width: 100%; padding: 0.65rem 0.75rem; border: 1.5px solid #e2e8f0;
                  border-radius: 0.5rem; font-size: 0.875rem; resize: vertical;
                  min-height: 80px; outline: none; margin-bottom: 0.75rem; }
@@ -115,6 +128,8 @@
   .dl-btn { display: inline-block; padding: 0.75rem 2rem; background: #1e3a5f; color: #fff;
              border-radius: 0.75rem; font-weight: 700; text-decoration: none; font-size: 0.95rem; }
   .fault-badge { background: #fef2f2; color: #dc2626; border-radius: 0.5rem;
+                  padding: 0.5rem 1rem; font-weight: 700; margin-bottom: 0.5rem; display: inline-block; }
+  .task-badge  { background: #fef3c7; color: #92400e; border-radius: 0.5rem;
                   padding: 0.5rem 1rem; font-weight: 700; margin-bottom: 1rem; display: inline-block; }
 </style>
 </head>
@@ -126,6 +141,7 @@
     <div class="sub">
       {% if template.equipment_name %}{{ template.equipment_name }} · {% endif %}
       PMCS Checklist · {{ items | length }} items
+      {% if linked_equipment %} · {{ linked_equipment | length }} piece{% if linked_equipment | length != 1 %}s{% endif %} of equipment{% endif %}
     </div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
   </div>
@@ -151,43 +167,130 @@
     <span style="color:#94a3b8;">· <span id="cnt-rem">{{ items | length }}</span> remaining</span>
   </div>
 
-  <div class="items-list" id="items-list">
-    {% set ns = namespace(last_interval='') %}
-    {% for item in items %}
-      {% if item.interval != ns.last_interval %}
-        {% set ns.last_interval = item.interval %}
-        {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
-        <div class="interval-header">
-          <span class="interval-badge int-{{ item.interval }}">{{ item.interval }}</span>
-          <span class="interval-label">{{ interval_names.get(item.interval, item.interval) }}</span>
-        </div>
-      {% endif %}
-      <div class="check-card" id="card-{{ item.id }}" data-item-id="{{ item.id }}">
-        <div class="check-top">
-          <div class="check-text">
-            <div class="item-no">{{ item.item_no or loop.index }} · {{ item.interval }}</div>
-            <div class="check-item">{{ item.check_item }}</div>
-            {% if item.procedure %}
-              <div class="procedure">{{ item.procedure }}</div>
-            {% endif %}
-            {% if item.not_ready_if %}
-              <div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>
-            {% endif %}
+  {% if linked_equipment %}
+    {# Render items grouped by equipment #}
+    {% for eq in linked_equipment %}
+      {% set eq_items = items | selectattr("equipment_id", "equalto", eq.id) | list %}
+      {% if eq_items %}
+      <div class="eq-section">
+        <div class="eq-section-header">
+          <div>
+            <div class="eq-name">{{ eq.name }}</div>
+            {% if eq.serial_num %}<div class="eq-serial">S/N: {{ eq.serial_num }}</div>{% endif %}
           </div>
-          <div class="btn-group">
-            <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"   id="btn-ok-{{ item.id }}">OK</button>
-            <button class="status-btn" onclick="setStatus({{ item.id }}, 'fault')" id="btn-fault-{{ item.id }}">FAULT</button>
-            <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
-          </div>
+          <div class="eq-count">{{ eq_items | length }} item{% if eq_items | length != 1 %}s{% endif %}</div>
         </div>
-        <div class="fault-notes" id="notes-{{ item.id }}">
-          <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+        <div class="eq-section-body">
+          {% set ns = namespace(last_interval='') %}
+          {% for item in eq_items %}
+            {% if item.interval != ns.last_interval %}
+              {% set ns.last_interval = item.interval %}
+              {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
+              <div class="interval-header">
+                <span class="interval-badge int-{{ item.interval }}">{{ item.interval }}</span>
+                <span class="interval-label">{{ interval_names.get(item.interval, item.interval) }}</span>
+              </div>
+            {% endif %}
+            <div class="check-card" id="card-{{ item.id }}" data-item-id="{{ item.id }}">
+              <div class="check-top">
+                <div class="check-text">
+                  <div class="item-no">{{ item.item_no or loop.index }} · {{ item.interval }}</div>
+                  <div class="check-item">{{ item.check_item }}</div>
+                  {% if item.procedure %}<div class="procedure">{{ item.procedure }}</div>{% endif %}
+                  {% if item.not_ready_if %}<div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>{% endif %}
+                  {% if item.creates_task %}<div class="creates-task-hint">⚡ Fault will auto-create maintenance task</div>{% endif %}
+                </div>
+                <div class="btn-group">
+                  <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"    id="btn-ok-{{ item.id }}">OK</button>
+                  <button class="status-btn" onclick="setStatus({{ item.id }}, 'fault')" id="btn-fault-{{ item.id }}">FAULT</button>
+                  <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
+                </div>
+              </div>
+              <div class="fault-notes" id="notes-{{ item.id }}">
+                <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+              </div>
+            </div>
+          {% endfor %}
         </div>
       </div>
+      {% endif %}
     {% endfor %}
-  </div>
 
-  <div class="submit-section">
+    {# Also render any items NOT scoped to equipment #}
+    {% set ungrouped = items | selectattr("equipment_id", "none") | list %}
+    {% if ungrouped %}
+    <div class="items-list">
+      <div class="interval-header" style="margin-top:1rem;">
+        <span style="font-size:0.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">General Checks</span>
+      </div>
+      {% set ns2 = namespace(last_interval='') %}
+      {% for item in ungrouped %}
+        {% if item.interval != ns2.last_interval %}
+          {% set ns2.last_interval = item.interval %}
+          {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
+          <div class="interval-header">
+            <span class="interval-badge int-{{ item.interval }}">{{ item.interval }}</span>
+            <span class="interval-label">{{ interval_names.get(item.interval, item.interval) }}</span>
+          </div>
+        {% endif %}
+        <div class="check-card" id="card-{{ item.id }}" data-item-id="{{ item.id }}">
+          <div class="check-top">
+            <div class="check-text">
+              <div class="item-no">{{ item.item_no or loop.index }} · {{ item.interval }}</div>
+              <div class="check-item">{{ item.check_item }}</div>
+              {% if item.procedure %}<div class="procedure">{{ item.procedure }}</div>{% endif %}
+              {% if item.not_ready_if %}<div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>{% endif %}
+            </div>
+            <div class="btn-group">
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"    id="btn-ok-{{ item.id }}">OK</button>
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'fault')" id="btn-fault-{{ item.id }}">FAULT</button>
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
+            </div>
+          </div>
+          <div class="fault-notes" id="notes-{{ item.id }}">
+            <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  {% else %}
+    {# Legacy flat list (no linked equipment) #}
+    <div class="items-list">
+      {% set ns = namespace(last_interval='') %}
+      {% for item in items %}
+        {% if item.interval != ns.last_interval %}
+          {% set ns.last_interval = item.interval %}
+          {% set interval_names = {'B': 'Before Operations', 'D': 'During Operations', 'A': 'After Operations', 'W': 'Weekly', 'M': 'Monthly'} %}
+          <div class="interval-header">
+            <span class="interval-badge int-{{ item.interval }}">{{ item.interval }}</span>
+            <span class="interval-label">{{ interval_names.get(item.interval, item.interval) }}</span>
+          </div>
+        {% endif %}
+        <div class="check-card" id="card-{{ item.id }}" data-item-id="{{ item.id }}">
+          <div class="check-top">
+            <div class="check-text">
+              <div class="item-no">{{ item.item_no or loop.index }} · {{ item.interval }}</div>
+              <div class="check-item">{{ item.check_item }}</div>
+              {% if item.procedure %}<div class="procedure">{{ item.procedure }}</div>{% endif %}
+              {% if item.not_ready_if %}<div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>{% endif %}
+            </div>
+            <div class="btn-group">
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"    id="btn-ok-{{ item.id }}">OK</button>
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'fault')" id="btn-fault-{{ item.id }}">FAULT</button>
+              <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
+            </div>
+          </div>
+          <div class="fault-notes" id="notes-{{ item.id }}">
+            <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="submit-section" style="margin-top:1.25rem;">
     <div style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.4rem;">Session Notes (optional)</div>
     <textarea class="notes-area" id="session-notes" placeholder="Any overall notes about this inspection…"></textarea>
     <button class="submit-btn" id="submit-btn" onclick="submitChecklist()" disabled>
@@ -204,6 +307,7 @@
   <h2 id="success-title">Inspection Complete</h2>
   <p id="success-msg">Your PMCS record has been archived.</p>
   <div id="fault-notice" style="display:none" class="fault-badge"></div>
+  <div id="task-notice" style="display:none" class="task-badge"></div>
   <a id="dl-link" href="#" class="dl-btn" target="_blank">📄 View / Download PDF</a>
   <br><br>
   <a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;">Run another inspection</a>
@@ -211,7 +315,7 @@
 
 <script>
 const TOTAL = {{ items | length }};
-const statuses = {};  // item_id -> 'ok'|'fault'|'na'
+const statuses = {};
 
 function setStatus(itemId, status) {
   statuses[itemId] = status;
@@ -260,7 +364,6 @@ async function submitChecklist() {
     results,
   };
 
-  // start session then complete it
   const startRes = await fetch('/api/pmcs/templates/{{ template.id }}/sessions', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -280,9 +383,14 @@ async function submitChecklist() {
   if (completeRes.fault_count > 0) {
     document.getElementById('success-icon').textContent = '⚠️';
     document.getElementById('success-title').textContent = 'Inspection Complete — Faults Found';
-    document.getElementById('fault-notice').textContent  =
+    document.getElementById('fault-notice').textContent =
       completeRes.fault_count + ' fault' + (completeRes.fault_count > 1 ? 's' : '') + ' recorded';
     document.getElementById('fault-notice').style.display = 'inline-block';
+  }
+  if (completeRes.tasks_created > 0) {
+    document.getElementById('task-notice').textContent =
+      completeRes.tasks_created + ' maintenance task' + (completeRes.tasks_created > 1 ? 's' : '') + ' created automatically';
+    document.getElementById('task-notice').style.display = 'inline-block';
   }
 
   document.getElementById('dl-link').href =

@@ -297,6 +297,15 @@ async def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_fault_equipment ON fault_reports(equipment_id);
             CREATE INDEX IF NOT EXISTS idx_fault_status ON fault_reports(status);
+
+            CREATE TABLE IF NOT EXISTS pmcs_template_equipment (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                template_id  INTEGER NOT NULL REFERENCES pmcs_templates(id) ON DELETE CASCADE,
+                equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
+                order_index  INTEGER DEFAULT 0,
+                UNIQUE(template_id, equipment_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_pmcs_tmpl_eq ON pmcs_template_equipment(template_id);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}
@@ -308,5 +317,11 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN warranty_expiry TEXT")
         if "end_of_life_date" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN end_of_life_date TEXT")
+
+        pmcs_item_cols = {row[1] async for row in await db.execute("PRAGMA table_info(pmcs_items)")}
+        if "equipment_id" not in pmcs_item_cols:
+            await db.execute("ALTER TABLE pmcs_items ADD COLUMN equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL")
+        if "creates_task" not in pmcs_item_cols:
+            await db.execute("ALTER TABLE pmcs_items ADD COLUMN creates_task INTEGER NOT NULL DEFAULT 0")
 
         await db.commit()
