@@ -226,7 +226,7 @@ async def export_da2404(
 @router.post("/bulk", status_code=201)
 async def bulk_create_tasks(data: MaintenanceBulkCreate, request: Request, db=Depends(get_db)):
     require_admin(request)
-    query = "SELECT id FROM equipment WHERE status='active'"
+    query = "SELECT id FROM equipment WHERE status != 'retired'"
     params = []
     if data.category:
         query += " AND LOWER(category)=LOWER(?)"
