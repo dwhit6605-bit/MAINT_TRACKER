@@ -19,7 +19,8 @@ self.addEventListener('activate', e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     )
   );
-  self.clients.claim();
+  // Note: intentionally NOT calling clients.claim() — it causes reload loops
+  // when the SW activates mid-session. New pages pick up the SW naturally.
 });
 
 self.addEventListener('fetch', e => {
