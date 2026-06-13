@@ -1,7 +1,9 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import InventoryItemCreate, InventoryAdjust
-from backend.auth import require_tech
+from backend.auth import require_admin, require_tech
+from backend.notifications import send_low_stock_alert
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -31,7 +33,8 @@ async def get_item(item_id: int, db=Depends(get_db)):
 
 
 @router.post("", status_code=201)
-async def create_item(data: InventoryItemCreate, db=Depends(get_db)):
+async def create_item(data: InventoryItemCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
     async with db.execute("""
         INSERT INTO inventory_items
             (name, part_number, category, location, quantity, unit, min_stock, unit_cost, supplier, notes)
@@ -50,7 +53,8 @@ async def create_item(data: InventoryItemCreate, db=Depends(get_db)):
 
 
 @router.put("/{item_id}")
-async def update_item(item_id: int, data: InventoryItemCreate, db=Depends(get_db)):
+async def update_item(item_id: int, data: InventoryItemCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
     await db.execute("""
         UPDATE inventory_items
         SET name=?, part_number=?, category=?, location=?, unit=?, min_stock=?,
@@ -65,7 +69,7 @@ async def update_item(item_id: int, data: InventoryItemCreate, db=Depends(get_db
 @router.post("/{item_id}/adjust")
 async def adjust_stock(item_id: int, data: InventoryAdjust, request: Request, db=Depends(get_db)):
     require_tech(request)
-    async with db.execute("SELECT quantity FROM inventory_items WHERE id=?", (item_id,)) as cur:
+    async with db.execute("SELECT * FROM inventory_items WHERE id=?", (item_id,)) as cur:
         row = await cur.fetchone()
     if not row:
         raise HTTPException(404, "Item not found")
@@ -88,11 +92,18 @@ async def adjust_stock(item_id: int, data: InventoryAdjust, request: Request, db
         VALUES (?, ?, ?, ?, ?)
     """, (item_id, data.action, data.quantity, data.reference, data.performed_by))
     await db.commit()
+    # Fire low-stock alert if qty dropped to or below min_stock
+    min_stock = row["min_stock"] or 0
+    if min_stock > 0 and new_qty <= min_stock and (data.action in ("remove", "set")):
+        asyncio.create_task(send_low_stock_alert(
+            item_id, row["name"], new_qty, min_stock, row["unit"] or ""
+        ))
     return {"quantity": new_qty}
 
 
 @router.delete("/{item_id}")
-async def delete_item(item_id: int, db=Depends(get_db)):
+async def delete_item(item_id: int, request: Request, db=Depends(get_db)):
+    require_admin(request)
     await db.execute("DELETE FROM inventory_items WHERE id=?", (item_id,))
     await db.commit()
     return {"ok": True}

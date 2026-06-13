@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import EquipmentCreate, EquipmentUpdate
-from backend.auth import require_admin
+from backend.auth import require_admin, require_tech
 from backend import audit
 
 router = APIRouter(prefix="/api/equipment", tags=["equipment"])
@@ -59,7 +59,7 @@ async def get_equipment(eq_id: int, db=Depends(get_db)):
 
 @router.post("", status_code=201)
 async def create_equipment(data: EquipmentCreate, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     async with db.execute("""
         INSERT INTO equipment (name, category, serial_num, model, manufacturer,
             location, assigned_to, status, notes, purchase_date, warranty_expiry, end_of_life_date)
@@ -76,7 +76,7 @@ async def create_equipment(data: EquipmentCreate, request: Request, db=Depends(g
 
 @router.put("/{eq_id}")
 async def update_equipment(eq_id: int, data: EquipmentUpdate, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     await db.execute("""
         UPDATE equipment SET name=?, category=?, serial_num=?, model=?, manufacturer=?,
             location=?, assigned_to=?, status=?, notes=?,

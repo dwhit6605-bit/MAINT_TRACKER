@@ -2,7 +2,7 @@ import os, shutil
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from backend.database import get_db
 from backend.models import CalibrationCreate, CalibrationBulkEdit
-from backend.auth import require_tech
+from backend.auth import require_admin, require_tech
 from backend import audit
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
@@ -104,7 +104,8 @@ async def upload_cert(rec_id: int, file: UploadFile = File(...), db=Depends(get_
 
 
 @router.delete("/{rec_id}")
-async def delete_record(rec_id: int, db=Depends(get_db)):
+async def delete_record(rec_id: int, request: Request, db=Depends(get_db)):
+    require_admin(request)
     async with db.execute(
         "SELECT equipment_id FROM calibration_records WHERE id=?", (rec_id,)
     ) as cur:

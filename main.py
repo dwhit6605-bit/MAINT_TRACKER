@@ -19,6 +19,7 @@ from backend.routers import readiness as readiness_router
 from backend.routers import reorder as reorder_router
 from backend.routers import rolling_stock as rolling_stock_router
 from backend.routers import task_attachments as task_attachments_router
+from backend.routers import faults as faults_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -99,6 +100,7 @@ app.include_router(readiness_router.router)
 app.include_router(reorder_router.router)
 app.include_router(rolling_stock_router.router)
 app.include_router(task_attachments_router.router)
+app.include_router(faults_router.router)
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -135,7 +137,7 @@ async def pmcs_checklist(request: Request, template_id: int):
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{page}", response_class=HTMLResponse)
 async def spa(request: Request, page: str = "dashboard"):
-    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock"}
+    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "faults"}
     if page not in valid:
         page = "dashboard"
     return templates.TemplateResponse("index.html", {"request": request, "page": page})

@@ -57,6 +57,46 @@ def _send(subject: str, html: str, *, to: str, from_: str,
         s.sendmail(from_, recipients, msg.as_string())
 
 
+async def send_low_stock_alert(item_id: int, item_name: str, qty: int, min_stock: int, unit: str = ""):
+    cfg = await _load_settings()
+    TO, FROM = cfg["NOTIFY_EMAIL_TO"], cfg["NOTIFY_EMAIL_FROM"]
+    SMTP_HOST = cfg["SMTP_HOST"]
+    if not (TO and FROM and SMTP_HOST):
+        return
+    label = "OUT OF STOCK" if qty == 0 else "LOW STOCK"
+    color = "#dc2626" if qty == 0 else "#d97706"
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+  <tr><td style="background:#1e3a5f;padding:24px 32px;">
+    <div style="font-size:20px;font-weight:700;color:#fff;">GEAR GUARD</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">Inventory Alert</div>
+  </td></tr>
+  <tr><td style="padding:24px 32px;">
+    <div style="display:inline-block;background:{color}22;color:{color};font-weight:700;font-size:13px;padding:4px 12px;border-radius:9999px;margin-bottom:16px;">⚠ {label}</div>
+    <h3 style="margin:0 0 8px;color:#1e3a5f;font-size:16px;">{item_name}</h3>
+    <p style="margin:0 0 4px;color:#374151;">Current quantity: <strong style="color:{color};">{qty} {unit}</strong></p>
+    <p style="margin:0;color:#6b7280;font-size:13px;">Minimum stock level: {min_stock} {unit}</p>
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">
+      Sent automatically by GEAR GUARD &nbsp;·&nbsp;
+      <a href="https://gear.whitwerx.net" style="color:#1e3a5f;">gear.whitwerx.net</a>
+    </div>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+    subject = f"GEAR GUARD — {'Out of Stock' if qty == 0 else 'Low Stock'}: {item_name}"
+    try:
+        _send(subject, html, to=TO, from_=FROM,
+              host=SMTP_HOST, port=int(cfg.get("SMTP_PORT") or 587),
+              user=cfg["SMTP_USER"], password=cfg["SMTP_PASS"])
+    except Exception:
+        pass  # Don't fail the inventory operation if email fails
+
+
 async def run_daily_check():
     cfg   = await _load_settings()
     TO        = cfg["NOTIFY_EMAIL_TO"]

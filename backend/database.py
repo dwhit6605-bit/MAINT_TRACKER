@@ -280,6 +280,23 @@ async def init_db():
                 created_at    TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_task_att_task ON task_attachments(task_id);
+
+            CREATE TABLE IF NOT EXISTS fault_reports (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
+                reported_by  TEXT NOT NULL,
+                severity     TEXT NOT NULL DEFAULT 'routine',
+                title        TEXT NOT NULL,
+                description  TEXT,
+                status       TEXT NOT NULL DEFAULT 'open',
+                resolved_by  TEXT,
+                resolved_at  TEXT,
+                resolution   TEXT,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_fault_equipment ON fault_reports(equipment_id);
+            CREATE INDEX IF NOT EXISTS idx_fault_status ON fault_reports(status);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}

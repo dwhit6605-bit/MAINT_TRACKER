@@ -63,7 +63,7 @@ async def list_vehicles(db=Depends(get_db)):
 
 @router.post("", status_code=201)
 async def create_vehicle(request: Request, data: VehicleCreate, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     async with db.execute("""
         INSERT INTO rolling_stock (year,make,model,tag_number,key_number,license_plate,vin,color,status,notes)
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -76,7 +76,7 @@ async def create_vehicle(request: Request, data: VehicleCreate, db=Depends(get_d
 
 @router.put("/{vid}")
 async def update_vehicle(vid: int, request: Request, data: VehicleCreate, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     await db.execute("""
         UPDATE rolling_stock SET year=?,make=?,model=?,tag_number=?,key_number=?,
             license_plate=?,vin=?,color=?,status=?,notes=?,updated_at=datetime('now')

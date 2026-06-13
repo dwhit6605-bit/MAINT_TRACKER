@@ -34,7 +34,7 @@ async def list_tasks(equipment_id: int = None, status: str = None, db=Depends(ge
 
 @router.post("", status_code=201)
 async def create_task(data: MaintenanceTaskCreate, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     async with db.execute("""
         INSERT INTO maintenance_tasks
             (equipment_id, title, description, task_type, interval_days, last_done, next_due, status, assigned_to, notes)
@@ -122,7 +122,7 @@ async def get_task_parts(task_id: int, db=Depends(get_db)):
 
 @router.put("/{task_id}")
 async def update_task(task_id: int, data: MaintenanceTaskCreate, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     await db.execute("""
         UPDATE maintenance_tasks
         SET title=?, description=?, task_type=?, interval_days=?, last_done=?,
@@ -225,7 +225,7 @@ async def export_da2404(
 
 @router.post("/bulk", status_code=201)
 async def bulk_create_tasks(data: MaintenanceBulkCreate, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_tech(request)
     query = "SELECT id FROM equipment WHERE status != 'retired'"
     params = []
     if data.category:
