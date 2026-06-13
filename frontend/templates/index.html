@@ -4009,7 +4009,14 @@ function esc(s) {
 </script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/static/sw.js').catch(()=>{}));
+  // Unregister any existing SWs first (clears reload-loop bug), then re-register
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      Promise.all(regs.map(r => r.unregister())).then(() => {
+        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+      });
+    });
+  });
 }
 </script>
 </body>
