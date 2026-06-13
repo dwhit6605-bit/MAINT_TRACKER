@@ -3490,8 +3490,8 @@ function renderUsersTable() {
       <form id="smtp-form" style="display:none;" onsubmit="saveSmtp(event)">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
           <div>
-            <label class="text-xs font-semibold text-gray-500 block mb-1">Recipient Email (TO)</label>
-            <input name="NOTIFY_EMAIL_TO" class="input w-full" placeholder="admin@example.com">
+            <label class="text-xs font-semibold text-gray-500 block mb-1">Recipients (TO) — comma-separated</label>
+            <input name="NOTIFY_EMAIL_TO" class="input w-full" placeholder="admin@example.com, supervisor@example.com">
           </div>
           <div>
             <label class="text-xs font-semibold text-gray-500 block mb-1">Sender Email (FROM)</label>

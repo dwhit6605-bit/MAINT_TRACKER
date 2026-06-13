@@ -43,16 +43,18 @@ async def _load_settings() -> dict:
 
 def _send(subject: str, html: str, *, to: str, from_: str,
           host: str, port: int, user: str, password: str):
+    # to may be a comma-separated list of addresses
+    recipients = [a.strip() for a in to.split(",") if a.strip()]
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = from_
-    msg["To"]      = to
+    msg["To"]      = ", ".join(recipients)
     msg.attach(MIMEText(html, "html"))
     with smtplib.SMTP(host, port) as s:
         s.ehlo()
         s.starttls()
         s.login(user, password)
-        s.sendmail(from_, to, msg.as_string())
+        s.sendmail(from_, recipients, msg.as_string())
 
 
 async def run_daily_check():
