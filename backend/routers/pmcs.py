@@ -273,3 +273,19 @@ async def download_archive(session_id: int, db=Depends(get_db)):
         pdf_bytes = f.read()
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{os.path.basename(path)}"'})
+
+
+@router.get("/equipment/{equipment_id}/sessions")
+async def equipment_pmcs_sessions(equipment_id: int, db=Depends(get_db)):
+    """All PMCS sessions for an equipment record, across all its templates."""
+    async with db.execute("""
+        SELECT s.id, s.started_at, s.completed_at, s.status,
+               s.operator_name, s.operator_rank, s.fault_count, s.notes,
+               t.id as template_id, t.title as template_title
+        FROM pmcs_sessions s
+        JOIN pmcs_templates t ON t.id = s.template_id
+        WHERE t.equipment_id = ?
+        ORDER BY s.started_at DESC
+        LIMIT 100
+    """, (equipment_id,)) as cur:
+        return [dict(r) for r in await cur.fetchall()]

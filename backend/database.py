@@ -220,6 +220,19 @@ async def init_db():
                 value      TEXT,
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS reorder_requests (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id      INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                qty_requested INTEGER NOT NULL DEFAULT 1,
+                requested_by TEXT,
+                supplier     TEXT,
+                notes        TEXT,
+                status       TEXT NOT NULL DEFAULT 'pending',
+                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_reorder_item ON reorder_requests(item_id);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}

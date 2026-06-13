@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAINT SUPER — Maintenance &amp; Calibration</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#1e3a5f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MAINT">
+  <link rel="apple-touch-icon" href="/static/img/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -120,6 +127,10 @@
       <a href="/pmcs" class="nav-link" data-page="pmcs">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         PMCS
+      </a>
+      <a href="/readiness" class="nav-link" data-page="readiness">
+        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Readiness
       </a>
       <a href="/skos" class="nav-link" data-page="skos">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11m0 0L4 7"/></svg>
@@ -271,8 +282,8 @@ function closeSidebar() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -598,6 +609,7 @@ async function openEqDetail(id) {
       <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dce8f5;color:#141414;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
       <button onclick="eqTab('calibration')" id="tab-calibration" class="eq-tab">Calibration <span id="cal-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:1px 7px;">${cals.length||''}</span></button>
       <button onclick="eqTab('attachments')" id="tab-attachments" class="eq-tab">Attachments <span id="att-count-badge" style="margin-left:4px;font-size:0.7rem;background:#f3f4f6;color:#4b5563;border-radius:9999px;padding:1px 7px;">${atts.length||''}</span></button>
+      <button onclick="eqTab('pmcs-history')" id="tab-pmcs-history" class="eq-tab">PMCS History</button>
       <button onclick="eqTab('history')" id="tab-history" class="eq-tab">History</button>
     </div>
 
@@ -722,6 +734,27 @@ function eqTab(tab) {
     $('att-drop').addEventListener('click', e => {
       if (e.target.tagName !== 'INPUT') $('att-file-input').click();
     });
+  }
+
+  else if (tab === 'pmcs-history') {
+    body.innerHTML = '<div style="padding:1rem;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
+    const sessions = await api('GET', `/api/pmcs/equipment/${id}/sessions`).catch(()=>[]);
+    const faultColor = n => n === 0 ? '#22c55e' : n <= 2 ? '#f59e0b' : '#ef4444';
+    body.innerHTML = sessions.length === 0
+      ? '<p style="font-size:0.875rem;color:#9ca3af;">No PMCS sessions recorded for this equipment.</p>'
+      : `<div style="display:flex;flex-direction:column;gap:0.5rem;">
+          ${sessions.map(s => `
+          <div style="display:flex;gap:0.75rem;align-items:center;padding:0.55rem 0.75rem;border-radius:0.5rem;background:#f9fafb;border:1px solid #f3f4f6;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.82rem;font-weight:600;">${esc(s.template_title)}</div>
+              <div style="font-size:0.72rem;color:#6b7280;">${s.operator_rank ? esc(s.operator_rank)+' ' : ''}${esc(s.operator_name||'—')} · ${(s.started_at||'').slice(0,16).replace('T',' ')}</div>
+            </div>
+            <span style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${faultColor(s.fault_count)}22;color:${faultColor(s.fault_count)};white-space:nowrap;">
+              ${s.fault_count === 0 ? '✓ Clean' : s.fault_count+' fault'+(s.fault_count>1?'s':'')}
+            </span>
+            ${s.status==='completed' ? `<a href="/api/pmcs/sessions/${s.id}/archive?token=${getToken()}" target="_blank" style="font-size:0.7rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">PDF</a>` : `<span style="font-size:0.7rem;color:#9ca3af;">${s.status}</span>`}
+          </div>`).join('')}
+        </div>`;
   }
 
   else if (tab === 'history') {
@@ -1812,17 +1845,40 @@ async function deleteCal(id) {
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 let inventoryData = [];
-async function inventoryPage() {
+async function inventoryPage(tab) {
   $('page-actions').innerHTML = `
     <button onclick="openCsvImport('inventory')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openItemModal()" class="btn-primary">+ Add Item</button>`;
   inventoryData = await api('GET', '/api/inventory');
-  renderInventoryTable(inventoryData);
+  // Tab bar
+  $('page-content').innerHTML = `
+    <div style="display:flex;border-bottom:1px solid #e5e7eb;margin-bottom:1rem;">
+      <button id="inv-tab-stock" onclick="invTab('stock')" style="padding:0.5rem 1.25rem;font-size:0.85rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;">Stock</button>
+      <button id="inv-tab-reorder" id="reorder-tab-btn" onclick="invTab('reorder')" style="padding:0.5rem 1.25rem;font-size:0.85rem;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;">Reorder Requests</button>
+    </div>
+    <div id="inv-tab-body"></div>`;
+  invTab(tab || 'stock');
 }
 
-function renderInventoryTable(rows) {
-  $('page-content').innerHTML = `
+async function invTab(tab) {
+  document.getElementById('inv-tab-stock').style.borderBottomColor   = tab==='stock'   ? '#1e3a5f' : 'transparent';
+  document.getElementById('inv-tab-stock').style.color               = tab==='stock'   ? '#1e3a5f' : '#6b7280';
+  document.getElementById('inv-tab-reorder').style.borderBottomColor = tab==='reorder' ? '#1e3a5f' : 'transparent';
+  document.getElementById('inv-tab-reorder').style.color             = tab==='reorder' ? '#1e3a5f' : '#6b7280';
+  const body = document.getElementById('inv-tab-body');
+  if (tab === 'reorder') {
+    body.setAttribute('data-reorder-table', '1');
+    body.innerHTML = await loadReorderTab();
+  } else {
+    body.removeAttribute('data-reorder-table');
+    renderInventoryTable(inventoryData, true);
+  }
+}
+
+function renderInventoryTable(rows, inTab) {
+  const target = (inTab && document.getElementById('inv-tab-body')) || $('page-content');
+  target.innerHTML = `
     <div class="card overflow-hidden p-0">
       <div class="px-5 py-4 border-b flex flex-wrap items-center gap-3">
         <input id="inv-search" class="input max-w-xs" placeholder="Search inventory…" oninput="filterInventory()">
@@ -3312,9 +3368,314 @@ async function deleteUser(id, username) {
   } catch(err) { toast(err.message, false); }
 }
 
+// ─── Readiness Page ───────────────────────────────────────────────────────────
+async function readinessPage() {
+  $('page-actions').innerHTML = `<button onclick="readinessPage()" class="btn-secondary" style="font-size:0.8rem;">↻ Refresh</button>`;
+  const d = await api('GET', '/api/readiness');
+  const eq = d.equipment, maint = d.maintenance, cal = d.calibration, inv = d.inventory, pmcs30 = d.pmcs_30d;
+
+  const gauge = (pct, color) => `
+    <div style="position:relative;width:90px;height:90px;flex-shrink:0;">
+      <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);width:90px;height:90px;">
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="3"/>
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="${color}" stroke-width="3"
+          stroke-dasharray="${pct} ${100-pct}" stroke-linecap="round"/>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:${color};">${pct}%</div>
+    </div>`;
+
+  const mcPct  = eq.mc_pct;
+  const mcColor = mcPct >= 90 ? '#22c55e' : mcPct >= 70 ? '#f59e0b' : '#ef4444';
+  const pmcsPct  = pmcs30.pct ?? null;
+  const pmcsColor = pmcsPct === null ? '#94a3b8' : pmcsPct >= 90 ? '#22c55e' : pmcsPct >= 70 ? '#f59e0b' : '#ef4444';
+
+  $('page-content').innerHTML = `
+    <!-- Top KPI strip -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.25rem;">
+      ${kpiCard('MC Rate', mcPct+'%', mcColor, `${eq.mc} of ${eq.total} active`)}
+      ${kpiCard('Maint Overdue', maint.overdue, maint.overdue ? '#ef4444' : '#22c55e', `${maint.pending} pending`)}
+      ${kpiCard('Cal Overdue', cal.overdue, cal.overdue ? '#ef4444' : '#22c55e', `${cal.no_record} no record`)}
+      ${kpiCard('Low Stock', inv.low_stock_count, inv.low_stock_count ? '#f59e0b' : '#22c55e', 'items below min')}
+      ${kpiCard('PMCS (30d)', pmcsPct !== null ? pmcsPct+'%' : '—', pmcsColor, `${pmcs30.clean}/${pmcs30.total} clean`)}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <!-- Equipment status -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:1rem;">
+          ${gauge(mcPct, mcColor)}
+          <div>
+            <div style="font-weight:700;font-size:0.95rem;margin-bottom:0.5rem;">Equipment Readiness</div>
+            ${Object.entries(eq.by_status).map(([s,n])=>`
+              <div style="display:flex;justify-content:space-between;gap:1.5rem;font-size:0.82rem;margin-bottom:0.2rem;">
+                <span style="text-transform:capitalize;color:#6b7280;">${s}</span>
+                <span style="font-weight:600;">${n}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <!-- PMCS gauge -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:1rem;">
+          ${gauge(pmcsPct ?? 0, pmcsColor)}
+          <div>
+            <div style="font-weight:700;font-size:0.95rem;margin-bottom:0.25rem;">PMCS Pass Rate</div>
+            <div style="font-size:0.78rem;color:#6b7280;">Last 30 days</div>
+            <div style="font-size:0.82rem;margin-top:0.4rem;">${pmcs30.total} session${pmcs30.total!==1?'s':''} · ${pmcs30.clean} clean · ${pmcs30.total-pmcs30.clean} faults</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <!-- Overdue maintenance -->
+      <div class="card">
+        <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">Overdue Maintenance <span style="font-weight:400;color:#6b7280;font-size:0.78rem;">(${maint.overdue_items.length})</span></div>
+        ${maint.overdue_items.length ? `
+        <div style="display:flex;flex-direction:column;gap:0.35rem;max-height:240px;overflow-y:auto;">
+          ${maint.overdue_items.map(t=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:#fef2f2;border-radius:0.4rem;font-size:0.78rem;">
+            <div>
+              <div style="font-weight:600;">${esc(t.equipment_name)}</div>
+              <div style="color:#6b7280;">${esc(t.title)}</div>
+            </div>
+            <span style="color:#dc2626;font-weight:700;white-space:nowrap;">${t.next_due||'—'}</span>
+          </div>`).join('')}
+        </div>` : '<p style="font-size:0.85rem;color:#22c55e;font-weight:600;">✓ No overdue tasks</p>'}
+      </div>
+
+      <!-- Cal overdue -->
+      <div class="card">
+        <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">Calibration Overdue / No Record <span style="font-weight:400;color:#6b7280;font-size:0.78rem;">(${cal.overdue+cal.no_record})</span></div>
+        ${(cal.overdue_items.length || cal.no_record_items.length) ? `
+        <div style="display:flex;flex-direction:column;gap:0.35rem;max-height:240px;overflow-y:auto;">
+          ${cal.overdue_items.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:#fef2f2;border-radius:0.4rem;font-size:0.78rem;">
+            <div><div style="font-weight:600;">${esc(r.name)}</div><div style="color:#6b7280;">${esc(r.category||'')}</div></div>
+            <span style="color:#dc2626;font-weight:700;">Due ${r.next_due}</span>
+          </div>`).join('')}
+          ${cal.no_record_items.slice(0,10).map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:0.4rem;font-size:0.78rem;">
+            <div><div style="font-weight:600;">${esc(r.name)}</div><div style="color:#6b7280;">${esc(r.category||'')}</div></div>
+            <span style="color:#94a3b8;">No record</span>
+          </div>`).join('')}
+        </div>` : '<p style="font-size:0.85rem;color:#22c55e;font-weight:600;">✓ All calibrations current</p>'}
+      </div>
+    </div>
+
+    <!-- Low stock -->
+    ${inv.low_stock_items.length ? `
+    <div class="card">
+      <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">Low Stock Items <span style="font-weight:400;color:#6b7280;font-size:0.78rem;">(${inv.low_stock_items.length})</span></div>
+      <table class="w-full text-sm">
+        <thead><tr class="text-xs text-gray-500 border-b">
+          <th class="pb-2 text-left">Item</th><th class="pb-2 text-left">Location</th>
+          <th class="pb-2 text-right">Qty</th><th class="pb-2 text-right">Min</th><th class="pb-2 text-right">Action</th>
+        </tr></thead>
+        <tbody>${inv.low_stock_items.map(i=>`
+          <tr class="border-b last:border-0">
+            <td class="py-2 pr-4"><div class="font-medium">${esc(i.name)}</div>${i.part_number?`<div class="text-xs text-gray-400">${esc(i.part_number)}</div>`:''}</td>
+            <td class="py-2 pr-4 text-gray-500">${esc(i.location||'—')}</td>
+            <td class="py-2 text-right font-bold" style="color:${i.quantity===0?'#ef4444':'#f59e0b'};">${i.quantity} ${esc(i.unit)}</td>
+            <td class="py-2 text-right text-gray-500">${i.min_stock}</td>
+            <td class="py-2 text-right"><button onclick="openReorderModal(${i.id},'${esc(i.name)}',${i.min_stock-i.quantity+i.min_stock},'${esc(i.supplier||'')}')" class="btn-primary" style="font-size:0.72rem;padding:3px 10px;">Reorder</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}`;
+}
+
+function kpiCard(label, value, color, sub) {
+  return `<div class="card" style="text-align:center;padding:1rem;">
+    <div style="font-size:1.75rem;font-weight:800;color:${color};">${value}</div>
+    <div style="font-size:0.78rem;font-weight:700;margin:0.2rem 0;">${label}</div>
+    <div style="font-size:0.7rem;color:#9ca3af;">${sub}</div>
+  </div>`;
+}
+
+// ─── Inventory Reorder Workflow ────────────────────────────────────────────────
+let reorderData = [];
+
+async function loadReorderTab() {
+  reorderData = await api('GET', '/api/reorder');
+  const pending  = reorderData.filter(r => r.status === 'pending');
+  const ordered  = reorderData.filter(r => r.status === 'ordered');
+  const received = reorderData.filter(r => r.status === 'received');
+
+  const statusColor = {pending:'#f59e0b',ordered:'#3b82f6',received:'#22c55e',cancelled:'#9ca3af'};
+
+  return `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-3 border-b flex items-center justify-between">
+        <div style="font-size:0.82rem;font-weight:600;">Reorder Requests
+          <span style="margin-left:0.5rem;font-size:0.72rem;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:9999px;">${pending.length} pending</span>
+          ${ordered.length?`<span style="margin-left:0.25rem;font-size:0.72rem;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:9999px;">${ordered.length} ordered</span>`:''}
+        </div>
+      </div>
+      ${reorderData.length === 0
+        ? '<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:0.85rem;">No reorder requests.</div>'
+        : `<table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th class="px-4 py-3 text-left">Item</th>
+                <th class="px-4 py-3 text-left">Qty</th>
+                <th class="px-4 py-3 text-left col-m-hide">Supplier</th>
+                <th class="px-4 py-3 text-left col-m-hide">Requested By</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reorderData.map(r=>`
+              <tr class="table-row border-b last:border-0">
+                <td class="px-4 py-3">
+                  <div class="font-medium">${esc(r.item_name)}</div>
+                  ${r.part_number?`<div class="text-xs text-gray-400">${esc(r.part_number)}</div>`:''}
+                  <div class="text-xs text-gray-400">On hand: ${r.current_qty} ${esc(r.unit)} · Min: ${r.min_stock}</div>
+                </td>
+                <td class="px-4 py-3 font-bold">${r.qty_requested} ${esc(r.unit)}</td>
+                <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(r.supplier||'—')}</td>
+                <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(r.requested_by||'—')}</td>
+                <td class="px-4 py-3">
+                  <span style="font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:9999px;background:${statusColor[r.status]+'22'};color:${statusColor[r.status]};">${r.status}</span>
+                </td>
+                <td class="px-4 py-3 text-right" style="white-space:nowrap;">
+                  ${r.status==='pending'?`<button onclick="setReorderStatus(${r.id},'ordered')" class="btn-secondary" style="font-size:0.7rem;padding:2px 8px;margin-right:4px;">Mark Ordered</button>`:''}
+                  ${r.status==='ordered'?`<button onclick="setReorderStatus(${r.id},'received')" class="btn-primary" style="font-size:0.7rem;padding:2px 8px;margin-right:4px;">Received</button>`:''}
+                  <button onclick="printRequisition(${r.id})" style="font-size:0.7rem;background:none;border:1px solid #d1d5db;border-radius:4px;padding:2px 8px;cursor:pointer;margin-right:4px;" title="Print requisition">🖨</button>
+                  ${isAdmin()?`<button onclick="deleteReorder(${r.id})" style="font-size:0.7rem;background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:2px 8px;cursor:pointer;">✕</button>`:''}
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`}
+    </div>`;
+}
+
+function openReorderModal(itemId, itemName, suggestedQty, supplier) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'reorder-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:440px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">Request Reorder</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${esc(itemName)}</div>
+      </div>
+      <button onclick="document.getElementById('reorder-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form onsubmit="submitReorder(event,${itemId})" class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Quantity to Order *</label>
+        <input name="qty" type="number" min="1" value="${Math.max(1,suggestedQty||1)}" class="form-input" style="width:120px;" required>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Requested By</label>
+        <input name="requested_by" class="form-input" style="width:100%;" value="${currentUser?.sub||''}" placeholder="Name / Rank">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Supplier</label>
+        <input name="supplier" class="form-input" style="width:100%;" value="${esc(supplier)}" placeholder="Supplier / NSN source">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
+        <input name="notes" class="form-input" style="width:100%;" placeholder="Optional">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('reorder-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Submit Request</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function submitReorder(e, itemId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await api('POST', '/api/reorder', {
+    item_id: itemId,
+    qty_requested: parseInt(fd.get('qty')),
+    requested_by: fd.get('requested_by') || null,
+    supplier: fd.get('supplier') || null,
+    notes: fd.get('notes') || null,
+  });
+  document.getElementById('reorder-backdrop').remove();
+  toast('Reorder request submitted.');
+  // Refresh inventory page if open
+  if (document.getElementById('reorder-tab-btn')) {
+    document.getElementById('reorder-tab-btn').click();
+  }
+}
+
+async function setReorderStatus(id, status) {
+  await api('PATCH', `/api/reorder/${id}`, { status });
+  if (status === 'received') toast('Marked received — inventory updated.');
+  else toast(`Marked as ${status}.`);
+  // re-render whichever view is showing reorder data
+  if (document.querySelector('[data-reorder-table]')) {
+    const html = await loadReorderTab();
+    document.querySelector('[data-reorder-table]').innerHTML = html;
+  }
+}
+
+async function deleteReorder(id) {
+  if (!confirm('Delete this reorder request?')) return;
+  await api('DELETE', `/api/reorder/${id}`);
+  toast('Deleted.');
+  if (document.querySelector('[data-reorder-table]')) {
+    const html = await loadReorderTab();
+    document.querySelector('[data-reorder-table]').innerHTML = html;
+  }
+}
+
+function printRequisition(id) {
+  const r = reorderData.find(x => x.id === id);
+  if (!r) return;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Reorder Requisition</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:2rem;color:#111;max-width:700px;margin:0 auto;}
+    h1{font-size:1.2rem;border-bottom:2px solid #1e3a5f;padding-bottom:.5rem;margin-bottom:1rem;color:#1e3a5f;}
+    table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;}
+    td{padding:6px 10px;border:1px solid #ccc;font-size:0.9rem;}
+    td:first-child{font-weight:700;background:#f8f9fa;width:35%;}
+    .sig-box{display:flex;gap:2rem;margin-top:2rem;}
+    .sig{flex:1;border-top:1px solid #333;padding-top:.25rem;font-size:0.75rem;color:#555;}
+    @media print{button{display:none!important}}
+  </style></head><body>
+  <h1>PARTS REORDER REQUISITION</h1>
+  <table>
+    <tr><td>Date</td><td>${new Date().toLocaleDateString()}</td></tr>
+    <tr><td>Item</td><td>${esc(r.item_name)}</td></tr>
+    <tr><td>Part Number / NSN</td><td>${esc(r.part_number||'—')}</td></tr>
+    <tr><td>Qty Requested</td><td>${r.qty_requested} ${esc(r.unit)}</td></tr>
+    <tr><td>Supplier</td><td>${esc(r.supplier||'—')}</td></tr>
+    <tr><td>Requested By</td><td>${esc(r.requested_by||'—')}</td></tr>
+    <tr><td>Location</td><td>${esc(r.location||'—')}</td></tr>
+    <tr><td>Current Qty on Hand</td><td>${r.current_qty} ${esc(r.unit)}</td></tr>
+    <tr><td>Min Stock Level</td><td>${r.min_stock} ${esc(r.unit)}</td></tr>
+    <tr><td>Notes</td><td>${esc(r.notes||'—')}</td></tr>
+    <tr><td>Status</td><td>${r.status.toUpperCase()}</td></tr>
+  </table>
+  <div class="sig-box">
+    <div class="sig">Requested by / Date</div>
+    <div class="sig">Approved by / Date</div>
+    <div class="sig">Received by / Date</div>
+  </div>
+  <br><button onclick="window.print()" style="padding:.5rem 1.5rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9rem;">Print</button>
+  </body></html>`);
+  w.document.close();
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/static/sw.js').catch(()=>{}));
 }
 </script>
 </body>
