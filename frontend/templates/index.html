@@ -999,37 +999,51 @@ async function eqTab(tab) {
 // ─── Equipment Type Checklist Helpers ────────────────────────────────────────
 async function eqClAddStep(eqId, eqName) {
   const title = prompt('Check item title:');
-  if (!title) return;
-  const stepNo = prompt('Step # (optional, e.g. 1, 2a):') || '';
-  const interval = prompt('Interval (B/W/M/Q/S/A — default B):') || 'B';
+  if (!title?.trim()) return;
+  const stepNo    = prompt('Step # (optional, e.g. 1, 2a):') || '';
+  const intervalR = prompt('Interval (B/W/M/Q/S/A — default B):') || 'B';
   const procedure = prompt('Procedure notes (optional):') || '';
-  await api('POST', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}/steps`,
-    { title, step_no: stepNo, interval: interval.toUpperCase() || 'B', procedure });
-  toast('Step added');
-  eqTab('maintenance');
+  try {
+    await api('POST', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}/steps`,
+      { title: title.trim(), step_no: stepNo, interval: intervalR.toUpperCase() || 'B', procedure });
+    toast('Step added');
+  } catch(e) { toast(e.message || 'Failed to add step', false); return; }
+  await eqTab('maintenance');
 }
 
-async function eqClSaveStep(stepId, field, value, eqId) {
+async function eqClSaveStep(stepId, field, value) {
   const row = document.querySelector(`tr[data-step-id="${stepId}"]`);
   if (!row) return;
-  const inputs = row.querySelectorAll('input, select');
-  const [stepNoEl, intervalEl, titleEl, procedureEl] = inputs;
+  const allInputs = Array.from(row.querySelectorAll('input, select'));
+  // order: step_no input, interval select, title input, procedure input
+  const byName = {};
+  allInputs.forEach(el => {
+    const ob = el.getAttribute('onblur') || '';
+    if (ob.includes("'step_no'"))   byName.step_no   = el;
+    else if (ob.includes("'interval'")) byName.interval  = el;
+    else if (ob.includes("'title'"))    byName.title     = el;
+    else if (ob.includes("'procedure'")) byName.procedure = el;
+  });
   const payload = {
-    step_no:   stepNoEl?.value   || '',
-    interval:  intervalEl?.value || 'B',
-    title:     titleEl?.value    || '',
-    procedure: procedureEl?.value || '',
+    step_no:   byName.step_no?.value   || '',
+    interval:  byName.interval?.value  || 'B',
+    title:     byName.title?.value     || '',
+    procedure: byName.procedure?.value || '',
     [field]: value
   };
-  if (!payload.title) return;
-  await api('PUT', `/api/eq-checklists/steps/${stepId}`, payload);
+  if (!payload.title) { toast('Title is required', false); return; }
+  try {
+    await api('PUT', `/api/eq-checklists/steps/${stepId}`, payload);
+  } catch(e) { toast(e.message || 'Save failed', false); }
 }
 
-async function eqClDeleteStep(stepId, eqId) {
+async function eqClDeleteStep(stepId) {
   if (!confirm('Remove this step from the template?')) return;
-  await api('DELETE', `/api/eq-checklists/steps/${stepId}`);
-  toast('Step removed');
-  eqTab('maintenance');
+  try {
+    await api('DELETE', `/api/eq-checklists/steps/${stepId}`);
+    toast('Step removed');
+  } catch(e) { toast(e.message || 'Delete failed', false); return; }
+  await eqTab('maintenance');
 }
 
 function eqTaskRow(t) {
