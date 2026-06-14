@@ -2284,6 +2284,31 @@ function filterInventory() {
 
 async function openItemModal(id) {
   const i = id ? inventoryData.find(x=>x.id===id) || {} : {};
+  const cats = [...new Set(inventoryData.map(x=>x.category).filter(Boolean))].sort();
+  const locs = [...new Set(inventoryData.map(x=>x.location).filter(Boolean))].sort();
+  const catVal = i.category || '';
+  const locVal = i.location || '';
+  const catOther = catVal && !cats.includes(catVal);
+  const locOther = locVal && !locs.includes(locVal);
+
+  const catSelect = `
+    <select class="input" id="inv-cat-select" onchange="invDropChange('cat')">
+      <option value="">— None —</option>
+      ${cats.map(c=>`<option ${catVal===c?'selected':''}>${esc(c)}</option>`).join('')}
+      <option value="__new__" ${catOther?'selected':''}>+ Add new…</option>
+    </select>
+    <input class="input" id="inv-cat-new" placeholder="New category" style="margin-top:0.3rem;display:${catOther?'block':'none'};" value="${catOther?esc(catVal):''}">
+    <input type="hidden" name="category" id="inv-cat-val" value="${esc(catVal)}">`;
+
+  const locSelect = `
+    <select class="input" id="inv-loc-select" onchange="invDropChange('loc')">
+      <option value="">— None —</option>
+      ${locs.map(l=>`<option ${locVal===l?'selected':''}>${esc(l)}</option>`).join('')}
+      <option value="__new__" ${locOther?'selected':''}>+ Add new…</option>
+    </select>
+    <input class="input" id="inv-loc-new" placeholder="New location" style="margin-top:0.3rem;display:${locOther?'block':'none'};" value="${locOther?esc(locVal):''}">
+    <input type="hidden" name="location" id="inv-loc-val" value="${esc(locVal)}">`;
+
   modal(`<div class="modal">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">${id?'Edit':'Add'} Inventory Item</h2>
@@ -2293,13 +2318,13 @@ async function openItemModal(id) {
       <div class="grid grid-cols-2 gap-4">
         <div class="col-span-2"><label class="label">Name *</label><input class="input" name="name" required value="${esc(i.name||'')}"></div>
         <div><label class="label">Part #</label><input class="input" name="part_number" value="${esc(i.part_number||'')}"></div>
-        <div><label class="label">Category</label><input class="input" name="category" value="${esc(i.category||'')}"></div>
-        <div><label class="label">Location</label><input class="input" name="location" value="${esc(i.location||'')}"></div>
         <div><label class="label">Unit</label><input class="input" name="unit" value="${esc(i.unit||'ea')}"></div>
+        <div><label class="label">Category</label>${catSelect}</div>
+        <div><label class="label">Location</label>${locSelect}</div>
         ${!id ? `<div><label class="label">Initial Qty</label><input class="input" type="number" name="quantity" min="0" value="0"></div>` : ''}
         <div><label class="label">Min Stock</label><input class="input" type="number" name="min_stock" min="0" value="${i.min_stock||0}"></div>
         <div><label class="label">Unit Cost ($)</label><input class="input" type="number" step="0.01" name="unit_cost" value="${i.unit_cost||''}"></div>
-        <div><label class="label">Supplier</label><input class="input" name="supplier" value="${esc(i.supplier||'')}"></div>
+        <div class="col-span-2"><label class="label">Supplier</label><input class="input" name="supplier" value="${esc(i.supplier||'')}"></div>
         <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(i.notes||'')}</textarea></div>
       </div>
       <div class="flex justify-end gap-3 pt-2">
@@ -2308,6 +2333,21 @@ async function openItemModal(id) {
       </div>
     </form>
   </div>`);
+}
+
+function invDropChange(field) {
+  const sel    = document.getElementById(`inv-${field}-select`);
+  const newInp = document.getElementById(`inv-${field}-new`);
+  const hidden = document.getElementById(`inv-${field}-val`);
+  if (sel.value === '__new__') {
+    newInp.style.display = 'block';
+    newInp.focus();
+    newInp.oninput = () => { hidden.value = newInp.value.trim(); };
+    hidden.value = '';
+  } else {
+    newInp.style.display = 'none';
+    hidden.value = sel.value;
+  }
 }
 
 async function saveItem(e, id) {
