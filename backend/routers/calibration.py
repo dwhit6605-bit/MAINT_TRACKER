@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/calibration", tags=["calibration"])
 @router.get("")
 async def list_records(equipment_id: int = None, db=Depends(get_db)):
     query = """
-        SELECT c.*, e.name as equipment_name
+        SELECT c.*, e.name as equipment_name, e.serial_num
         FROM calibration_records c
         JOIN equipment e ON e.id = c.equipment_id
         WHERE 1=1
