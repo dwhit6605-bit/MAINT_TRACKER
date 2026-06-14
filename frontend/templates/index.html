@@ -2240,7 +2240,7 @@ async function submitCalBulkEdit(e) {
 function filterCal() {
   const s = $('cal-search').value.toLowerCase();
   $('cal-tbody').innerHTML = calRows(calData.filter(c=>
-    c.equipment_name.toLowerCase().includes(s) || (c.certificate_num||'').toLowerCase().includes(s)
+    c.equipment_name.toLowerCase().includes(s) || (c.serial_num||'').toLowerCase().includes(s) || (c.certificate_num||'').toLowerCase().includes(s)
   ));
 }
 
