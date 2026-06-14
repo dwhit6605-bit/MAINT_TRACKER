@@ -2127,6 +2127,7 @@ function renderCalTable(rows) {
             <tr>
               ${isTech() ? `<th class="px-4 py-3"><input type="checkbox" id="cal-check-all" onchange="calToggleAll(this.checked)" style="cursor:pointer;"></th>` : ''}
               <th class="px-4 py-3 text-left">Equipment</th>
+              <th class="px-4 py-3 text-left col-m-hide">Serial #</th>
               <th class="px-4 py-3 text-left">Calibrated</th>
               <th class="px-4 py-3 text-left col-m-hide">By</th>
               <th class="px-4 py-3 text-left col-m-hide">Cert #</th>
@@ -2147,6 +2148,7 @@ function calRows(rows) {
     <tr class="table-row border-b last:border-0">
       ${isTech() ? `<td class="px-4 py-3"><input type="checkbox" class="cal-row-check" data-id="${c.id}" ${calSelected.has(c.id)?'checked':''} onchange="calToggleRow(${c.id},this.checked)" style="cursor:pointer;"></td>` : ''}
       <td class="px-4 py-3 font-medium">${esc(c.equipment_name)}</td>
+      <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(c.serial_num||'—')}</td>
       <td class="px-4 py-3 text-gray-500">${fmtDate(c.calibrated_at)}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(c.calibrated_by||'—')}</td>
       <td class="px-4 py-3 font-mono text-xs col-m-hide">${esc(c.certificate_num||'—')}</td>
