@@ -189,6 +189,11 @@
         <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
       </div>
       <div class="flex items-center gap-3">
+        <button onclick="openGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.3rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;color:#6b7280;font-size:0.8rem;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span class="col-m-hide">Search…</span>
+          <kbd class="col-m-hide" style="font-size:0.65rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:3px;padding:1px 4px;">Ctrl K</kbd>
+        </button>
         <div class="flex items-center gap-3" id="page-actions"></div>
         <div id="user-badge" style="display:none;align-items:center;gap:0.5rem;font-size:0.8rem;color:#64748b;border-left:1px solid #e5e7eb;padding-left:0.75rem;margin-left:0.25rem;">
           <span id="user-name" style="font-weight:600;color:#374151;"></span>
@@ -197,6 +202,18 @@
         </div>
       </div>
     </header>
+
+    <!-- Global search overlay -->
+    <div id="gsearch-overlay" onclick="closeGlobalSearch()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;"></div>
+    <div id="gsearch-panel" style="display:none;position:fixed;top:5rem;left:50%;transform:translateX(-50%);width:min(640px,96vw);background:#fff;border-radius:0.75rem;box-shadow:0 20px 60px rgba(0,0,0,0.25);z-index:201;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e5e7eb;">
+        <svg width="18" height="18" fill="none" stroke="#9ca3af" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="gsearch-input" placeholder="Search equipment, tasks, inventory, faults…" oninput="runGlobalSearch(this.value)"
+          style="flex:1;border:none;outline:none;font-size:0.95rem;color:#111;" autocomplete="off">
+        <kbd onclick="closeGlobalSearch()" style="cursor:pointer;font-size:0.7rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:3px;padding:2px 6px;color:#6b7280;">Esc</kbd>
+      </div>
+      <div id="gsearch-results" style="max-height:420px;overflow-y:auto;padding:0.5rem 0;"></div>
+    </div>
 
 
     <!-- Page content -->
@@ -300,7 +317,88 @@ function modal(html, onload) {
 function closeModal() { $('modal-container').innerHTML = ''; }
 
 
-// ─── Mobile sidebar ──────────────────────────────────────────────────────────
+// ─── Global search ───────────────────────────────────────────────────────────
+function openGlobalSearch() {
+  document.getElementById('gsearch-overlay').style.display = 'block';
+  document.getElementById('gsearch-panel').style.display = 'block';
+  const inp = document.getElementById('gsearch-input');
+  inp.value = '';
+  document.getElementById('gsearch-results').innerHTML = '<div style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">Start typing to search…</div>';
+  inp.focus();
+}
+
+function closeGlobalSearch() {
+  document.getElementById('gsearch-overlay').style.display = 'none';
+  document.getElementById('gsearch-panel').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openGlobalSearch(); }
+  if (e.key === 'Escape') closeGlobalSearch();
+});
+
+async function runGlobalSearch(q) {
+  q = q.trim().toLowerCase();
+  const el = document.getElementById('gsearch-results');
+  if (!q) { el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">Start typing to search…</div>'; return; }
+
+  // Fetch all data sources in parallel (use cached where available)
+  const [equip, tasks, inventory, faults, cals] = await Promise.all([
+    api('GET', '/api/equipment').catch(()=>[]),
+    api('GET', '/api/maintenance').catch(()=>[]),
+    api('GET', '/api/inventory').catch(()=>[]),
+    api('GET', '/api/faults').catch(()=>[]),
+    api('GET', '/api/calibration').catch(()=>[]),
+  ]);
+
+  const results = [];
+
+  equip.forEach(e => {
+    if ([e.name,e.serial_num,e.model,e.category,e.location].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'Equipment', icon:'⚙️', title: e.name, sub: `${e.category}${e.serial_num?' · S/N '+e.serial_num:''}`, action: ()=>{ closeGlobalSearch(); openEquipmentDetail(e.id); } });
+  });
+
+  tasks.forEach(t => {
+    if ([t.title,t.description,t.equipment_name].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'Task', icon:'🔧', title: t.title, sub: `${t.equipment_name||''} · ${t.status}${t.next_due?' · Due '+t.next_due.slice(0,10):''}`, action: ()=>{ closeGlobalSearch(); navigate('maintenance'); } });
+  });
+
+  inventory.forEach(i => {
+    if ([i.name,i.part_number,i.category,i.location].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'Inventory', icon:'📦', title: i.name, sub: `${i.category||''}${i.location?' · '+i.location:''} · Qty: ${i.quantity} ${i.unit}`, action: ()=>{ closeGlobalSearch(); navigate('inventory'); } });
+  });
+
+  faults.forEach(f => {
+    if ([f.title,f.description,f.reported_by,f.equipment_name].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'Fault', icon:'⚠️', title: f.title, sub: `${f.equipment_name||''} · ${f.severity} · ${f.status}`, action: ()=>{ closeGlobalSearch(); navigate('faults'); } });
+  });
+
+  cals.forEach(c => {
+    if ([c.equipment_name,c.calibrated_by,c.certificate_num].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'Calibration', icon:'📐', title: c.equipment_name, sub: `Cal by ${c.calibrated_by||'—'}${c.next_due?' · Due '+c.next_due.slice(0,10):''}`, action: ()=>{ closeGlobalSearch(); navigate('calibration'); } });
+  });
+
+  if (!results.length) {
+    el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">No results found.</div>';
+    return;
+  }
+
+  const TYPE_COLORS = { Equipment:'#1d4ed8', Task:'#7c3aed', Inventory:'#b45309', Fault:'#dc2626', Calibration:'#0369a1' };
+  el.innerHTML = results.slice(0,30).map((r,i)=>`
+    <div onclick="_gsearchGo(${i})" style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 1rem;cursor:pointer;border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <span style="font-size:1.1rem;flex-shrink:0;">${r.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.875rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.title)}</div>
+        <div style="font-size:0.72rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.sub)}</div>
+      </div>
+      <span style="font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:9999px;background:${TYPE_COLORS[r.type]||'#64748b'}18;color:${TYPE_COLORS[r.type]||'#64748b'};border:1px solid ${TYPE_COLORS[r.type]||'#64748b'}33;flex-shrink:0;">${r.type}</span>
+    </div>`).join('');
+  window._gsearchActions = results.map(r=>r.action);
+}
+
+function _gsearchGo(i) { window._gsearchActions?.[i]?.(); }
+
+// ─── Mobile sidebar ───────────────────────────────────────────────────────────
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -1508,11 +1606,20 @@ function syncNewAssigned(input) {
 async function saveEquipment(e, id) {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target));
-  // location comes from the hidden field; drop the helper fields
   delete body.location_select;
   delete body.location_new;
   delete body.assigned_select;
   delete body.assigned_new;
+
+  // Soft duplicate serial warning
+  const serial = body.serial_num?.trim();
+  if (serial) {
+    const dupe = equipmentData.find(eq => eq.serial_num?.trim() === serial && eq.id !== id);
+    if (dupe) {
+      if (!confirm(`Serial number "${serial}" is already assigned to "${dupe.name}". Save anyway?`)) return;
+    }
+  }
+
   try {
     if (id) await api('PUT', `/api/equipment/${id}`, body);
     else await api('POST', '/api/equipment', body);
@@ -2422,20 +2529,41 @@ async function pmcsPage() {
   const templates = await api('GET', '/api/pmcs/templates');
   pmcsTemplateCache = templates;
   $('page-actions').innerHTML = `<button onclick="openPmcsTemplateModal()" class="btn-primary">+ New Checklist</button>`;
-  $('page-content').innerHTML = templates.length === 0
-    ? `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
+  if (templates.length === 0) {
+    $('page-content').innerHTML = `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
         <div style="font-size:2.5rem;margin-bottom:0.75rem;">📋</div>
         <div style="font-weight:600;margin-bottom:0.4rem;">No PMCS checklists yet</div>
         <div style="font-size:0.875rem;">Create a checklist, add check items, then scan the QR code to run an inspection.</div>
-       </div>`
-    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
-        ${templates.map(pmcsCard).join('')}
        </div>`;
+    return;
+  }
+  $('page-content').innerHTML = `
+    <div style="margin-bottom:1rem;">
+      <input id="pmcs-filter" class="input" placeholder="Filter checklists by name or equipment…" oninput="filterPmcsCards()" style="max-width:380px;">
+    </div>
+    <div id="pmcs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
+      ${templates.map(pmcsCard).join('')}
+    </div>
+    <div id="pmcs-no-results" style="display:none;color:#9ca3af;font-size:0.875rem;padding:2rem 0;">No checklists match your filter.</div>`;
+}
+
+function filterPmcsCards() {
+  const q = document.getElementById('pmcs-filter')?.value.toLowerCase().trim() || '';
+  const cards = document.querySelectorAll('#pmcs-grid [data-pmcs-id]');
+  let shown = 0;
+  cards.forEach(card => {
+    const match = !q || card.dataset.pmcsSearch?.includes(q);
+    card.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  const noRes = document.getElementById('pmcs-no-results');
+  if (noRes) noRes.style.display = shown === 0 ? 'block' : 'none';
 }
 
 function pmcsCard(t) {
   const eqList = (t.linked_equipment||[]).map(e=>`<span style="font-size:0.72rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:0.3rem;padding:1px 7px;">${esc(e.name)}</span>`).join('');
-  return `<div class="card" style="display:flex;flex-direction:column;gap:0.75rem;">
+  const searchStr = [t.title, t.description, ...(t.linked_equipment||[]).map(e=>e.name)].filter(Boolean).join(' ').toLowerCase();
+  return `<div class="card" data-pmcs-id="${t.id}" data-pmcs-search="${esc(searchStr)}" style="display:flex;flex-direction:column;gap:0.75rem;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
       <div style="flex:1;">
         <div style="font-weight:700;font-size:1rem;">${esc(t.title)}</div>
