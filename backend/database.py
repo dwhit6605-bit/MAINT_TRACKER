@@ -306,6 +306,24 @@ async def init_db():
                 UNIQUE(template_id, equipment_id)
             );
             CREATE INDEX IF NOT EXISTS idx_pmcs_tmpl_eq ON pmcs_template_equipment(template_id);
+
+            CREATE TABLE IF NOT EXISTS equipment_type_checklists (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_name TEXT NOT NULL UNIQUE,
+                created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS equipment_type_checklist_steps (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                checklist_id INTEGER NOT NULL REFERENCES equipment_type_checklists(id) ON DELETE CASCADE,
+                step_no      TEXT,
+                interval     TEXT NOT NULL DEFAULT 'B',
+                title        TEXT NOT NULL,
+                procedure    TEXT,
+                order_index  INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_eq_type_steps ON equipment_type_checklist_steps(checklist_id);
         """)
         # Migrations — add columns that may not exist in older DBs
         eq_cols = {row[1] async for row in await db.execute("PRAGMA table_info(equipment)")}

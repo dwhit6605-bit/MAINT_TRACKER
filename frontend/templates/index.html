@@ -826,10 +826,71 @@ async function eqTab(tab) {
   }
 
   else if (tab === 'maintenance') {
+    // Load the shared type checklist template for this equipment name
+    body.innerHTML = '<div style="padding:1rem;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
+    const eqName = equipmentData.find(e=>e.id===id)?.name || '';
+    const clData = await api('GET', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}`).catch(()=>({checklist:null,steps:[]}));
+    const clSteps = clData.steps || [];
+
     const activeTasks = tasks.filter(t => t.status !== 'completed');
     const doneTasks   = tasks.filter(t => t.status === 'completed');
+
+    const INTERVALS = ['B','W','M','Q','S','A'];
+    const stepRows = clSteps.map((s,i) => `
+      <tr data-step-id="${s.id}" style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:0.35rem 0.5rem;font-size:0.78rem;color:#6b7280;width:3.5rem;">
+          <input value="${esc(s.step_no||'')}" style="width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;font-size:0.75rem;"
+                 onblur="eqClSaveStep(${s.id},'step_no',this.value,${id})">
+        </td>
+        <td style="padding:0.35rem 0.5rem;width:3.5rem;">
+          <select style="font-size:0.75rem;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;"
+                  onchange="eqClSaveStep(${s.id},'interval',this.value,${id})">
+            ${INTERVALS.map(v=>`<option value="${v}"${s.interval===v?' selected':''}>${v}</option>`).join('')}
+          </select>
+        </td>
+        <td style="padding:0.35rem 0.5rem;">
+          <input value="${esc(s.title)}" style="width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;font-size:0.78rem;"
+                 onblur="eqClSaveStep(${s.id},'title',this.value,${id})">
+        </td>
+        <td style="padding:0.35rem 0.5rem;">
+          <input value="${esc(s.procedure||'')}" style="width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;font-size:0.78rem;"
+                 onblur="eqClSaveStep(${s.id},'procedure',this.value,${id})">
+        </td>
+        ${isTech() ? `<td style="padding:0.35rem 0.5rem;text-align:center;">
+          <button onclick="eqClDeleteStep(${s.id},${id})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.85rem;" title="Remove step">✕</button>
+        </td>` : ''}
+      </tr>`).join('');
+
     body.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <!-- ── Maintenance Checklist Template ── -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;">Maintenance Checklist Template</div>
+            <div style="font-size:0.72rem;color:#6b7280;">Shared by all equipment named "${esc(eqName)}" · auto-populates PMCS</div>
+          </div>
+          ${isTech() ? `<button onclick="eqClAddStep(${id},'${esc(eqName).replace(/'/g,"\\'")}');" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Add Step</button>` : ''}
+        </div>
+        ${clSteps.length === 0
+          ? `<p style="font-size:0.8rem;color:#9ca3af;padding:0.75rem;background:#f9fafb;border-radius:0.5rem;text-align:center;">No checklist steps yet.${isTech()?' Click "+ Add Step" to build this equipment\'s maintenance template.':''}</p>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                <thead>
+                  <tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb;">
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-size:0.72rem;color:#6b7280;font-weight:600;">Step #</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-size:0.72rem;color:#6b7280;font-weight:600;">Interval</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-size:0.72rem;color:#6b7280;font-weight:600;">Check Item</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-size:0.72rem;color:#6b7280;font-weight:600;">Procedure</th>
+                    ${isTech() ? '<th style="padding:0.4rem 0.5rem;"></th>' : ''}
+                  </tr>
+                </thead>
+                <tbody>${stepRows}</tbody>
+              </table>
+            </div>`}
+      </div>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin-bottom:1.25rem;">
+      <!-- ── Maintenance Tasks ── -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
         <div style="font-weight:600;font-size:0.875rem;">Maintenance Tasks</div>
         ${isTech() ? `<button onclick="openEqTaskModal(${id})" class="btn-primary" style="font-size:0.75rem;padding:0.35rem 0.8rem;">+ Add Task</button>` : ''}
       </div>
@@ -933,6 +994,42 @@ async function eqTab(tab) {
             }).join('')}
           </div>`}`;
   }
+}
+
+// ─── Equipment Type Checklist Helpers ────────────────────────────────────────
+async function eqClAddStep(eqId, eqName) {
+  const title = prompt('Check item title:');
+  if (!title) return;
+  const stepNo = prompt('Step # (optional, e.g. 1, 2a):') || '';
+  const interval = prompt('Interval (B/W/M/Q/S/A — default B):') || 'B';
+  const procedure = prompt('Procedure notes (optional):') || '';
+  await api('POST', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}/steps`,
+    { title, step_no: stepNo, interval: interval.toUpperCase() || 'B', procedure });
+  toast('Step added');
+  eqTab('maintenance');
+}
+
+async function eqClSaveStep(stepId, field, value, eqId) {
+  const row = document.querySelector(`tr[data-step-id="${stepId}"]`);
+  if (!row) return;
+  const inputs = row.querySelectorAll('input, select');
+  const [stepNoEl, intervalEl, titleEl, procedureEl] = inputs;
+  const payload = {
+    step_no:   stepNoEl?.value   || '',
+    interval:  intervalEl?.value || 'B',
+    title:     titleEl?.value    || '',
+    procedure: procedureEl?.value || '',
+    [field]: value
+  };
+  if (!payload.title) return;
+  await api('PUT', `/api/eq-checklists/steps/${stepId}`, payload);
+}
+
+async function eqClDeleteStep(stepId, eqId) {
+  if (!confirm('Remove this step from the template?')) return;
+  await api('DELETE', `/api/eq-checklists/steps/${stepId}`);
+  toast('Step removed');
+  eqTab('maintenance');
 }
 
 function eqTaskRow(t) {
@@ -2855,6 +2952,31 @@ async function addPmcsEquipment(tmplId) {
   if (!eqId) return;
   try {
     await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eqId });
+
+    // Auto-populate checklist steps as PMCS check items if template exists
+    const eqRecord = equipmentData.find(e => e.id === eqId);
+    if (eqRecord) {
+      const clData = await api('GET', `/api/eq-checklists/for-equipment/${eqId}`).catch(()=>null);
+      if (clData?.steps?.length) {
+        const accept = confirm(
+          `"${eqRecord.name}" has a ${clData.steps.length}-step maintenance checklist template.\n\nAuto-populate these steps as PMCS check items?`
+        );
+        if (accept) {
+          for (const s of clData.steps) {
+            await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+              item_no:      s.step_no || '',
+              interval:     s.interval || 'B',
+              check_item:   s.title,
+              procedure:    s.procedure || '',
+              not_ready_if: '',
+              equipment_id: eqId
+            });
+          }
+          toast(`Added ${clData.steps.length} checklist steps as PMCS items.`);
+        }
+      }
+    }
+
     toast('Equipment added.');
     await _reloadPmcsEditor(tmplId, eqId);
   } catch(err) { toast(err.message, false); }
