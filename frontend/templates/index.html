@@ -240,6 +240,8 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) 
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 let currentUser = null;
+const ORG_NAME = '9th CST(WMD)';
+const cu = () => currentUser?.username || '';
 function getToken() { return localStorage.getItem('auth_token'); }
 function isAdmin() { return currentUser?.role === 'admin'; }
 function isTech()  { return currentUser?.role === 'admin' || currentUser?.role === 'tech'; }
@@ -1088,7 +1090,7 @@ async function eqCompleteTask(taskId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="eqSubmitComplete(event,${taskId},${eqId})">
-      <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
+      <div><label class="label">Completed By</label><input class="input" name="completed_by" value="${esc(cu())}"></div>
       <div><label class="label">Override Next Due Date</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
@@ -1272,7 +1274,7 @@ function openDA2404Modal(taskId) {
     <div class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;">
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Organization</label>
-        <input id="da-org" class="form-input" placeholder="e.g. 1st BN 75th Ranger Regt" style="width:100%;">
+        <input id="da-org" class="form-input" style="width:100%;" value="${esc(ORG_NAME)}">
       </div>
       <div style="display:flex;gap:0.75rem;">
         <div style="flex:1;">
@@ -1330,7 +1332,7 @@ function openEqCalModal(eqId) {
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqSaveCal(event,${eqId})">
       <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required></div>
       <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
-      <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by"></div>
+      <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
       <div><label class="label">Result</label>
         <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
@@ -1920,7 +1922,7 @@ async function completeTaskModal(id) {
     </div>
     <form id="complete-form" class="px-6 py-4 space-y-4" onsubmit="submitComplete(event,${id})">
       ${recurringHint}
-      <div><label class="label">Completed By</label><input class="input" name="completed_by"></div>
+      <div><label class="label">Completed By</label><input class="input" name="completed_by" value="${esc(cu())}"></div>
       <div><label class="label">${task.interval_days ? 'Override Next Due (optional)' : 'Next Due'}</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
 
@@ -2296,7 +2298,7 @@ function openCalModal() {
         </div>
         <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-new" name="calibrated_at" required value="${today}" onchange="applyCalInterval('cal-date-new','next_due',document.getElementById('next_due-interval')?.value)"></div>
         <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-new','next_due','')}</div>
-        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(currentUser?.sub||'')}"></div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
         <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
         <div><label class="label">Result</label>
           <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
@@ -3698,7 +3700,7 @@ function openSkoCalModal(eqId, eqName) {
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Calibrated By</label>
-        <input name="calibrated_by" class="form-input" style="width:100%;" value="${esc(currentUser?.username||'')}">
+        <input name="calibrated_by" class="form-input" style="width:100%;" value="${esc(cu())}">
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Certificate #</label>
@@ -3763,7 +3765,7 @@ function openSkoPartsModal(skoId, skoName) {
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Used By</label>
-        <input name="used_by" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${esc(currentUser?.username||'')}">
+        <input name="used_by" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${esc(cu())}">
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Notes</label>
@@ -3812,7 +3814,7 @@ function openCheckoutModal(skoId, skoName) {
     <form class="px-6 py-4" style="display:flex;flex-direction:column;gap:0.75rem;" onsubmit="submitCheckout(event,${skoId})">
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Checked Out By *</label>
-        <input name="checked_out_by" class="form-input" style="width:100%;" placeholder="Last, First MI" required value="${esc(currentUser?.username||'')}">
+        <input name="checked_out_by" class="form-input" style="width:100%;" placeholder="Last, First MI" required value="${esc(cu())}">
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Expected Return</label>
@@ -3954,7 +3956,7 @@ async function openFaultModal() {
         </select>
       </div>
       <div><label class="label">Details</label><textarea class="input" name="description" rows="3" placeholder="Additional details, symptoms, when it was observed…"></textarea></div>
-      <div><label class="label">Reported By *</label><input class="input" name="reported_by" required value="${esc(currentUser?.username||'')}"></div>
+      <div><label class="label">Reported By *</label><input class="input" name="reported_by" required value="${esc(cu())}"></div>
       <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
         <button type="submit" class="btn-primary">Submit Fault</button>
@@ -3987,7 +3989,7 @@ async function openFaultUpdate(id, currentStatus) {
           ${['open','in_progress','resolved','closed'].map(s=>`<option value="${s}"${s===currentStatus?' selected':''}>${s.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`).join('')}
         </select>
       </div>
-      <div><label class="label">Resolved By</label><input class="input" name="resolved_by" value="${esc(currentUser?.username||'')}"></div>
+      <div><label class="label">Resolved By</label><input class="input" name="resolved_by" value="${esc(cu())}"></div>
       <div><label class="label">Resolution / Notes</label><textarea class="input" name="resolution" rows="3" placeholder="What was done to resolve this fault…"></textarea></div>
       <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
@@ -4555,9 +4557,9 @@ async function openDispatchForm(vid) {
           </select>
         </div>
         <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
-          <div><label class="label">Operator Name</label><input name="operator_name" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${currentUser?.sub||''}"></div>
+          <div><label class="label">Operator Name</label><input name="operator_name" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${cu()}"></div>
           <div><label class="label">Unit Phone</label><input name="operator_phone" class="form-input" style="width:100%;" placeholder="DSN or commercial"></div>
-          <div><label class="label">Dispatcher (Print)</label><input name="dispatcher_name" class="form-input" style="width:100%;" placeholder="Dispatcher name"></div>
+          <div><label class="label">Dispatcher (Print)</label><input name="dispatcher_name" class="form-input" style="width:100%;" value="${esc(cu())}"></div>
         </div>
       </div>
 
@@ -4699,7 +4701,7 @@ async function openReturnModal(vid) {
       </div>
       <div><label class="label">Date In *</label><input name="date_in" type="date" class="form-input" style="width:100%;" value="${today}" required></div>
       <div><label class="label">Ending Mileage</label><input name="ending_mileage" type="number" class="form-input" style="width:100%;" placeholder="0"></div>
-      <div style="grid-column:1/-1;"><label class="label">Dispatcher (Sign-In)</label><input name="dispatcher_in_name" class="form-input" style="width:100%;" placeholder="Dispatcher name" value="${currentUser?.sub||''}"></div>
+      <div style="grid-column:1/-1;"><label class="label">Dispatcher (Sign-In)</label><input name="dispatcher_in_name" class="form-input" style="width:100%;" placeholder="Dispatcher name" value="${cu()}"></div>
       <div style="grid-column:1/-1;"><label class="label">Notes</label><textarea name="notes" class="form-input" style="width:100%;min-height:50px;" placeholder="Any return notes…"></textarea></div>
       <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;border-top:1px solid #e5e7eb;padding-top:0.5rem;">
         <button type="button" onclick="document.getElementById('return-backdrop').remove()" class="btn-secondary">Cancel</button>
@@ -4928,7 +4930,7 @@ function openReorderModal(itemId, itemName, suggestedQty, supplier) {
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Requested By</label>
-        <input name="requested_by" class="form-input" style="width:100%;" value="${currentUser?.sub||''}" placeholder="Name / Rank">
+        <input name="requested_by" class="form-input" style="width:100%;" value="${cu()}" placeholder="Name / Rank">
       </div>
       <div>
         <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.25rem;">Supplier</label>
