@@ -1330,8 +1330,8 @@ function openEqCalModal(eqId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqSaveCal(event,${eqId})">
-      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required></div>
-      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eqnew" name="calibrated_at" required onchange="applyCalInterval('cal-date-eqnew','next_due-eqnew',document.getElementById('next_due-eqnew-interval')?.value)"></div>
+      <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-eqnew','next_due-eqnew','')}</div>
       <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
       <div><label class="label">Result</label>
