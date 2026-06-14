@@ -1225,8 +1225,8 @@ async function dashEditCal(calId) {
       <button onclick="document.getElementById('dash-edit-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="dashSaveCal(event,${calId},${cal.equipment_id})">
-      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
-      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${cal.next_due||''}"></div>
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-dash" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
+      <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-dash','next_due',cal.next_due||'')}</div>
       <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cal.calibrated_by||'')}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num" value="${esc(cal.certificate_num||'')}"></div>
       <div><label class="label">Result</label>
@@ -1370,8 +1370,8 @@ function eqUpdateCalDue(calId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqPatchCalDue(event,${calId},${eqId})">
-      <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
-      <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${cal.next_due||''}"></div>
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eq" name="calibrated_at" required value="${cal.calibrated_at||''}"></div>
+      <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-eq','next_due',cal.next_due||'')}</div>
       <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cal.calibrated_by||'')}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num" value="${esc(cal.certificate_num||'')}"></div>
       <div><label class="label">Result</label>
@@ -2244,8 +2244,45 @@ function filterCal() {
   ));
 }
 
+const CAL_INTERVALS = [
+  { label:'7 days',   days: 7   },
+  { label:'14 days',  days: 14  },
+  { label:'30 days',  days: 30  },
+  { label:'90 days',  days: 90  },
+  { label:'180 days', days: 180 },
+  { label:'1 year',   days: 365 },
+  { label:'5 years',  days: 1825},
+];
+
+function calIntervalPicker(calDateInputId, nextDueInputId, currentNextDue) {
+  return `<div style="display:flex;flex-direction:column;gap:0.3rem;">
+    <select class="input" id="${nextDueInputId}-interval" onchange="applyCalInterval('${calDateInputId}','${nextDueInputId}',this.value)">
+      <option value="">— Pick interval or set date —</option>
+      ${CAL_INTERVALS.map(i=>`<option value="${i.days}">${i.label}</option>`).join('')}
+      <option value="custom">Custom date…</option>
+    </select>
+    <input class="input" type="date" id="${nextDueInputId}" name="${nextDueInputId}" value="${currentNextDue||''}" style="display:${currentNextDue?'block':'none'};">
+  </div>`;
+}
+
+function applyCalInterval(calInputId, nextDueId, val) {
+  const nextDueEl = document.getElementById(nextDueId);
+  if (val === 'custom' || val === '') {
+    nextDueEl.style.display = 'block';
+    nextDueEl.value = '';
+    nextDueEl.focus();
+    return;
+  }
+  const calEl = document.getElementById(calInputId);
+  const base = calEl?.value ? new Date(calEl.value) : new Date();
+  base.setDate(base.getDate() + parseInt(val));
+  nextDueEl.value = base.toISOString().slice(0,10);
+  nextDueEl.style.display = 'block';
+}
+
 function openCalModal() {
   const eqOptions = equipList.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  const today = new Date().toISOString().slice(0,10);
   modal(`<div class="modal">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">Log Calibration</h2>
@@ -2257,14 +2294,12 @@ function openCalModal() {
           <label class="label">Equipment *</label>
           <select class="input" name="equipment_id" required><option value="">Select…</option>${eqOptions}</select>
         </div>
-        <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" required></div>
-        <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
-        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by"></div>
+        <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-new" name="calibrated_at" required value="${today}" onchange="applyCalInterval('cal-date-new','next_due',document.getElementById('next_due-interval')?.value)"></div>
+        <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-new','next_due','')}</div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(currentUser?.sub||'')}"></div>
         <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
         <div><label class="label">Result</label>
-          <select class="input" name="result">
-            <option value="pass">Pass</option><option value="fail">Fail</option>
-          </select>
+          <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
         </div>
         <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       </div>
@@ -4466,10 +4501,18 @@ async function saveRs(e, id) {
 }
 
 // ── Dispatch / Inspection form ────────────────────────────────────────────────
-function openDispatchForm(vid) {
+async function openDispatchForm(vid) {
   const v = rsData.find(x=>x.id===vid);
   if (!v) return;
   const today = new Date().toISOString().slice(0,10);
+
+  // Prefill beginning mileage from last inspection's ending mileage
+  let prefillMileage = '';
+  try {
+    const inspections = await api('GET', `/api/rolling-stock/${vid}/inspections`);
+    const last = inspections.find(i => i.ending_mileage);
+    if (last) prefillMileage = last.ending_mileage;
+  } catch(e) { /* ignore */ }
 
   const checkRows = RS_CHECKLIST.map(sec => `
     <tr><td colspan="3" style="background:#dce8f5;font-weight:700;font-size:0.78rem;padding:5px 8px;">${esc(sec.section)}</td></tr>
@@ -4505,7 +4548,7 @@ function openDispatchForm(vid) {
       <!-- Header fields -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
         <div><label class="label">Date Out</label><input name="date_out" type="date" class="form-input" style="width:100%;" value="${today}" required></div>
-        <div><label class="label">Beginning Mileage</label><input name="beginning_mileage" type="number" class="form-input" style="width:100%;" placeholder="0"></div>
+        <div><label class="label">Beginning Mileage</label><input name="beginning_mileage" type="number" class="form-input" style="width:100%;" placeholder="0" value="${prefillMileage}" ${prefillMileage?'style="background:#fefce8;width:100%;"':'style="width:100%;"'}></div>
         <div><label class="label">Accident Card on File?</label>
           <select name="accident_card" class="form-input" style="width:100%;">
             <option value="0">No</option><option value="1">Yes</option>
