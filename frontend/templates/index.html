@@ -294,10 +294,10 @@ function toast(msg, ok=true) {
   setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-function fmtDate(d) { return d ? new Date(d+'T00:00:00').toLocaleDateString() : '—'; }
+function fmtDate(d) { if (!d) return '—'; const s = String(d).slice(0,10); return new Date(s+'T00:00:00').toLocaleDateString(); }
 function daysUntil(d) {
   if (!d) return null;
-  return Math.round((new Date(d+'T00:00:00') - new Date()) / 86400000);
+  return Math.round((new Date(String(d).slice(0,10)+'T00:00:00') - new Date()) / 86400000);
 }
 function dueBadge(d, statusOverride) {
   if (statusOverride === 'overdue' || statusOverride === 'fail') return `<span class="badge-red">${statusOverride==='fail'?'FAIL':'Overdue'}</span>`;
@@ -856,8 +856,10 @@ async function eqTab(tab) {
           <input value="${esc(s.procedure||'')}" style="width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;font-size:0.78rem;"
                  onblur="eqClSaveStep(${s.id},'procedure',this.value,${id})">
         </td>
-        ${isTech() ? `<td style="padding:0.35rem 0.5rem;text-align:center;">
-          <button onclick="eqClDeleteStep(${s.id},${id})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.85rem;" title="Remove step">✕</button>
+        ${isTech() ? `<td style="padding:0.35rem 0.5rem;text-align:center;white-space:nowrap;">
+          <button onclick="eqClMoveStep('${esc(eqName)}',${i},${clSteps.length},-1)" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:#6b7280;padding:0 2px;" title="Move up">▲</button>
+          <button onclick="eqClMoveStep('${esc(eqName)}',${i},${clSteps.length},1)" ${i===clSteps.length-1?'disabled':''} style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:#6b7280;padding:0 2px;" title="Move down">▼</button>
+          <button onclick="eqClDeleteStep(${s.id})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.85rem;padding:0 2px;" title="Remove step">✕</button>
         </td>` : ''}
       </tr>`).join('');
 
@@ -1037,6 +1039,19 @@ async function eqClSaveStep(stepId, field, value) {
   } catch(e) { toast(e.message || 'Save failed', false); }
 }
 
+async function eqClMoveStep(eqName, idx, total, dir) {
+  // Build current ordered step_ids from DOM, swap idx and idx+dir
+  const rows = Array.from(document.querySelectorAll('tr[data-step-id]'));
+  const ids = rows.map(r => parseInt(r.dataset.stepId));
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= ids.length) return;
+  [ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]];
+  try {
+    await api('PUT', `/api/eq-checklists/steps/reorder?name=${encodeURIComponent(eqName)}`, ids);
+  } catch(e) { toast(e.message || 'Reorder failed', false); return; }
+  await eqTab('maintenance');
+}
+
 async function eqClDeleteStep(stepId) {
   if (!confirm('Remove this step from the template?')) return;
   try {
@@ -1192,6 +1207,16 @@ async function eqPutTask(e, taskId, eqId) {
 
 async function eqCompleteTask(taskId) {
   const eqId = window._eqDetail.id;
+  _completePartsRows = [];
+  _inventoryForComplete = await api('GET', '/api/inventory').catch(() => []);
+  const task = (window._eqDetail.tasks || []).find(t => t.id === taskId) || {};
+  let recurringHint = '';
+  if (task.interval_days) {
+    const nxt = new Date(); nxt.setDate(nxt.getDate() + task.interval_days);
+    recurringHint = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.375rem;padding:0.6rem 0.9rem;font-size:0.8rem;color:#15803d;margin-bottom:0.5rem;">
+      🔁 Recurring — next auto-schedules for <strong>${nxt.toISOString().slice(0,10)}</strong>
+    </div>`;
+  }
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop';
   overlay.id = 'subtask-backdrop';
@@ -1201,9 +1226,17 @@ async function eqCompleteTask(taskId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="eqSubmitComplete(event,${taskId},${eqId})">
+      ${recurringHint}
       <div><label class="label">Completed By</label><input class="input" name="completed_by" value="${esc(cu())}"></div>
-      <div><label class="label">Override Next Due Date</label><input class="input" type="date" name="next_due"></div>
+      <div><label class="label">${task.interval_days ? 'Override Next Due (optional)' : 'Next Due'}</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      <div style="border-top:1px solid #f3f4f6;padding-top:0.75rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:#374151;">Parts Used (optional)</div>
+          <button type="button" onclick="addCompletePartRow()" class="btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;">+ Add Part</button>
+        </div>
+        <div id="complete-parts-list" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
         <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
         <button type="submit" class="btn-primary">Mark Complete</button>
@@ -1215,7 +1248,9 @@ async function eqCompleteTask(taskId) {
 
 async function eqSubmitComplete(e, taskId, eqId) {
   e.preventDefault();
-  const body = Object.fromEntries(new FormData(e.target));
+  const fd = Object.fromEntries(new FormData(e.target));
+  const parts = _completePartsRows.filter(p => p && p.item_id);
+  const body = { ...fd, parts_used: parts.length ? parts : undefined };
   try {
     await api('POST', `/api/maintenance/${taskId}/complete`, body);
     document.getElementById('subtask-backdrop')?.remove();
