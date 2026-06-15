@@ -95,11 +95,16 @@
     .status-summary { flex-wrap: wrap; gap: 0.35rem 0.75rem; padding: 0 0.5rem; }
   }
 
-  .fault-notes { margin-top: 0.6rem; display: none; }
-  .fault-notes.show { display: block; }
-  .fault-notes input { width: 100%; padding: 0.45rem 0.7rem; border: 1.5px solid #fca5a5;
-                         border-radius: 0.5rem; font-size: 0.82rem; outline: none; }
-  .fault-notes input:focus { border-color: #ef4444; }
+  .item-notes { margin-top: 0.5rem; display: none; flex-direction: column; gap: 0.3rem; }
+  .item-notes.show { display: flex; }
+  .item-notes input { width: 100%; padding: 0.45rem 0.7rem; border: 1.5px solid #e2e8f0;
+                       border-radius: 0.5rem; font-size: 0.82rem; outline: none; box-sizing: border-box; }
+  .item-notes input:focus { border-color: #3b82f6; }
+  .item-notes.fault-mode input { border-color: #fca5a5; }
+  .item-notes.fault-mode input:focus { border-color: #ef4444; }
+  .note-toggle { background: none; border: none; font-size: 0.72rem; color: #6b7280;
+                  cursor: pointer; padding: 0.2rem 0; text-align: left; margin-top: 0.35rem; }
+  .note-toggle:hover { color: #374151; }
 
   .submit-section { margin: 0.75rem 0.75rem 2rem; }
   .notes-area { width: 100%; padding: 0.65rem 0.75rem; border: 1.5px solid #e2e8f0;
@@ -230,8 +235,9 @@
                   <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
                 </div>
               </div>
-              <div class="fault-notes" id="notes-{{ item.id }}">
-                <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+              <button class="note-toggle" id="note-toggle-{{ item.id }}" onclick="toggleNote({{ item.id }})" style="display:none;">📝 Add observation</button>
+              <div class="item-notes" id="notes-{{ item.id }}">
+                <input type="text" placeholder="Observations / notes…" id="note-{{ item.id }}">
               </div>
             </div>
           {% endfor %}
@@ -349,9 +355,31 @@ function setStatus(itemId, status) {
     const btn = document.getElementById('btn-' + s + '-' + itemId);
     btn.className = 'status-btn' + (s === status ? ' active-' + s : '');
   });
-  const notesEl = document.getElementById('notes-' + itemId);
-  notesEl.className = 'fault-notes' + (status === 'fault' ? ' show' : '');
+  const notesEl  = document.getElementById('notes-' + itemId);
+  const toggleEl = document.getElementById('note-toggle-' + itemId);
+  const noteInput = document.getElementById('note-' + itemId);
+  if (status === 'fault') {
+    notesEl.className = 'item-notes fault-mode show';
+    noteInput.placeholder = 'Describe the fault… (required)';
+    noteInput.required = true;
+    if (toggleEl) toggleEl.style.display = 'none';
+  } else {
+    noteInput.required = false;
+    noteInput.placeholder = 'Observations / notes…';
+    // Keep notes visible if user already typed something
+    const hasNote = noteInput.value.trim();
+    notesEl.className = 'item-notes' + (hasNote ? ' show' : '');
+    if (toggleEl) toggleEl.style.display = hasNote ? 'none' : 'block';
+  }
   updateCounts();
+}
+
+function toggleNote(itemId) {
+  const notesEl  = document.getElementById('notes-' + itemId);
+  const toggleEl = document.getElementById('note-toggle-' + itemId);
+  notesEl.classList.add('show');
+  toggleEl.style.display = 'none';
+  document.getElementById('note-' + itemId).focus();
 }
 
 function updateCounts() {
@@ -370,6 +398,18 @@ function updateCounts() {
 async function submitChecklist() {
   const name = document.getElementById('op-name').value.trim();
   if (!name) { document.getElementById('op-name').focus(); return; }
+  // Fault notes are required
+  const missingFault = Object.entries(statuses).find(([id, s]) =>
+    s === 'fault' && !document.getElementById('note-' + id)?.value?.trim()
+  );
+  if (missingFault) {
+    const el = document.getElementById('note-' + missingFault[0]);
+    el?.focus();
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el?.setAttribute('style', 'border-color:#ef4444;');
+    alert('Please describe all faults before submitting.');
+    return;
+  }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
