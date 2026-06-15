@@ -36,7 +36,7 @@ async def _get_or_create(db, name: str) -> int:
         return cur.lastrowid
 
 
-@router.get("/by-name/{name}")
+@router.get("/by-name")
 async def get_by_name(name: str, db=Depends(get_db)):
     async with db.execute(
         "SELECT * FROM equipment_type_checklists WHERE equipment_name=?", (name,)
@@ -61,7 +61,7 @@ async def get_for_equipment(equipment_id: int, db=Depends(get_db)):
     return await get_by_name(row["name"], db)
 
 
-@router.post("/by-name/{name}/steps", status_code=201)
+@router.post("/steps", status_code=201)
 async def add_step(name: str, data: StepCreate, request: Request, db=Depends(get_db)):
     require_tech(request)
     cl_id = await _get_or_create(db, name)
@@ -104,7 +104,7 @@ async def delete_step(step_id: int, request: Request, db=Depends(get_db)):
     return {"ok": True}
 
 
-@router.put("/by-name/{name}/steps/reorder")
+@router.put("/steps/reorder")
 async def reorder_steps(name: str, step_ids: list[int], request: Request, db=Depends(get_db)):
     require_tech(request)
     for idx, sid in enumerate(step_ids):

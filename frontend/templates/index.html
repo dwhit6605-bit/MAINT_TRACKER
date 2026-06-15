@@ -829,7 +829,7 @@ async function eqTab(tab) {
     // Load the shared type checklist template for this equipment name
     body.innerHTML = '<div style="padding:1rem;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
     const eqName = equipmentData.find(e=>e.id===id)?.name || '';
-    const clData = await api('GET', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}`).catch(()=>({checklist:null,steps:[]}));
+    const clData = await api('GET', `/api/eq-checklists/by-name?name=${encodeURIComponent(eqName)}`).catch(()=>({checklist:null,steps:[]}));
     const clSteps = clData.steps || [];
 
     const activeTasks = tasks.filter(t => t.status !== 'completed');
@@ -1004,7 +1004,7 @@ async function eqClAddStep(eqId, eqName) {
   const intervalR = prompt('Interval (B/W/M/Q/S/A — default B):') || 'B';
   const procedure = prompt('Procedure notes (optional):') || '';
   try {
-    await api('POST', `/api/eq-checklists/by-name/${encodeURIComponent(eqName)}/steps`,
+    await api('POST', `/api/eq-checklists/steps?name=${encodeURIComponent(eqName)}`,
       { title: title.trim(), step_no: stepNo, interval: intervalR.toUpperCase() || 'B', procedure });
     toast('Step added');
   } catch(e) { toast(e.message || 'Failed to add step', false); return; }
