@@ -2240,32 +2240,49 @@ async function deleteTaskAtt(taskId, taskTitle, attId) {
 
 // ─── Calibration ──────────────────────────────────────────────────────────────
 let calData = [];
+let calEquipRows = []; // one entry per equipment with latest cal
 let calSelected = new Set();
+
 async function calibrationPage() {
   $('page-actions').innerHTML = `
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/calibration/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
-    <button onclick="openCsvImport('calibration')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>
-    ${isTech() ? `<button onclick="openCalModal()" class="btn-primary">+ Log Calibration</button>` : ''}`;
-  [calData, equipList] = await Promise.all([
+    <button onclick="openCsvImport('calibration')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>`;
+  const [allCals, allEquip] = await Promise.all([
     api('GET', '/api/calibration'),
     api('GET', '/api/equipment'),
   ]);
+  equipList = allEquip;
+  calData = allCals;
+  // Build one-row-per-equipment view: latest cal per equipment_id
+  const latestByEq = {};
+  for (const c of allCals) {
+    if (!latestByEq[c.equipment_id] || c.calibrated_at > latestByEq[c.equipment_id].calibrated_at)
+      latestByEq[c.equipment_id] = c;
+  }
+  calEquipRows = allEquip.map(e => ({ eq: e, cal: latestByEq[e.id] || null }));
   calSelected.clear();
-  renderCalTable(calData);
+  renderCalTable(calEquipRows);
 }
 
 function renderCalTable(rows) {
   const bulkBar = isTech() ? `
     <div id="cal-bulk-bar" style="display:none;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;display:flex;align-items:center;gap:1rem;font-size:0.85rem;">
       <span id="cal-bulk-count">0 selected</span>
-      <button onclick="openCalBulkEdit()" style="background:#fff;color:#1e3a5f;border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;font-size:0.8rem;font-weight:600;cursor:pointer;">✏️ Bulk Edit</button>
+      <button onclick="openCalBulkEdit()" style="background:#fff;color:#1e3a5f;border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;font-size:0.8rem;font-weight:600;cursor:pointer;">✏️ Bulk Update</button>
       <button onclick="calClearSelection()" style="background:transparent;color:rgba(255,255,255,.7);border:none;cursor:pointer;font-size:0.8rem;">✕ Clear</button>
     </div>` : '';
   $('page-content').innerHTML = `
     <div class="card overflow-hidden p-0">
       ${bulkBar}
-      <div class="px-5 py-4 border-b flex items-center gap-3">
-        <input id="cal-search" class="input max-w-xs" placeholder="Search…" oninput="filterCal()">
+      <div class="px-5 py-4 border-b flex items-center gap-3 flex-wrap">
+        <input id="cal-search" class="input max-w-xs" placeholder="Search equipment…" oninput="filterCal()">
+        <select id="cal-status-filter" class="input w-40" onchange="filterCal()">
+          <option value="">All status</option>
+          <option value="overdue">Overdue</option>
+          <option value="due">Due soon (30d)</option>
+          <option value="ok">OK</option>
+          <option value="never">Never calibrated</option>
+        </select>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -2274,46 +2291,51 @@ function renderCalTable(rows) {
               ${isTech() ? `<th class="px-4 py-3"><input type="checkbox" id="cal-check-all" onchange="calToggleAll(this.checked)" style="cursor:pointer;"></th>` : ''}
               <th class="px-4 py-3 text-left">Equipment</th>
               <th class="px-4 py-3 text-left col-m-hide">Serial #</th>
-              <th class="px-4 py-3 text-left">Calibrated</th>
+              <th class="px-4 py-3 text-left col-m-hide">Last Calibrated</th>
               <th class="px-4 py-3 text-left col-m-hide">By</th>
-              <th class="px-4 py-3 text-left col-m-hide">Cert #</th>
               <th class="px-4 py-3 text-left">Result</th>
               <th class="px-4 py-3 text-left">Next Due</th>
-              <th class="px-4 py-3 text-right">Actions</th>
+              ${isTech() ? `<th class="px-4 py-3 text-right">Actions</th>` : ''}
             </tr>
           </thead>
-          <tbody id="cal-tbody">${calRows(rows)}</tbody>
+          <tbody id="cal-tbody">${calEquipRowsHtml(rows)}</tbody>
         </table>
       </div>
     </div>`;
   updateCalBulkBar();
 }
 
-function calRows(rows) {
-  return rows.map(c=>`
-    <tr class="table-row border-b last:border-0">
-      ${isTech() ? `<td class="px-4 py-3"><input type="checkbox" class="cal-row-check" data-id="${c.id}" ${calSelected.has(c.id)?'checked':''} onchange="calToggleRow(${c.id},this.checked)" style="cursor:pointer;"></td>` : ''}
-      <td class="px-4 py-3 font-medium">${esc(c.equipment_name)}</td>
-      <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(c.serial_num||'—')}</td>
-      <td class="px-4 py-3 text-gray-500">${fmtDate(c.calibrated_at)}</td>
-      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(c.calibrated_by||'—')}</td>
-      <td class="px-4 py-3 font-mono text-xs col-m-hide">${esc(c.certificate_num||'—')}</td>
-      <td class="px-4 py-3"><span class="${c.result==='pass'?'badge-green':'badge-red'}">${c.result.toUpperCase()}</span></td>
-      <td class="px-4 py-3">${dueBadge(c.next_due, c.result==='fail'?'fail':undefined)}</td>
-      <td class="px-4 py-3 text-right">
-        <button onclick="deleteCal(${c.id})" class="text-red-500 hover:underline text-xs">Delete</button>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="${isTech()?8:7}" class="px-4 py-8 text-center text-gray-400">No records found.</td></tr>`;
+function calEquipRowsHtml(rows) {
+  if (!rows.length) return `<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No equipment found.</td></tr>`;
+  const today = new Date().toISOString().slice(0,10);
+  return rows.map(({eq, cal}) => {
+    const calId = cal?.id;
+    const neverCal = !cal;
+    const overdue  = cal?.next_due && cal.next_due.slice(0,10) < today;
+    const rowBg    = neverCal ? '' : overdue ? 'background:#fff5f5;' : '';
+    return `<tr class="table-row border-b last:border-0" style="${rowBg}">
+      ${isTech() ? `<td class="px-4 py-3"><input type="checkbox" class="cal-row-check" data-eq-id="${eq.id}" data-cal-id="${calId||''}" ${calSelected.has(eq.id)?'checked':''} onchange="calToggleRow(${eq.id},this.checked)" style="cursor:pointer;"></td>` : ''}
+      <td class="px-4 py-3 font-medium">${esc(eq.name)}</td>
+      <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(eq.serial_num||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${cal ? fmtDate(cal.calibrated_at) : '<span style="color:#9ca3af;">Never</span>'}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${cal ? esc(cal.calibrated_by||'—') : '—'}</td>
+      <td class="px-4 py-3">${cal ? `<span class="${cal.result==='pass'?'badge-green':'badge-red'}">${cal.result.toUpperCase()}</span>` : '<span class="badge-gray">—</span>'}</td>
+      <td class="px-4 py-3">${cal ? dueBadge(cal.next_due, cal.result==='fail'?'fail':undefined) : '<span class="badge-gray">Not set</span>'}</td>
+      ${isTech() ? `<td class="px-4 py-3 text-right">
+        <button onclick="openCalModalForEq(${eq.id})" class="btn-primary" style="font-size:0.75rem;padding:0.25rem 0.7rem;">+ Log Cal</button>
+      </td>` : ''}
+    </tr>`;
+  }).join('');
 }
 
-function calToggleRow(id, checked) {
-  checked ? calSelected.add(id) : calSelected.delete(id);
+function calToggleRow(eqId, checked) {
+  checked ? calSelected.add(eqId) : calSelected.delete(eqId);
   updateCalBulkBar();
 }
 
 function calToggleAll(checked) {
   document.querySelectorAll('.cal-row-check').forEach(cb => {
-    const id = parseInt(cb.dataset.id);
+    const id = parseInt(cb.dataset.eqId);
     cb.checked = checked;
     checked ? calSelected.add(id) : calSelected.delete(id);
   });
@@ -2334,64 +2356,117 @@ function updateCalBulkBar() {
   const n = calSelected.size;
   bar.style.display = n > 0 ? 'flex' : 'none';
   const cnt = document.getElementById('cal-bulk-count');
-  if (cnt) cnt.textContent = `${n} record${n!==1?'s':''} selected`;
+  if (cnt) cnt.textContent = `${n} equipment selected`;
 }
 
 function openCalBulkEdit() {
-  const ids = [...calSelected];
-  if (!ids.length) return;
+  const eqIds = [...calSelected];
+  if (!eqIds.length) return;
+  // Get the most recent cal record IDs for these equipment
+  const calIds = eqIds.map(eqId => {
+    const row = calEquipRows.find(r => r.eq.id === eqId);
+    return row?.cal?.id;
+  }).filter(Boolean);
+  const today = new Date().toISOString().slice(0,10);
   modal(`<div class="modal" style="max-width:34rem;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
-      <h2 class="font-semibold">Bulk Edit — ${ids.length} Calibration Record${ids.length!==1?'s':''}</h2>
+      <h2 class="font-semibold">Bulk Log Calibration — ${eqIds.length} Equipment</h2>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
-    <form id="cal-bulk-form" class="px-6 py-4 space-y-4" onsubmit="submitCalBulkEdit(event)">
-      <p style="font-size:0.8rem;color:#6b7280;">Only filled fields will be applied. Leave blank to keep existing values.</p>
+    <form id="cal-bulk-form" class="px-6 py-4 space-y-4" onsubmit="submitCalBulkLog(event,${JSON.stringify(eqIds)})">
+      <p style="font-size:0.8rem;color:#6b7280;">Logs a new calibration record for each selected equipment.</p>
       <div class="grid grid-cols-2 gap-4">
-        <div><label class="label">Calibrated At</label><input class="input" type="date" name="calibrated_at"></div>
-        <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
-        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" placeholder="Leave blank to keep"></div>
+        <div><label class="label">Calibrated At *</label><input class="input" type="date" name="calibrated_at" id="bulk-cal-date" value="${today}" required onchange="applyCalInterval('bulk-cal-date','bulk-next-due',document.getElementById('bulk-next-due-interval')?.value)"></div>
+        <div><label class="label">Next Due</label>${calIntervalPicker('bulk-cal-date','bulk-next-due','')}</div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
         <div><label class="label">Result</label>
-          <select class="input" name="result">
-            <option value="">— keep existing —</option>
-            <option value="pass">Pass</option>
-            <option value="fail">Fail</option>
-          </select>
+          <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
         </div>
-        <div class="col-span-2"><label class="label">Notes (appends / overwrites)</label><textarea class="input" name="notes" rows="2" placeholder="Leave blank to keep"></textarea></div>
+        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
-        <button type="submit" class="btn-primary">Apply to ${ids.length} Record${ids.length!==1?'s':''}</button>
+        <button type="submit" class="btn-primary">Log for ${eqIds.length} Equipment</button>
       </div>
     </form>
   </div>`);
 }
 
-async function submitCalBulkEdit(e) {
+async function submitCalBulkLog(e, eqIds) {
   e.preventDefault();
   const fd = new FormData(e.target);
-  const body = { ids: [...calSelected] };
-  if (fd.get('calibrated_at')) body.calibrated_at = fd.get('calibrated_at');
-  if (fd.get('next_due'))      body.next_due      = fd.get('next_due');
-  if (fd.get('calibrated_by')) body.calibrated_by = fd.get('calibrated_by');
-  if (fd.get('result'))        body.result        = fd.get('result');
-  if (fd.get('notes'))         body.notes         = fd.get('notes');
+  const base = {
+    calibrated_at: fd.get('calibrated_at'),
+    next_due:      fd.get('bulk-next-due') || null,
+    calibrated_by: fd.get('calibrated_by') || null,
+    result:        fd.get('result') || 'pass',
+    notes:         fd.get('notes') || null,
+  };
   try {
-    const res = await api('PATCH', '/api/calibration/bulk', body);
+    for (const eqId of eqIds)
+      await api('POST', '/api/calibration', { ...base, equipment_id: eqId });
     closeModal();
     calSelected.clear();
-    toast(`Updated ${res.updated} record${res.updated!==1?'s':''}.`);
-    calData = await api('GET', '/api/calibration');
-    renderCalTable(calData);
+    toast(`Logged calibration for ${eqIds.length} equipment.`);
+    await calibrationPage();
   } catch(err) { toast(err.message, false); }
 }
 
 function filterCal() {
-  const s = $('cal-search').value.toLowerCase();
-  $('cal-tbody').innerHTML = calRows(calData.filter(c=>
-    c.equipment_name.toLowerCase().includes(s) || (c.serial_num||'').toLowerCase().includes(s) || (c.certificate_num||'').toLowerCase().includes(s)
-  ));
+  const s    = ($('cal-search')?.value || '').toLowerCase();
+  const stat = $('cal-status-filter')?.value || '';
+  const today = new Date().toISOString().slice(0,10);
+  const filtered = calEquipRows.filter(({eq, cal}) => {
+    if (s && !eq.name.toLowerCase().includes(s) && !(eq.serial_num||'').toLowerCase().includes(s)) return false;
+    if (stat === 'never')  return !cal;
+    if (stat === 'overdue') return cal?.next_due && cal.next_due.slice(0,10) < today;
+    if (stat === 'due')    { const d = daysUntil(cal?.next_due); return d !== null && d >= 0 && d <= 30; }
+    if (stat === 'ok')     { const d = daysUntil(cal?.next_due); return d !== null && d > 30; }
+    return true;
+  });
+  $('cal-tbody').innerHTML = calEquipRowsHtml(filtered);
+}
+
+function openCalModalForEq(eqId) {
+  const eq = equipList.find(e => e.id === eqId);
+  if (!eq) return;
+  const today = new Date().toISOString().slice(0,10);
+  modal(`<div class="modal" style="max-width:32rem;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Log Calibration</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div style="padding:0.6rem 1.5rem;background:#f9fafb;border-bottom:1px solid #f3f4f6;font-size:0.85rem;font-weight:600;">${esc(eq.name)}${eq.serial_num?' · S/N: '+esc(eq.serial_num):''}</div>
+    <form id="cal-form" class="px-6 py-4 space-y-4" onsubmit="saveCalForEq(event,${eqId})">
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eq${eqId}" name="calibrated_at" required value="${today}" onchange="applyCalInterval('cal-date-eq${eqId}','next_due-eq${eqId}',document.getElementById('next_due-eq${eqId}-interval')?.value)"></div>
+        <div><label class="label">Next Due</label>${calIntervalPicker(`cal-date-eq${eqId}`,`next_due-eq${eqId}`,'')}</div>
+        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
+        <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
+        <div><label class="label">Result</label>
+          <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
+        </div>
+        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveCalForEq(e, eqId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = { equipment_id: eqId };
+  for (const [k,v] of fd.entries()) body[k.replace(/-eq\d+$/,'')] = v;
+  try {
+    await api('POST', '/api/calibration', body);
+    closeModal();
+    toast('Calibration logged.');
+    await calibrationPage();
+  } catch(err) { toast(err.message, false); }
 }
 
 const CAL_INTERVALS = [
@@ -2429,59 +2504,6 @@ function applyCalInterval(calInputId, nextDueId, val) {
   nextDueEl.value = base.toISOString().slice(0,10);
   nextDueEl.style.display = 'block';
 }
-
-function openCalModal() {
-  const eqOptions = equipList.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
-  const today = new Date().toISOString().slice(0,10);
-  modal(`<div class="modal">
-    <div class="px-6 py-4 border-b flex items-center justify-between">
-      <h2 class="font-semibold">Log Calibration</h2>
-      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-    </div>
-    <form id="cal-form" class="px-6 py-4 space-y-4" onsubmit="saveCal(event)">
-      <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2">
-          <label class="label">Equipment *</label>
-          <select class="input" name="equipment_id" required><option value="">Select…</option>${eqOptions}</select>
-        </div>
-        <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-new" name="calibrated_at" required value="${today}" onchange="applyCalInterval('cal-date-new','next_due',document.getElementById('next_due-interval')?.value)"></div>
-        <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-new','next_due','')}</div>
-        <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
-        <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
-        <div><label class="label">Result</label>
-          <select class="input" name="result"><option value="pass">Pass</option><option value="fail">Fail</option></select>
-        </div>
-        <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
-      </div>
-      <div class="flex justify-end gap-3 pt-2">
-        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
-        <button type="submit" class="btn-primary">Save</button>
-      </div>
-    </form>
-  </div>`);
-}
-
-async function saveCal(e) {
-  e.preventDefault();
-  const body = Object.fromEntries(new FormData(e.target));
-  body.equipment_id = parseInt(body.equipment_id);
-  try {
-    await api('POST', '/api/calibration', body);
-    closeModal();
-    toast('Calibration logged.');
-    calData = await api('GET', '/api/calibration');
-    renderCalTable(calData);
-  } catch(err) { toast(err.message, false); }
-}
-
-async function deleteCal(id) {
-  if (!confirm('Delete this calibration record?')) return;
-  await api('DELETE', `/api/calibration/${id}`);
-  toast('Deleted.');
-  calData = await api('GET', '/api/calibration');
-  renderCalTable(calData);
-}
-
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 let inventoryData = [];
