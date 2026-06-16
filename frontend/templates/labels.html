@@ -6,60 +6,160 @@
 <title>QR Labels — 9th CST(WMD)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f3f4f6; color: #111; min-height: 100vh; }
 
-  body {
-    font-family: Arial, sans-serif;
-    background: #f3f4f6;
-    color: #111;
-  }
-
-  /* Screen-only controls */
-  .no-print {
+  /* ── Top bar ── */
+  .topbar {
     background: #1e3a5f;
     color: #fff;
-    padding: 0.75rem 1.25rem;
+    padding: 0.65rem 1.25rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar h1 { font-size: 0.95rem; font-weight: 700; flex: 1; }
+  .topbar button, .topbar a {
+    background: #fff;
+    color: #1e3a5f;
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .topbar button:hover, .topbar a:hover { background: #e2e8f0; }
+  .btn-print { background: #059669 !important; color: #fff !important; }
+  .btn-print:hover { background: #047857 !important; }
+  .btn-print:disabled { background: #9ca3af !important; color: #fff !important; cursor: not-allowed; }
+  .badge {
+    background: rgba(255,255,255,0.2);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-width: 1.5rem;
+    text-align: center;
+  }
+
+  /* ── Layout ── */
+  .layout { display: flex; height: calc(100vh - 48px); }
+
+  /* ── Selector panel ── */
+  .selector {
+    width: 320px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .selector-search {
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .selector-search input {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+  .selector-search input:focus { outline: 2px solid #1e3a5f; border-color: transparent; }
+  .selector-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .selector-actions button {
+    flex: 1;
+    padding: 0.3rem 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: #f9fafb;
+    cursor: pointer;
+    color: #374151;
+  }
+  .selector-actions button:hover { background: #e5e7eb; }
+  .cat-filter {
+    display: flex;
+    gap: 0.3rem;
     flex-wrap: wrap;
   }
-  .no-print h1 { font-size: 1rem; font-weight: 600; flex: 1; }
-  .no-print button {
-    background: #fff;
-    color: #1e3a5f;
-    border: none;
-    border-radius: 4px;
-    padding: 0.4rem 1rem;
-    font-size: 0.85rem;
+  .cat-chip {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
     font-weight: 600;
+    border: 1px solid #d1d5db;
+    background: #f3f4f6;
     cursor: pointer;
+    color: #374151;
+    white-space: nowrap;
   }
-  .no-print button:hover { background: #e2e8f0; }
-  .no-print label { font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-  .no-print select {
-    padding: 0.35rem 0.5rem;
-    border-radius: 4px;
-    border: none;
-    font-size: 0.8rem;
-    color: #1e3a5f;
-    font-weight: 600;
-  }
-  .count-note { font-size: 0.75rem; opacity: 0.8; }
+  .cat-chip.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
 
-  /* Label sheet */
+  .eq-list { flex: 1; overflow-y: auto; }
+  .eq-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    user-select: none;
+  }
+  .eq-item:hover { background: #f9fafb; }
+  .eq-item.checked { background: #eff6ff; }
+  .eq-item input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; accent-color: #1e3a5f; cursor: pointer; }
+  .eq-item-text { flex: 1; min-width: 0; }
+  .eq-item-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eq-item-sub { font-size: 0.68rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eq-item-cat { font-size: 0.62rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+  .eq-empty { padding: 2rem 1rem; text-align: center; color: #9ca3af; font-size: 0.8rem; }
+
+  /* ── Preview panel ── */
+  .preview {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: #e5e7eb;
+  }
+  .preview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 2rem;
+  }
+
   .sheet {
-    padding: 0.5in;
     background: #fff;
+    padding: 0.35in;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    margin: 0 auto;
+    width: 8.5in;
     min-height: 11in;
   }
-
-  /* Label grid — 2×5 per page by default (Avery 5163 size: 4"×2") */
   .label-grid {
     display: grid;
     grid-template-columns: repeat(var(--cols, 2), 1fr);
-    gap: var(--row-gap, 0) var(--col-gap, 0.125in);
+    gap: 0 var(--col-gap, 0.125in);
   }
-
   .label {
     width: 100%;
     aspect-ratio: 4 / 2;
@@ -72,120 +172,193 @@
     break-inside: avoid;
     overflow: hidden;
   }
-
-  .label-qr {
-    flex-shrink: 0;
-    width: 1.3in;
-    height: 1.3in;
-  }
-  .label-qr img {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  .label-text {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-  .label-org {
-    font-size: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #555;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .label-name {
-    font-size: 0.72rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin: 0.05in 0 0.08in;
-    word-break: break-word;
-  }
-  .label-serial {
-    font-size: 0.58rem;
-    color: #444;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  .label-qr { flex-shrink: 0; width: 1.3in; height: 1.3in; }
+  .label-qr img { width: 100%; height: 100%; display: block; }
+  .label-text { flex: 1; min-width: 0; overflow: hidden; }
+  .label-org { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; color: #555; }
+  .label-name { font-size: 0.72rem; font-weight: 700; line-height: 1.2; margin: 0.05in 0 0.08in; word-break: break-word; }
+  .label-serial { font-size: 0.58rem; color: #444; }
   .label-serial span { font-weight: 700; }
-  .label-category {
-    font-size: 0.5rem;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-top: 0.04in;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  .label-category { font-size: 0.5rem; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.04in; }
 
-  /* 3-column variant */
+  /* 3-col variant */
   .cols-3 .label-grid { --cols: 3; }
   .cols-3 .label { aspect-ratio: 3 / 2; }
   .cols-3 .label-qr { width: 1in; height: 1in; }
   .cols-3 .label-name { font-size: 0.62rem; }
 
-  /* Print styles */
+  /* cols select */
+  .topbar select {
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    border: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1e3a5f;
+    cursor: pointer;
+  }
+
+  /* ── Print ── */
   @media print {
-    body { background: #fff; }
-    .no-print { display: none !important; }
-    .sheet { padding: 0.25in; min-height: unset; }
+    .topbar, .selector { display: none !important; }
+    .layout { height: auto; display: block; }
+    .preview { background: #fff; padding: 0; overflow: visible; }
+    .sheet { box-shadow: none; padding: 0.25in; min-height: unset; width: 100%; }
     .label { border-color: #aaa; }
     @page { margin: 0.25in; size: letter; }
+  }
+
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; height: auto; }
+    .selector { width: 100%; height: 50vh; }
+    .preview { min-height: 60vh; }
+    .sheet { width: 100%; min-height: unset; }
   }
 </style>
 </head>
 <body>
 
-<div class="no-print">
-  <h1>QR Label Sheet — 9th CST(WMD)
-    <span class="count-note">&nbsp;({{ equipment_list | length }} items)</span>
-  </h1>
-  <label>
-    Columns:
-    <select id="cols-select" onchange="setCols(this.value)">
-      <option value="2" selected>2 per row (Avery 5163)</option>
-      <option value="3">3 per row</option>
-    </select>
-  </label>
-  <button onclick="window.print()">⬛ Print / Save PDF</button>
-  <button onclick="window.history.back()" style="background:#4b5563;color:#fff;">← Back</button>
+<div class="topbar no-print">
+  <h1>QR Label Sheet — 9th CST(WMD)</h1>
+  <span class="badge" id="sel-count">0</span> selected
+  <select id="cols-select" onchange="renderPreview()">
+    <option value="2">2 per row</option>
+    <option value="3">3 per row</option>
+  </select>
+  <button class="btn-print" id="print-btn" onclick="window.print()" disabled>Print / Save PDF</button>
+  <a href="javascript:history.back()">← Back</a>
 </div>
 
-<div class="sheet" id="sheet">
-  <div class="label-grid" id="label-grid">
-    {% for eq in equipment_list %}
-    <div class="label">
-      <div class="label-qr">
-        <img src="/api/qr/equipment/{{ eq.id }}" alt="QR for {{ eq.name }}" loading="lazy">
+<div class="layout">
+  <!-- Selector -->
+  <div class="selector">
+    <div class="selector-search">
+      <input type="text" id="search-input" placeholder="Search equipment…" oninput="filterList()">
+      <div class="selector-actions">
+        <button onclick="selectAll()">Select All</button>
+        <button onclick="selectNone()">Clear</button>
+        <button onclick="selectFiltered()">Select Filtered</button>
       </div>
-      <div class="label-text">
-        <div class="label-org">9th CST (WMD)</div>
-        <div class="label-name">{{ eq.name }}</div>
-        {% if eq.serial_num %}
-        <div class="label-serial">S/N: <span>{{ eq.serial_num }}</span></div>
-        {% else %}
-        <div class="label-serial" style="color:#aaa;">No serial recorded</div>
-        {% endif %}
-        {% if eq.category %}
-        <div class="label-category">{{ eq.category }}</div>
-        {% endif %}
-      </div>
+      <div class="cat-filter" id="cat-filter"></div>
     </div>
-    {% endfor %}
+    <div class="eq-list" id="eq-list"></div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview" id="preview">
+    <div class="preview-empty">Select equipment on the left to preview labels.</div>
   </div>
 </div>
 
 <script>
-function setCols(v) {
-  const sheet = document.getElementById('sheet');
-  sheet.className = v === '3' ? 'sheet cols-3' : 'sheet';
+// Pull token from URL so the QR image requests also work
+const params = new URLSearchParams(location.search);
+const token  = params.get('token') || '';
+
+let allEquipment = [];
+let selected = new Set();
+let activeCategory = '';
+
+async function load() {
+  const headers = token ? { Authorization: 'Bearer ' + token } : {};
+  const res = await fetch('/api/equipment', { headers });
+  if (!res.ok) { document.getElementById('eq-list').innerHTML = '<div class="eq-empty">Not authenticated.</div>'; return; }
+  allEquipment = await res.json();
+  buildCatFilter();
+  renderList();
 }
+
+function buildCatFilter() {
+  const cats = [...new Set(allEquipment.map(e => e.category).filter(Boolean))].sort();
+  const div = document.getElementById('cat-filter');
+  div.innerHTML = `<span class="cat-chip active" onclick="setCategory('')">All</span>` +
+    cats.map(c => `<span class="cat-chip" onclick="setCategory('${c.replace(/'/g,"\\'")})">${c}</span>`).join('');
+}
+
+function setCategory(cat) {
+  activeCategory = cat;
+  document.querySelectorAll('.cat-chip').forEach(el => {
+    el.classList.toggle('active', el.textContent === (cat || 'All'));
+  });
+  filterList();
+}
+
+function filteredItems() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  return allEquipment.filter(e => {
+    const matchCat = !activeCategory || e.category === activeCategory;
+    const matchQ   = !q || e.name.toLowerCase().includes(q) ||
+                     (e.serial_num||'').toLowerCase().includes(q) ||
+                     (e.category||'').toLowerCase().includes(q);
+    return matchCat && matchQ;
+  });
+}
+
+function renderList() {
+  const items = filteredItems();
+  const div = document.getElementById('eq-list');
+  if (!items.length) { div.innerHTML = '<div class="eq-empty">No equipment found.</div>'; return; }
+  div.innerHTML = items.map(e => `
+    <div class="eq-item${selected.has(e.id) ? ' checked' : ''}" onclick="toggleItem(${e.id})" id="row-${e.id}">
+      <input type="checkbox" ${selected.has(e.id) ? 'checked' : ''} onclick="event.stopPropagation();toggleItem(${e.id})">
+      <div class="eq-item-text">
+        <div class="eq-item-name">${esc(e.name)}</div>
+        <div class="eq-item-sub">${e.serial_num ? 'S/N: ' + esc(e.serial_num) : 'No serial'}</div>
+        ${e.category ? `<div class="eq-item-cat">${esc(e.category)}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function filterList() { renderList(); }
+
+function toggleItem(id) {
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  updateCount();
+  renderList();
+  renderPreview();
+}
+
+function selectAll()      { allEquipment.forEach(e => selected.add(e.id));      updateCount(); renderList(); renderPreview(); }
+function selectNone()     { selected.clear();                                    updateCount(); renderList(); renderPreview(); }
+function selectFiltered() { filteredItems().forEach(e => selected.add(e.id));   updateCount(); renderList(); renderPreview(); }
+
+function updateCount() {
+  const n = selected.size;
+  document.getElementById('sel-count').textContent = n;
+  document.getElementById('print-btn').disabled = n === 0;
+}
+
+function renderPreview() {
+  const cols = document.getElementById('cols-select').value;
+  const items = allEquipment.filter(e => selected.has(e.id));
+  const div = document.getElementById('preview');
+  if (!items.length) {
+    div.innerHTML = '<div class="preview-empty">Select equipment on the left to preview labels.</div>';
+    return;
+  }
+  const labels = items.map(e => `
+    <div class="label">
+      <div class="label-qr">
+        <img src="/api/qr/equipment/${e.id}${token ? '?token=' + encodeURIComponent(token) : ''}" alt="QR" loading="lazy">
+      </div>
+      <div class="label-text">
+        <div class="label-org">9th CST (WMD)</div>
+        <div class="label-name">${esc(e.name)}</div>
+        ${e.serial_num
+          ? `<div class="label-serial">S/N: <span>${esc(e.serial_num)}</span></div>`
+          : `<div class="label-serial" style="color:#aaa;">No serial recorded</div>`}
+        ${e.category ? `<div class="label-category">${esc(e.category)}</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  div.innerHTML = `<div class="sheet${cols === '3' ? ' cols-3' : ''}"><div class="label-grid">${labels}</div></div>`;
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+load();
 </script>
 </body>
 </html>
