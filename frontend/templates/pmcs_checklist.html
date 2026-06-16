@@ -342,13 +342,36 @@
   <div id="fault-notice" style="display:none" class="fault-badge"></div>
   <div id="task-notice" style="display:none" class="task-badge"></div>
   <a id="dl-link" href="#" class="dl-btn" target="_blank">📄 View / Download PDF</a>
-  <br><br>
+
+  <!-- Fault report creation panel — shown when faults exist -->
+  <div id="fault-report-panel" style="display:none;margin-top:1.25rem;text-align:left;background:#fff5f5;border:1.5px solid #fca5a5;border-radius:0.75rem;padding:1rem 1.25rem;max-width:480px;margin-left:auto;margin-right:auto;">
+    <div style="font-weight:700;color:#dc2626;font-size:0.9rem;margin-bottom:0.6rem;">⚠ Open Fault Reports</div>
+    <p style="font-size:0.78rem;color:#6b7280;margin-bottom:0.75rem;">Select which faults to log as formal fault reports:</p>
+    <div id="fault-report-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;"></div>
+    <button onclick="submitFaultReports()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:0.5rem;padding:0.6rem 1rem;font-weight:700;font-size:0.85rem;cursor:pointer;">
+      Create Selected Fault Reports
+    </button>
+    <div id="fault-report-done" style="display:none;color:#15803d;font-size:0.82rem;font-weight:600;text-align:center;margin-top:0.5rem;">✓ Fault reports created</div>
+  </div>
+
+  <br>
   <a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;">Run another inspection</a>
 </div>
 
 <script>
 const TOTAL = {{ items | length }};
 const statuses = {};
+
+// Item metadata for fault report creation: {item_id: {check_item, equipment_id, equipment_name}}
+const ITEMS_META = {
+  {% for item in items %}
+  {{ item.id }}: {
+    check_item: {{ item.check_item | tojson }},
+    equipment_id: {{ item.equipment_id | tojson }},
+    equipment_name: {{ (linked_equipment | selectattr("id","equalto",item.equipment_id) | map(attribute="name") | first) | default("") | tojson }}
+  },
+  {% endfor %}
+};
 
 function setStatus(itemId, status) {
   statuses[itemId] = status;
@@ -458,6 +481,28 @@ async function submitChecklist() {
     document.getElementById('fault-notice').textContent =
       completeRes.fault_count + ' fault' + (completeRes.fault_count > 1 ? 's' : '') + ' recorded';
     document.getElementById('fault-notice').style.display = 'inline-block';
+
+    // Build fault report panel
+    const faultedItems = Object.entries(statuses).filter(([,s]) => s === 'fault');
+    const list = document.getElementById('fault-report-list');
+    list.innerHTML = '';
+    faultedItems.forEach(([itemId]) => {
+      const meta = ITEMS_META[itemId] || {};
+      const note = document.getElementById('note-' + itemId)?.value?.trim() || '';
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:0.6rem;background:#fff;border:1px solid #fca5a5;border-radius:0.5rem;padding:0.6rem 0.75rem;cursor:pointer;';
+      row.innerHTML = `
+        <input type="checkbox" checked data-item-id="${itemId}" data-equipment-id="${meta.equipment_id||''}"
+               data-title="${(meta.check_item||'').replace(/"/g,'&quot;')}"
+               data-desc="${note.replace(/"/g,'&quot;')}"
+               style="margin-top:3px;flex-shrink:0;">
+        <div style="font-size:0.8rem;">
+          <div style="font-weight:600;">${meta.equipment_name ? meta.equipment_name+' — ' : ''}${meta.check_item||'Item '+itemId}</div>
+          ${note ? `<div style="color:#6b7280;font-size:0.75rem;margin-top:0.15rem;">${note}</div>` : ''}
+        </div>`;
+      list.appendChild(row);
+    });
+    document.getElementById('fault-report-panel').style.display = 'block';
   }
   if (completeRes.tasks_created > 0) {
     document.getElementById('task-notice').textContent =
@@ -467,6 +512,31 @@ async function submitChecklist() {
 
   document.getElementById('dl-link').href =
     '/api/pmcs/sessions/' + startRes.id + '/archive';
+}
+
+async function submitFaultReports() {
+  const opName = document.getElementById('op-name')?.value?.trim() || 'PMCS Operator';
+  const checks = document.querySelectorAll('#fault-report-list input[type=checkbox]:checked');
+  if (!checks.length) return;
+  const btn = document.querySelector('#fault-report-panel button');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  for (const cb of checks) {
+    const eqId = parseInt(cb.dataset.equipmentId);
+    if (!eqId) continue;
+    await fetch('/api/faults', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        equipment_id: eqId,
+        reported_by: opName,
+        severity: 'routine',
+        title: cb.dataset.title || 'PMCS Fault',
+        description: cb.dataset.desc || null,
+      })
+    });
+  }
+  btn.style.display = 'none';
+  document.getElementById('fault-report-done').style.display = 'block';
 }
 </script>
 </body>

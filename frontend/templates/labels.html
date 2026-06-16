@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Labels — 9th CST(WMD)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #f3f4f6;
+    color: #111;
+  }
+
+  /* Screen-only controls */
+  .no-print {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .no-print h1 { font-size: 1rem; font-weight: 600; flex: 1; }
+  .no-print button {
+    background: #fff;
+    color: #1e3a5f;
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .no-print button:hover { background: #e2e8f0; }
+  .no-print label { font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  .no-print select {
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    border: none;
+    font-size: 0.8rem;
+    color: #1e3a5f;
+    font-weight: 600;
+  }
+  .count-note { font-size: 0.75rem; opacity: 0.8; }
+
+  /* Label sheet */
+  .sheet {
+    padding: 0.5in;
+    background: #fff;
+    min-height: 11in;
+  }
+
+  /* Label grid — 2×5 per page by default (Avery 5163 size: 4"×2") */
+  .label-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 2), 1fr);
+    gap: var(--row-gap, 0) var(--col-gap, 0.125in);
+  }
+
+  .label {
+    width: 100%;
+    aspect-ratio: 4 / 2;
+    border: 1px dashed #ccc;
+    padding: 0.15in 0.2in;
+    display: flex;
+    align-items: center;
+    gap: 0.15in;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .label-qr {
+    flex-shrink: 0;
+    width: 1.3in;
+    height: 1.3in;
+  }
+  .label-qr img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .label-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .label-org {
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label-name {
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0.05in 0 0.08in;
+    word-break: break-word;
+  }
+  .label-serial {
+    font-size: 0.58rem;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label-serial span { font-weight: 700; }
+  .label-category {
+    font-size: 0.5rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.04in;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 3-column variant */
+  .cols-3 .label-grid { --cols: 3; }
+  .cols-3 .label { aspect-ratio: 3 / 2; }
+  .cols-3 .label-qr { width: 1in; height: 1in; }
+  .cols-3 .label-name { font-size: 0.62rem; }
+
+  /* Print styles */
+  @media print {
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    .sheet { padding: 0.25in; min-height: unset; }
+    .label { border-color: #aaa; }
+    @page { margin: 0.25in; size: letter; }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <h1>QR Label Sheet — 9th CST(WMD)
+    <span class="count-note">&nbsp;({{ equipment_list | length }} items)</span>
+  </h1>
+  <label>
+    Columns:
+    <select id="cols-select" onchange="setCols(this.value)">
+      <option value="2" selected>2 per row (Avery 5163)</option>
+      <option value="3">3 per row</option>
+    </select>
+  </label>
+  <button onclick="window.print()">⬛ Print / Save PDF</button>
+  <button onclick="window.history.back()" style="background:#4b5563;color:#fff;">← Back</button>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="label-grid" id="label-grid">
+    {% for eq in equipment_list %}
+    <div class="label">
+      <div class="label-qr">
+        <img src="/api/qr/equipment/{{ eq.id }}" alt="QR for {{ eq.name }}" loading="lazy">
+      </div>
+      <div class="label-text">
+        <div class="label-org">9th CST (WMD)</div>
+        <div class="label-name">{{ eq.name }}</div>
+        {% if eq.serial_num %}
+        <div class="label-serial">S/N: <span>{{ eq.serial_num }}</span></div>
+        {% else %}
+        <div class="label-serial" style="color:#aaa;">No serial recorded</div>
+        {% endif %}
+        {% if eq.category %}
+        <div class="label-category">{{ eq.category }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function setCols(v) {
+  const sheet = document.getElementById('sheet');
+  sheet.className = v === '3' ? 'sheet cols-3' : 'sheet';
+}
+</script>
+</body>
+</html>

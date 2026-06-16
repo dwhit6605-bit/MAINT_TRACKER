@@ -150,6 +150,32 @@ async def pmcs_checklist(request: Request, template_id: int):
     )
 
 
+@app.get("/labels", response_class=HTMLResponse)
+async def labels_page(request: Request, ids: str = ""):
+    """QR label print sheet — ?ids=1,2,3 or all equipment if omitted."""
+    import aiosqlite
+    db_path = os.getenv("DB_PATH", "maint.db")
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        if ids:
+            id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
+            placeholders = ",".join("?" * len(id_list))
+            async with db.execute(
+                f"SELECT id, name, serial_num, category FROM equipment WHERE id IN ({placeholders}) ORDER BY name",
+                id_list
+            ) as cur:
+                equipment_rows = [dict(r) for r in await cur.fetchall()]
+        else:
+            async with db.execute(
+                "SELECT id, name, serial_num, category FROM equipment ORDER BY name"
+            ) as cur:
+                equipment_rows = [dict(r) for r in await cur.fetchall()]
+    return templates.TemplateResponse(
+        "labels.html",
+        {"request": request, "equipment_list": equipment_rows}
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{page}", response_class=HTMLResponse)
 async def spa(request: Request, page: str = "dashboard"):

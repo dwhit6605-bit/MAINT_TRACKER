@@ -670,6 +670,7 @@ async function equipmentPage() {
   $('page-actions').innerHTML = `
     ${isTech() ? `<button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/equipment/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <a href="/labels?token=${getToken()}" target="_blank" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">&#9641; QR Labels</a>
     ${isTech() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
   await refreshEquipment();
 }
@@ -2489,6 +2490,25 @@ function openCalModalForEq(eqId) {
   const eq = equipList.find(e => e.id === eqId);
   if (!eq) return;
   const today = new Date().toISOString().slice(0,10);
+
+  // Detect previous interval from last cal record
+  const prevCal = calEquipRows.find(r => r.eq.id === eqId)?.cal;
+  let detectedInterval = '';
+  let detectedHint = '';
+  if (prevCal?.calibrated_at && prevCal?.next_due) {
+    const calDate  = new Date(String(prevCal.calibrated_at).slice(0,10)+'T00:00:00');
+    const dueDate  = new Date(String(prevCal.next_due).slice(0,10)+'T00:00:00');
+    const days     = Math.round((dueDate - calDate) / 86400000);
+    // Find closest standard interval
+    const closest  = CAL_INTERVALS.reduce((best, ci) =>
+      Math.abs(ci.days - days) < Math.abs(best.days - days) ? ci : best
+    );
+    if (Math.abs(closest.days - days) <= 7) {
+      detectedInterval = String(closest.days);
+      detectedHint = `<div style="font-size:0.72rem;color:#059669;margin-top:0.25rem;">↩ Previous interval: ${closest.label} — auto-selected</div>`;
+    }
+  }
+
   modal(`<div class="modal" style="max-width:32rem;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
       <h2 class="font-semibold">Log Calibration</h2>
@@ -2498,7 +2518,7 @@ function openCalModalForEq(eqId) {
     <form id="cal-form" class="px-6 py-4 space-y-4" onsubmit="saveCalForEq(event,${eqId})">
       <div class="grid grid-cols-2 gap-4">
         <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eq${eqId}" name="calibrated_at" required value="${today}" onchange="applyCalInterval('cal-date-eq${eqId}','next_due-eq${eqId}',document.getElementById('next_due-eq${eqId}-interval')?.value)"></div>
-        <div><label class="label">Next Due</label>${calIntervalPicker(`cal-date-eq${eqId}`,`next_due-eq${eqId}`,'')}</div>
+        <div><label class="label">Next Due</label>${calIntervalPicker(`cal-date-eq${eqId}`,`next_due-eq${eqId}`,'')}${detectedHint}</div>
         <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
         <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
         <div><label class="label">Result</label>
@@ -2512,6 +2532,14 @@ function openCalModalForEq(eqId) {
       </div>
     </form>
   </div>`);
+
+  // Apply the detected interval after modal renders
+  if (detectedInterval) {
+    setTimeout(() => {
+      const sel = document.getElementById(`next_due-eq${eqId}-interval`);
+      if (sel) { sel.value = detectedInterval; applyCalInterval(`cal-date-eq${eqId}`,`next_due-eq${eqId}`,detectedInterval); }
+    }, 0);
+  }
 }
 
 async function saveCalForEq(e, eqId) {
