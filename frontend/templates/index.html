@@ -3182,8 +3182,8 @@ async function _reloadPmcsEditor(tmplId, hint) {
     </optgroup>`;
   }).join('');
 
-  const INTERVALS = ['B','D','A','W','M'];
-  const INT_LABELS = {B:'Before',D:'During',A:'After',W:'Weekly',M:'Monthly'};
+  const INTERVALS = ['B','D','A','W','M','S'];
+  const INT_LABELS = {B:'Before',D:'During',A:'After',W:'Weekly',M:'Monthly',S:'Spot Check'};
 
   // ── Left panel: one row per equipment NAME group
   const eqPanel = `
@@ -3569,8 +3569,8 @@ async function pmcsAddAllLibrary(tmplId, eqId) {
 
 // ── Paste Steps: bulk-add via textarea (one per line, optional "B: text") ─────
 function openPmcsPaste(tmplId, eqId) {
-  const INTERVALS = ['B','D','A','W','M'];
-  const INT_LABELS = {B:'Before Ops',D:'During Ops',A:'After Ops',W:'Weekly',M:'Monthly'};
+  const INTERVALS = ['B','D','A','W','M','S'];
+  const INT_LABELS = {B:'Before Ops',D:'During Ops',A:'After Ops',W:'Weekly',M:'Monthly',S:'Spot Check'};
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop';
   overlay.id = 'pmcs-paste-backdrop';

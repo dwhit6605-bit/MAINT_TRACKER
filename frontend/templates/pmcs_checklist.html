@@ -111,7 +111,7 @@
   .interval-header { display: flex; align-items: center; gap: 0.6rem; margin: 0.75rem 0 0.4rem; padding: 0 0.25rem; }
   .interval-badge { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 9999px; color: #fff; }
   .interval-label { font-size: 0.78rem; font-weight: 600; color: #64748b; }
-  .int-B { background: #1d4ed8; } .int-D { background: #0369a1; } .int-A { background: #0f766e; }
+  .int-B { background: #1d4ed8; } .int-D { background: #0369a1; } .int-A { background: #0f766e; } .int-S { background: #be185d; }
   .int-W { background: #7c3aed; } .int-M { background: #b45309; }
 
   /* ── Status summary ── */
@@ -333,8 +333,8 @@ window.addEventListener('offline', () => { document.getElementById('offline-bann
 if (!navigator.onLine) document.getElementById('offline-banner').classList.add('show');
 
 // ── Interval helpers ──────────────────────────────────────────────────────────
-const INT_NAMES  = {B:'Before Operations',D:'During Operations',A:'After Operations',W:'Weekly',M:'Monthly'};
-const INT_COLORS = {B:'#1d4ed8',D:'#0369a1',A:'#0f766e',W:'#7c3aed',M:'#b45309'};
+const INT_NAMES  = {B:'Before Operations',D:'During Operations',A:'After Operations',W:'Weekly',M:'Monthly',S:'Spot Check'};
+const INT_COLORS = {B:'#1d4ed8',D:'#0369a1',A:'#0f766e',W:'#7c3aed',M:'#b45309',S:'#be185d'};
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Render checklist ──────────────────────────────────────────────────────────

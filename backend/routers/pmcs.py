@@ -455,19 +455,23 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
             VALUES (?, ?, ?, ?)
         """, (session_id, r.item_id, r.status, r.notes))
 
-        # Auto-create maintenance task for faults on items that have creates_task set
+        # Auto-create a corrective maintenance task for every fault
         if r.status == "fault":
             item = items_by_id.get(r.item_id)
-            if item and item.get("creates_task") and item.get("equipment_id"):
+            if item and item.get("equipment_id"):
+                fault_detail = r.notes.strip() if r.notes else ""
+                description = f"Fault found during PMCS: {session['title']}"
+                if fault_detail:
+                    description += f"\nDetails: {fault_detail}"
                 await db.execute("""
                     INSERT INTO maintenance_tasks
                         (equipment_id, title, description, task_type, status, notes)
-                    VALUES (?, ?, ?, 'inspection', 'pending', ?)
+                    VALUES (?, ?, ?, 'corrective', 'pending', ?)
                 """, (
                     item["equipment_id"],
                     f"PMCS Fault: {item['check_item']}",
-                    f"Fault identified during PMCS session: {session['title']}",
-                    r.notes or ""
+                    description,
+                    fault_detail,
                 ))
                 tasks_created += 1
 
