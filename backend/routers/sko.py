@@ -22,10 +22,13 @@ async def _sko_with_pmcs(sko_id: int, db):
     """Return equipment list augmented with their PMCS templates."""
     equip = await _sko_equipment(sko_id, db)
     for e in equip:
-        async with db.execute(
-            "SELECT id, title FROM pmcs_templates WHERE equipment_id=? ORDER BY title",
-            (e["id"],)
-        ) as cur:
+        async with db.execute("""
+            SELECT DISTINCT pt.id, pt.title
+            FROM pmcs_templates pt
+            JOIN pmcs_template_equipment pte ON pte.template_id = pt.id
+            WHERE pte.equipment_id = ?
+            ORDER BY pt.title
+        """, (e["id"],)) as cur:
             e["pmcs_templates"] = [dict(r) for r in await cur.fetchall()]
         async with db.execute("""
             SELECT status, next_due FROM maintenance_tasks

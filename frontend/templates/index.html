@@ -4044,20 +4044,37 @@ async function openSkoDetail(skoId) {
   const co = (s.checkout_history||[]).find(c => !c.returned_at);
 
   const eqStatusColor = { active:'#4ade80', inactive:'#6b7280', maintenance:'#fbbf24' };
+
+  // Group equipment by name so we can show grouped PMCS run buttons
+  const eqGroupNames = {};
+  (s.equipment||[]).forEach(e => { (eqGroupNames[e.name] = eqGroupNames[e.name] || []).push(e); });
+
   const eqRows = (s.equipment||[]).map(e => {
-    const pmcsBtns = (e.pmcs_templates||[]).map(t =>
-      `<button onclick="window.open('/pmcs/${t.id}','_blank')" style="font-size:0.7rem;background:#1e3a5f;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-right:3px;margin-bottom:2px;">📋 ${esc(t.title)}</button>`
+    const tmpls = e.pmcs_templates || [];
+    // Deduplicate templates (same template may cover multiple units)
+    const pmcsBtns = tmpls.map(t =>
+      `<a href="/pmcs/${t.id}" target="_blank"
+         style="display:inline-flex;align-items:center;gap:3px;font-size:0.7rem;background:#1e3a5f;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;text-decoration:none;margin-bottom:2px;">
+         ▶ ${esc(t.title)}</a>`
     ).join('');
+
+    const setupPmcsBtn = isTech() ? `
+      <button onclick="openSkoPmcsMenu(${e.id},${JSON.stringify(e.name)},${skoId})"
+        style="font-size:0.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">
+        ${tmpls.length ? '+ Add PMCS' : '+ Set up PMCS'}</button>` : '';
+
     const taskWarn = e.next_task
       ? `<span style="font-size:0.72rem;color:${e.next_task.status==='overdue'?'#f87171':'#fbbf24'};">⚠ ${e.next_task.status}${e.next_task.next_due?' · due '+e.next_task.next_due:''}</span>`
       : '';
-    const setupPmcsBtn = !e.pmcs_templates?.length
-      ? `<button onclick="openSkoSetupPmcsModal(${e.id},'${esc(e.name)}',${skoId})" style="font-size:0.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">+ Set up PMCS</button>`
-      : '';
+
+    const groupSize = eqGroupNames[e.name]?.length || 1;
+    const groupBadge = groupSize > 1
+      ? `<span style="font-size:0.65rem;color:#1d4ed8;margin-left:3px;">×${groupSize}</span>` : '';
+
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:8px 10px;">
-        <button onclick="openEqFromSko(${e.id},${skoId})" style="font-weight:600;font-size:0.85rem;background:none;border:none;cursor:pointer;padding:0;color:#141414;text-align:left;">${esc(e.name)}</button>
-        ${e.serial_num?`<div style="font-size:0.75rem;color:var(--muted);">S/N: ${esc(e.serial_num)}</div>`:''}
+        <button onclick="openEqFromSko(${e.id},${skoId})" style="font-weight:600;font-size:0.85rem;background:none;border:none;cursor:pointer;padding:0;color:#141414;text-align:left;">${esc(e.name)}${groupBadge}</button>
+        ${e.serial_num?`<div style="font-size:0.72rem;color:var(--muted);">S/N: ${esc(e.serial_num)}</div>`:''}
       </td>
       <td style="padding:8px 10px;">
         <span style="display:inline-flex;align-items:center;font-size:0.78rem;">
@@ -4219,6 +4236,89 @@ async function confirmAddEquipment(skoId) {
 
 // ── Create PMCS template from SKO detail ─────────────────────────────────────
 let _pmcsItemIdx = 0;
+
+// ── SKO PMCS menu: shows existing templates + options to link or create new ───
+async function openSkoPmcsMenu(eqId, eqName, skoId) {
+  // Fetch all PMCS templates and filter to those that include this equipment
+  const allTmpls = await api('GET', '/api/pmcs/templates').catch(() => []);
+  const linked = allTmpls.filter(t =>
+    (t.linked_equipment || []).some(e => e.id === eqId)
+  );
+  const unlinked = allTmpls.filter(t =>
+    !(t.linked_equipment || []).some(e => e.id === eqId)
+  );
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'sko-pmcs-menu-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:500px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700;">PMCS for ${esc(eqName)}</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:1px;">Run a checklist or set up a new template</div>
+      </div>
+      <button onclick="document.getElementById('sko-pmcs-menu-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div style="padding:1rem 1.5rem;display:flex;flex-direction:column;gap:1rem;">
+
+      ${linked.length ? `
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:0.5rem;">Checklists for this equipment</div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          ${linked.map(t => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:0.45rem;background:var(--bg);">
+              <div>
+                <div style="font-size:0.85rem;font-weight:600;">${esc(t.title)}</div>
+                <div style="font-size:0.7rem;color:var(--muted);">${t.linked_equipment?.length||0} equipment · ${t.item_count||0} steps</div>
+              </div>
+              <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+                <a href="/pmcs/${t.id}" target="_blank"
+                   style="font-size:0.78rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:4px 12px;text-decoration:none;font-weight:600;">▶ Run</a>
+                ${isTech()?`<button onclick="openPmcsItems(${t.id});document.getElementById('sko-pmcs-menu-backdrop').remove()"
+                   style="font-size:0.78rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;">✎ Edit</button>`:''}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>` : `
+      <div style="text-align:center;padding:0.75rem 0;color:var(--muted);font-size:0.85rem;">
+        No PMCS templates include this equipment yet.
+      </div>`}
+
+      ${unlinked.length && isTech() ? `
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:0.4rem;">Add to an existing checklist</div>
+        <div style="display:flex;gap:0.5rem;">
+          <select id="sko-pmcs-link-sel" class="input" style="flex:1;font-size:0.82rem;">
+            <option value="">— pick a template —</option>
+            ${unlinked.map(t=>`<option value="${t.id}">${esc(t.title)}</option>`).join('')}
+          </select>
+          <button onclick="skoLinkExistingTemplate(${eqId},${skoId})" class="btn-secondary" style="font-size:0.82rem;white-space:nowrap;">Link</button>
+        </div>
+      </div>` : ''}
+
+      ${isTech() ? `
+      <div style="border-top:1px solid var(--border);padding-top:0.75rem;">
+        <button onclick="document.getElementById('sko-pmcs-menu-backdrop').remove();openSkoSetupPmcsModal(${eqId},${JSON.stringify(eqName)},${skoId})"
+          class="btn-secondary" style="width:100%;font-size:0.82rem;">+ Create New Checklist Template</button>
+      </div>` : ''}
+
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+}
+
+async function skoLinkExistingTemplate(eqId, skoId) {
+  const tmplId = parseInt(document.getElementById('sko-pmcs-link-sel')?.value);
+  if (!tmplId) return;
+  try {
+    await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eqId });
+    toast('Equipment added to checklist.');
+    document.getElementById('sko-pmcs-menu-backdrop')?.remove();
+    document.getElementById('sko-detail-backdrop')?.remove();
+    await openSkoDetail(skoId);
+  } catch(err) { toast(err.message, false); }
+}
 
 function openSkoSetupPmcsModal(eqId, eqName, skoId) {
   _pmcsItemIdx = 1;
