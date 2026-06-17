@@ -542,19 +542,8 @@ initAuth().then(ok => { if (ok) renderPage('{{ page }}'); });
 })();
 
 
-// ─── Overdue banner ───────────────────────────────────────────────────────────
-function showOverdueBanner(overdueTasks, overdueCals) {
-  if (document.getElementById('overdue-banner')) return; // already shown
-  if (!overdueTasks && !overdueCals) return;
-  const parts = [];
-  if (overdueTasks) parts.push(`${overdueTasks} overdue maintenance task${overdueTasks>1?'s':''}`);
-  if (overdueCals)  parts.push(`${overdueCals} overdue calibration${overdueCals>1?'s':''}`);
-  const banner = document.createElement('div');
-  banner.id = 'overdue-banner';
-  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:200;background:#dc2626;color:#fff;padding:0.6rem 1.25rem;display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-  banner.innerHTML = `<span>⚠ ${parts.join(' · ')} — action required</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;padding:0 0.25rem;line-height:1;">✕</button>`;
-  document.body.prepend(banner);
-}
+// ─── Overdue banner — removed; notification bell handles this ─────────────────
+function showOverdueBanner(overdueTasks, overdueCals) {}
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 async function dashboardPage() {
