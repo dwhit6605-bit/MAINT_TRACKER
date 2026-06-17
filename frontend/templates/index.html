@@ -3104,7 +3104,7 @@ function openPmcsQR(tmplId, title) {
 }
 
 // ── Item editor (2-panel: equipment list + items per equipment) ───────────────
-let _pmcsEditorState = { tmplId: null, selectedEqId: null, tmpl: null, allEquip: [] };
+let _pmcsEditorState = { tmplId: null, selectedEqId: null, tmpl: null, allEquip: [], librarySteps: [] };
 
 async function openPmcsItems(tmplId) {
   _pmcsEditorState.allEquip = await api('GET', '/api/equipment');
@@ -3163,24 +3163,57 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
       </div>
     </div>`;
 
+  // ── Library chips: equipment-type checklist steps not yet in this PMCS ──
+  const librarySteps = selectedEqId ? (await api('GET', `/api/eq-checklists/for-equipment/${selectedEqId}`).catch(()=>null))?.steps || [] : [];
+  const existingTexts = new Set(eqItems.map(i => i.check_item.toLowerCase().trim()));
+  const newLibSteps = librarySteps.filter(s => !existingTexts.has((s.title||'').toLowerCase().trim()));
+  _pmcsEditorState.librarySteps   = librarySteps;
+  _pmcsEditorState.newLibSteps    = newLibSteps;
+
+  // ── Copy-to-similar: other equipment in this template with same name ──
+  const similarEq = selectedEqId && selectedEq
+    ? linked.filter(e => e.id !== selectedEqId && e.name === selectedEq.name)
+    : [];
+
+  const librarySection = (selectedEqId && newLibSteps.length > 0) ? `
+    <div style="padding:0.55rem 1rem;border-bottom:1px solid #e5e7eb;background:#fffbeb;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+        <span style="font-size:0.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.04em;">📚 From Equipment Library (${newLibSteps.length})</span>
+        <button onclick="pmcsAddAllLibrary(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.68rem;padding:0.15rem 0.55rem;">Add All</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;" id="pmcs-lib-chips">
+        ${newLibSteps.map((s,i)=>`
+          <button onclick="pmcsAddLibStep(${tmplId},${selectedEqId},${i})" data-lib-idx="${i}"
+            style="font-size:0.72rem;padding:0.2rem 0.6rem;border:1px solid #d97706;border-radius:9999px;background:#fff;color:#92400e;cursor:pointer;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;"
+            title="${esc(s.title)}">
+            <span style="font-size:0.6rem;font-weight:800;margin-right:0.2rem;color:#b45309;">${s.interval||'B'}</span>${esc(s.title)}
+          </button>`).join('')}
+      </div>
+    </div>` : '';
+
   const itemsPanel = `
     <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
-      <div style="padding:0.65rem 1rem;border-bottom:1px solid #f3f4f6;background:#f9fafb;font-size:0.8rem;font-weight:600;color:#374151;">
-        ${selectedEq ? `Items for: ${esc(selectedEq.name)}` : '<span style="color:#9ca3af;">← Select equipment to manage its check items</span>'}
+      <div style="padding:0.6rem 1rem;border-bottom:1px solid #f3f4f6;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;">
+        <div style="font-size:0.8rem;font-weight:600;color:#374151;">
+          ${selectedEq ? `Items for: ${esc(selectedEq.name)}` : '<span style="color:#9ca3af;">← Select equipment</span>'}
+        </div>
+        ${selectedEqId ? `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+          <button onclick="openPmcsPaste(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">📋 Paste Steps</button>
+          ${linked.length > 1 ? `<button onclick="openPmcsCopyFrom(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">⧉ Copy From…</button>` : ''}
+          ${similarEq.length > 0 ? `<button onclick="pmcsCopyToSimilar(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;color:#1d4ed8;">⇉ Copy to ${similarEq.length} similar</button>` : ''}
+        </div>` : ''}
       </div>
+      ${librarySection}
       <div style="flex:1;overflow-y:auto;padding:0.5rem 1rem;" id="pmcs-items-list">
         ${!selectedEqId
           ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">Select an equipment entry on the left to view and add check items.</p>'
           : eqItems.length === 0
-            ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">No items yet for this equipment. Add one below.</p>'
+            ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">No items yet. Add one below or use "Paste Steps" to bulk-add.</p>'
             : eqItems.map((it,i) => pmcsItemRow(it, i, eqItems.length)).join('')}
       </div>
       ${selectedEqId ? `
-      <div style="padding:0.75rem 1rem;border-top:1px solid #e5e7eb;background:#f9fafb;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-          <div style="font-size:0.72rem;font-weight:700;color:#374151;">Add Check Item</div>
-          ${linked.length > 1 ? `<button onclick="openPmcsCopyFrom(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">⧉ Copy items from…</button>` : ''}
-        </div>
+      <div style="padding:0.65rem 1rem;border-top:1px solid #e5e7eb;background:#f9fafb;">
+        <div style="font-size:0.7rem;font-weight:700;color:#374151;margin-bottom:0.4rem;">Add Single Item</div>
         <form id="pmcs-add-item-form" onsubmit="addPmcsItem(event,${tmplId},${selectedEqId})" style="display:grid;gap:0.4rem;">
           <div style="display:grid;grid-template-columns:50px 80px 1fr;gap:0.4rem;">
             <div><label class="label" style="font-size:0.65rem;">No.</label>
@@ -3206,7 +3239,7 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
           <div style="display:flex;align-items:center;justify-content:space-between;padding-top:0.2rem;gap:0.5rem;flex-wrap:wrap;">
             <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;cursor:pointer;">
               <input type="checkbox" name="creates_task" value="true" style="width:14px;height:14px;">
-              Auto-create maintenance task on fault
+              Auto-create task on fault
             </label>
             ${linked.length > 1 ? `<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;cursor:pointer;">
               <input type="checkbox" id="pmcs-apply-multi" onchange="togglePmcsMultiEq(this.checked)" style="width:14px;height:14px;">
@@ -3214,7 +3247,7 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
             </label>` : ''}
           </div>
           <div id="pmcs-multi-eq-picker" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:0.4rem;padding:0.5rem;margin-top:0.1rem;">
-            <div style="font-size:0.68rem;font-weight:700;color:#6b7280;margin-bottom:0.35rem;">Also add this item to:</div>
+            <div style="font-size:0.68rem;font-weight:700;color:#6b7280;margin-bottom:0.35rem;">Also add to:</div>
             ${linked.filter(e=>e.id!==selectedEqId).map(e=>`
               <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;padding:0.2rem 0;cursor:pointer;">
                 <input type="checkbox" name="extra_eq" value="${e.id}" style="width:13px;height:13px;">
@@ -3257,31 +3290,7 @@ async function addPmcsEquipment(tmplId) {
   try {
     await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eqId });
 
-    // Auto-populate checklist steps as PMCS check items if template exists
-    const eqRecord = equipmentData.find(e => e.id === eqId);
-    if (eqRecord) {
-      const clData = await api('GET', `/api/eq-checklists/for-equipment/${eqId}`).catch(()=>null);
-      if (clData?.steps?.length) {
-        const accept = confirm(
-          `"${eqRecord.name}" has a ${clData.steps.length}-step maintenance checklist template.\n\nAuto-populate these steps as PMCS check items?`
-        );
-        if (accept) {
-          for (const s of clData.steps) {
-            await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
-              item_no:      s.step_no || '',
-              interval:     s.interval || 'B',
-              check_item:   s.title,
-              procedure:    s.procedure || '',
-              not_ready_if: '',
-              equipment_id: eqId
-            });
-          }
-          toast(`Added ${clData.steps.length} checklist steps as PMCS items.`);
-        }
-      }
-    }
-
-    toast('Equipment added.');
+    toast('Equipment added — use the library chips to add steps.');
     await _reloadPmcsEditor(tmplId, eqId);
   } catch(err) { toast(err.message, false); }
 }
@@ -3421,6 +3430,141 @@ async function deletePmcsItem(itemId) {
   const { tmplId, selectedEqId } = _pmcsEditorState;
   toast('Item removed.');
   await _reloadPmcsEditor(tmplId, selectedEqId);
+}
+
+// ── Library chip: add a single step from the equipment-type library ───────────
+async function pmcsAddLibStep(tmplId, eqId, idx) {
+  const step = _pmcsEditorState.newLibSteps?.[idx];
+  if (!step) return;
+  const btn = document.querySelector(`[data-lib-idx="${idx}"]`);
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+  try {
+    await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+      item_no:      step.step_no || '',
+      interval:     step.interval || 'B',
+      check_item:   step.title,
+      procedure:    step.procedure || '',
+      not_ready_if: '',
+      equipment_id: eqId,
+      order_index:  document.querySelectorAll('[id^="pmcs-row-"]').length,
+    });
+    await _reloadPmcsEditor(tmplId, eqId);
+  } catch(err) { toast(err.message, false); if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
+}
+
+// ── Library: add ALL remaining library steps at once ─────────────────────────
+async function pmcsAddAllLibrary(tmplId, eqId) {
+  const steps = _pmcsEditorState.newLibSteps || [];
+  if (!steps.length) return;
+  const btn = document.querySelector('#pmcs-lib-chips')?.closest('div')?.querySelector('button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  try {
+    for (const s of steps) {
+      await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+        item_no: s.step_no || '', interval: s.interval || 'B',
+        check_item: s.title, procedure: s.procedure || '',
+        not_ready_if: '', equipment_id: eqId,
+        order_index: 0,
+      });
+    }
+    toast(`Added ${steps.length} step${steps.length !== 1 ? 's' : ''} from library.`);
+    await _reloadPmcsEditor(tmplId, eqId);
+  } catch(err) { toast(err.message, false); }
+}
+
+// ── Paste Steps: bulk-add via textarea (one per line, optional "B: text") ─────
+function openPmcsPaste(tmplId, eqId) {
+  const INTERVALS = ['B','D','A','W','M'];
+  const INT_LABELS = {B:'Before Ops',D:'During Ops',A:'After Ops',W:'Weekly',M:'Monthly'};
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'pmcs-paste-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:500px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;font-size:0.95rem;">Paste Steps</h2>
+        <div style="font-size:0.72rem;color:#6b7280;margin-top:0.1rem;">One step per line · Optionally prefix with interval: <code style="background:#f1f5f9;padding:0 3px;border-radius:2px;">B: Check oil level</code></div>
+      </div>
+      <button onclick="document.getElementById('pmcs-paste-backdrop').remove()" style="color:#9ca3af;font-size:1.4rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:1rem 1.5rem;display:flex;flex-direction:column;gap:0.65rem;">
+      <textarea id="pmcs-paste-text" rows="10" class="input" style="resize:vertical;font-size:0.82rem;line-height:1.55;font-family:monospace;"
+        placeholder="B: Check coolant level&#10;B: Inspect for fluid leaks&#10;A: Clean sensor housing&#10;W: Check calibration sticker&#10;Check battery voltage"></textarea>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <div style="font-size:0.75rem;font-weight:600;color:#374151;flex-shrink:0;">Default interval:</div>
+        <select id="pmcs-paste-interval" class="input" style="padding:0.3rem 0.4rem;font-size:0.8rem;max-width:160px;">
+          ${INTERVALS.map(v=>`<option value="${v}">${v} — ${INT_LABELS[v]}</option>`).join('')}
+        </select>
+        <div style="font-size:0.7rem;color:#9ca3af;">(used when no prefix given)</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div id="pmcs-paste-count" style="font-size:0.75rem;color:#6b7280;"></div>
+        <div style="display:flex;gap:0.5rem;">
+          <button onclick="document.getElementById('pmcs-paste-backdrop').remove()" class="btn-secondary" style="font-size:0.82rem;">Cancel</button>
+          <button onclick="submitPmcsPaste(${tmplId},${eqId})" class="btn-primary" style="font-size:0.82rem;" id="pmcs-paste-submit">Add Steps</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+
+  const ta = document.getElementById('pmcs-paste-text');
+  const countEl = document.getElementById('pmcs-paste-count');
+  ta.addEventListener('input', () => {
+    const lines = ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+    countEl.textContent = lines.length ? `${lines.length} step${lines.length !== 1 ? 's' : ''} ready to add` : '';
+  });
+  ta.focus();
+}
+
+async function submitPmcsPaste(tmplId, eqId) {
+  const ta = document.getElementById('pmcs-paste-text');
+  const defaultInterval = document.getElementById('pmcs-paste-interval')?.value || 'B';
+  const VALID_INT = new Set(['B','D','A','W','M']);
+  const lines = (ta?.value || '').split('\n').map(l=>l.trim()).filter(Boolean);
+  if (!lines.length) return;
+
+  const btn = document.getElementById('pmcs-paste-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+
+  const parsed = lines.map((line, i) => {
+    // Match optional "B: " or "B - " prefix
+    const m = line.match(/^([BDAWM])\s*[:–-]\s*/i);
+    if (m && VALID_INT.has(m[1].toUpperCase())) {
+      return { interval: m[1].toUpperCase(), check_item: line.slice(m[0].length).trim(), order_index: i };
+    }
+    return { interval: defaultInterval, check_item: line, order_index: i };
+  });
+
+  try {
+    for (const p of parsed) {
+      await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+        item_no: '', interval: p.interval, check_item: p.check_item,
+        procedure: '', not_ready_if: '', equipment_id: eqId, order_index: p.order_index,
+      });
+    }
+    document.getElementById('pmcs-paste-backdrop')?.remove();
+    toast(`Added ${parsed.length} step${parsed.length !== 1 ? 's' : ''}.`);
+    await _reloadPmcsEditor(tmplId, eqId);
+  } catch(err) { toast(err.message, false); if (btn) { btn.disabled = false; btn.textContent = 'Add Steps'; } }
+}
+
+// ── Copy to similar: replicate this equipment's items to others with same name ─
+async function pmcsCopyToSimilar(tmplId, srcEqId) {
+  const { tmpl } = _pmcsEditorState;
+  const srcName = tmpl.linked_equipment.find(e => e.id === srcEqId)?.name || '';
+  const targets = (tmpl.linked_equipment || []).filter(e => e.id !== srcEqId && e.name === srcName);
+  if (!targets.length) return;
+  const srcCount = tmpl.items.filter(i => i.equipment_id === srcEqId).length;
+  if (!confirm(`Copy ${srcCount} item${srcCount!==1?'s':''} from this ${srcName} to ${targets.length} other ${srcName}${targets.length!==1?'s':''}?\n\nThis will add to (not replace) existing items.`)) return;
+  let total = 0;
+  for (const t of targets) {
+    const res = await api('POST', `/api/pmcs/templates/${tmplId}/equipment/${t.id}/copy-from/${srcEqId}`);
+    total += res.copied || 0;
+  }
+  toast(`Copied ${total} item${total!==1?'s':''} to ${targets.length} equipment.`);
+  await _reloadPmcsEditor(tmplId, srcEqId);
 }
 
 // ── Archive viewer ────────────────────────────────────────────────────────────
