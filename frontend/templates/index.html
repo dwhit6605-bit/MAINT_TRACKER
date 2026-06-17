@@ -3104,86 +3104,122 @@ function openPmcsQR(tmplId, title) {
 }
 
 // ── Item editor (2-panel: equipment list + items per equipment) ───────────────
-let _pmcsEditorState = { tmplId: null, selectedEqId: null, tmpl: null, allEquip: [], librarySteps: [] };
+let _pmcsEditorState = { tmplId: null, selectedEqId: null, selectedGroupName: null, groupEqIds: [], tmpl: null, allEquip: [], librarySteps: [], newLibSteps: [] };
 
 async function openPmcsItems(tmplId) {
   _pmcsEditorState.allEquip = await api('GET', '/api/equipment');
   await _reloadPmcsEditor(tmplId, null);
 }
 
-async function _reloadPmcsEditor(tmplId, selectedEqId) {
+// hint: null = preserve state, number = eq id (find its group), string = group name
+async function _reloadPmcsEditor(tmplId, hint) {
   const tmpl = await api('GET', `/api/pmcs/templates/${tmplId}`);
-  _pmcsEditorState = { tmplId, selectedEqId, tmpl, allEquip: _pmcsEditorState.allEquip };
-
   const linked = tmpl.linked_equipment || [];
-  // If no selection default to first linked equipment
-  if (!selectedEqId && linked.length > 0) selectedEqId = linked[0].id;
-  _pmcsEditorState.selectedEqId = selectedEqId;
 
-  const selectedEq = linked.find(e => e.id === selectedEqId);
-  const eqItems = selectedEqId
-    ? tmpl.items.filter(i => i.equipment_id === selectedEqId)
-    : [];
+  // ── Build group structure: name → [eq, ...]
+  const linkedGroups = {};
+  linked.forEach(e => { (linkedGroups[e.name] = linkedGroups[e.name] || []).push(e); });
+  const groupNames = Object.keys(linkedGroups);
 
-  // Equipment not yet added
+  // ── Resolve which group is selected
+  let resolvedGroupName = _pmcsEditorState.selectedGroupName; // preserve by default
+  if (typeof hint === 'string')     resolvedGroupName = hint;
+  else if (typeof hint === 'number') {
+    const eq = linked.find(e => e.id === hint);
+    resolvedGroupName = eq?.name || resolvedGroupName;
+  } else if (hint === null)          resolvedGroupName = _pmcsEditorState.selectedGroupName;
+  if (!resolvedGroupName && groupNames.length > 0) resolvedGroupName = groupNames[0];
+  if (resolvedGroupName && !linkedGroups[resolvedGroupName]) resolvedGroupName = groupNames[0] || null;
+
+  const selectedGroup  = resolvedGroupName ? (linkedGroups[resolvedGroupName] || []) : [];
+  const repEqId        = selectedGroup[0]?.id || null;
+  const groupEqIds     = selectedGroup.map(e => e.id);
+  const isMultiGroup   = selectedGroup.length > 1;
+
+  _pmcsEditorState = {
+    tmplId, tmpl, allEquip: _pmcsEditorState.allEquip,
+    selectedEqId: repEqId, selectedGroupName: resolvedGroupName,
+    groupEqIds, librarySteps: [], newLibSteps: [],
+  };
+
+  const eqItems = repEqId ? tmpl.items.filter(i => i.equipment_id === repEqId) : [];
+
+  // ── Available equipment (not yet in template), grouped for the picker
   const linkedIds = new Set(linked.map(e => e.id));
-  const available = _pmcsEditorState.allEquip.filter(e => !linkedIds.has(e.id));
+  const available  = _pmcsEditorState.allEquip.filter(e => !linkedIds.has(e.id));
+  const availGroups = {};
+  available.forEach(e => { (availGroups[e.name] = availGroups[e.name] || []).push(e); });
+
+  const pickerOptions = Object.entries(availGroups).map(([name, eqs]) => {
+    if (eqs.length === 1) {
+      return `<option value="${eqs[0].id}">${esc(name)}${eqs[0].serial_num?' — '+esc(eqs[0].serial_num):''}</option>`;
+    }
+    return `<optgroup label="${esc(name)} (${eqs.length} units)">
+      <option value="bulk:${esc(name)}">↓ Add all ${eqs.length} units</option>
+      ${eqs.map(e=>`<option value="${e.id}">  ${esc(e.serial_num||e.name)}</option>`).join('')}
+    </optgroup>`;
+  }).join('');
 
   const INTERVALS = ['B','D','A','W','M'];
   const INT_LABELS = {B:'Before',D:'During',A:'After',W:'Weekly',M:'Monthly'};
 
+  // ── Left panel: one row per equipment NAME group
   const eqPanel = `
-    <div style="width:210px;flex-shrink:0;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;">
-      <div style="padding:0.75rem 1rem;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #f3f4f6;">Equipment</div>
+    <div style="width:215px;flex-shrink:0;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;">
+      <div style="padding:0.75rem 1rem;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #f3f4f6;">Equipment Groups</div>
       <div style="flex:1;overflow-y:auto;" id="pmcs-eq-list">
-        ${linked.length === 0
+        ${groupNames.length === 0
           ? '<p style="font-size:0.78rem;color:#9ca3af;padding:1rem;text-align:center;">No equipment yet</p>'
-          : linked.map((e,ei) => `
-            <div onclick="pmcsSelectEq(${e.id})" style="display:flex;align-items:center;gap:0.25rem;padding:0.45rem 0.5rem 0.45rem 0.75rem;cursor:pointer;border-bottom:1px solid #f9fafb;${e.id===selectedEqId?'background:#dce8f5;font-weight:600;':''}">
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.name)}</div>
-                <div style="font-size:0.68rem;color:#9ca3af;">${(tmpl.items.filter(i=>i.equipment_id===e.id).length)} items</div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;" onclick="event.stopPropagation()">
-                <button onclick="movePmcsEq(${tmplId},${ei},-1)" style="font-size:0.6rem;line-height:1;background:${ei===0?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${ei===0?'disabled':''}>▲</button>
-                <button onclick="movePmcsEq(${tmplId},${ei},1)" style="font-size:0.6rem;line-height:1;background:${ei===linked.length-1?'#f3f4f6':'#e5e7eb'};border:none;border-radius:2px;padding:1px 4px;cursor:pointer;color:#374151;" ${ei===linked.length-1?'disabled':''}>▼</button>
-              </div>
-              <button onclick="event.stopPropagation();removePmcsEquipment(${tmplId},${e.id})" style="font-size:0.65rem;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 4px;flex-shrink:0;" title="Remove">✕</button>
-            </div>`).join('')}
+          : groupNames.map(name => {
+              const group   = linkedGroups[name];
+              const isMulti = group.length > 1;
+              const cnt     = tmpl.items.filter(i => i.equipment_id === group[0].id).length;
+              const isSel   = name === resolvedGroupName;
+              return `<div onclick="pmcsSelectGroup(${JSON.stringify(name)})"
+                style="display:flex;align-items:flex-start;gap:0.25rem;padding:0.5rem 0.5rem 0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f9fafb;${isSel?'background:#dce8f5;':''}">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:0.82rem;${isSel?'font-weight:700;':''}overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(name)}</div>
+                  <div style="font-size:0.68rem;color:#9ca3af;margin-top:1px;">
+                    ${cnt} step${cnt!==1?'s':''}${isMulti?` · <span style="color:#1d4ed8;font-weight:700;">×${group.length} units</span>`:''}
+                  </div>
+                </div>
+                <button onclick="event.stopPropagation();removePmcsGroup(${tmplId},${JSON.stringify(name)})"
+                  style="font-size:0.65rem;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 4px;flex-shrink:0;margin-top:1px;" title="Remove">✕</button>
+              </div>`;
+            }).join('')}
       </div>
       <div style="padding:0.6rem 0.75rem;border-top:1px solid #e5e7eb;background:#f9fafb;">
         <div style="font-size:0.7rem;font-weight:600;color:#374151;margin-bottom:0.35rem;">Add Equipment</div>
         <div style="display:flex;gap:0.4rem;">
           <select id="pmcs-eq-picker" class="input" style="padding:0.3rem 0.4rem;font-size:0.75rem;flex:1;">
             <option value="">— select —</option>
-            ${available.map(e=>`<option value="${e.id}">${esc(e.name)}${e.serial_num?' — '+esc(e.serial_num):''}</option>`).join('')}
+            ${pickerOptions}
           </select>
           <button onclick="addPmcsEquipment(${tmplId})" class="btn-primary" style="font-size:0.72rem;padding:0.3rem 0.6rem;white-space:nowrap;">Add</button>
         </div>
       </div>
     </div>`;
 
-  // ── Library chips: equipment-type checklist steps not yet in this PMCS ──
-  const librarySteps = selectedEqId ? (await api('GET', `/api/eq-checklists/for-equipment/${selectedEqId}`).catch(()=>null))?.steps || [] : [];
+  // ── Library chips
+  const librarySteps = repEqId ? (await api('GET', `/api/eq-checklists/for-equipment/${repEqId}`).catch(()=>null))?.steps || [] : [];
   const existingTexts = new Set(eqItems.map(i => i.check_item.toLowerCase().trim()));
   const newLibSteps = librarySteps.filter(s => !existingTexts.has((s.title||'').toLowerCase().trim()));
-  _pmcsEditorState.librarySteps   = librarySteps;
-  _pmcsEditorState.newLibSteps    = newLibSteps;
+  _pmcsEditorState.librarySteps = librarySteps;
+  _pmcsEditorState.newLibSteps  = newLibSteps;
 
-  // ── Copy-to-similar: other equipment in this template with same name ──
-  const similarEq = selectedEqId && selectedEq
-    ? linked.filter(e => e.id !== selectedEqId && e.name === selectedEq.name)
-    : [];
+  const groupTag = isMultiGroup
+    ? `<span style="font-size:0.68rem;font-weight:700;background:#dce8f5;color:#1d4ed8;border-radius:9999px;padding:1px 8px;margin-left:0.4rem;">×${selectedGroup.length} — changes apply to all units</span>`
+    : '';
 
-  const librarySection = (selectedEqId && newLibSteps.length > 0) ? `
+  const librarySection = (repEqId && newLibSteps.length > 0) ? `
     <div style="padding:0.55rem 1rem;border-bottom:1px solid #e5e7eb;background:#fffbeb;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
         <span style="font-size:0.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.04em;">📚 From Equipment Library (${newLibSteps.length})</span>
-        <button onclick="pmcsAddAllLibrary(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.68rem;padding:0.15rem 0.55rem;">Add All</button>
+        <button onclick="pmcsAddAllLibrary(${tmplId},${repEqId})" class="btn-secondary" style="font-size:0.68rem;padding:0.15rem 0.55rem;">Add All${isMultiGroup?' to All Units':''}</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:0.3rem;" id="pmcs-lib-chips">
         ${newLibSteps.map((s,i)=>`
-          <button onclick="pmcsAddLibStep(${tmplId},${selectedEqId},${i})" data-lib-idx="${i}"
+          <button onclick="pmcsAddLibStep(${tmplId},${repEqId},${i})" data-lib-idx="${i}"
             style="font-size:0.72rem;padding:0.2rem 0.6rem;border:1px solid #d97706;border-radius:9999px;background:#fff;color:#92400e;cursor:pointer;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;"
             title="${esc(s.title)}">
             <span style="font-size:0.6rem;font-weight:800;margin-right:0.2rem;color:#b45309;">${s.interval||'B'}</span>${esc(s.title)}
@@ -3195,26 +3231,29 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
     <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
       <div style="padding:0.6rem 1rem;border-bottom:1px solid #f3f4f6;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;">
         <div style="font-size:0.8rem;font-weight:600;color:#374151;">
-          ${selectedEq ? `Items for: ${esc(selectedEq.name)}` : '<span style="color:#9ca3af;">← Select equipment</span>'}
+          ${resolvedGroupName
+            ? `${esc(resolvedGroupName)}${groupTag}`
+            : '<span style="color:#9ca3af;">← Select equipment</span>'}
         </div>
-        ${selectedEqId ? `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-          <button onclick="openPmcsPaste(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">📋 Paste Steps</button>
-          ${linked.length > 1 ? `<button onclick="openPmcsCopyFrom(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">⧉ Copy From…</button>` : ''}
-          ${similarEq.length > 0 ? `<button onclick="pmcsCopyToSimilar(${tmplId},${selectedEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;color:#1d4ed8;">⇉ Copy to ${similarEq.length} similar</button>` : ''}
+        ${repEqId ? `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+          <button onclick="openPmcsPaste(${tmplId},${repEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">📋 Paste Steps</button>
+          ${!isMultiGroup && linked.length > 1 ? `<button onclick="openPmcsCopyFrom(${tmplId},${repEqId})" class="btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;">⧉ Copy From…</button>` : ''}
         </div>` : ''}
       </div>
       ${librarySection}
       <div style="flex:1;overflow-y:auto;padding:0.5rem 1rem;" id="pmcs-items-list">
-        ${!selectedEqId
-          ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">Select an equipment entry on the left to view and add check items.</p>'
+        ${!repEqId
+          ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">Select an equipment group on the left to view and add check items.</p>'
           : eqItems.length === 0
             ? '<p style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:2rem 0;">No items yet. Add one below or use "Paste Steps" to bulk-add.</p>'
             : eqItems.map((it,i) => pmcsItemRow(it, i, eqItems.length)).join('')}
       </div>
-      ${selectedEqId ? `
+      ${repEqId ? `
       <div style="padding:0.65rem 1rem;border-top:1px solid #e5e7eb;background:#f9fafb;">
-        <div style="font-size:0.7rem;font-weight:700;color:#374151;margin-bottom:0.4rem;">Add Single Item</div>
-        <form id="pmcs-add-item-form" onsubmit="addPmcsItem(event,${tmplId},${selectedEqId})" style="display:grid;gap:0.4rem;">
+        <div style="font-size:0.7rem;font-weight:700;color:#374151;margin-bottom:0.4rem;">
+          Add Step${isMultiGroup?` <span style="font-weight:400;color:#1d4ed8;">(adds to all ${selectedGroup.length} units)</span>`:''}
+        </div>
+        <form id="pmcs-add-item-form" onsubmit="addPmcsItem(event,${tmplId},${repEqId})" style="display:grid;gap:0.4rem;">
           <div style="display:grid;grid-template-columns:50px 80px 1fr;gap:0.4rem;">
             <div><label class="label" style="font-size:0.65rem;">No.</label>
               <input class="input" name="item_no" placeholder="1" style="padding:0.35rem 0.4rem;font-size:0.8rem;">
@@ -3241,21 +3280,9 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
               <input type="checkbox" name="creates_task" value="true" style="width:14px;height:14px;">
               Auto-create task on fault
             </label>
-            ${linked.length > 1 ? `<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;cursor:pointer;">
-              <input type="checkbox" id="pmcs-apply-multi" onchange="togglePmcsMultiEq(this.checked)" style="width:14px;height:14px;">
-              Apply to multiple equipment
-            </label>` : ''}
-          </div>
-          <div id="pmcs-multi-eq-picker" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:0.4rem;padding:0.5rem;margin-top:0.1rem;">
-            <div style="font-size:0.68rem;font-weight:700;color:#6b7280;margin-bottom:0.35rem;">Also add to:</div>
-            ${linked.filter(e=>e.id!==selectedEqId).map(e=>`
-              <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;padding:0.2rem 0;cursor:pointer;">
-                <input type="checkbox" name="extra_eq" value="${e.id}" style="width:13px;height:13px;">
-                ${esc(e.name)}${e.serial_num?' <span style="color:#9ca3af;font-size:0.68rem;">'+esc(e.serial_num)+'</span>':''}
-              </label>`).join('')}
           </div>
           <div style="display:flex;justify-content:flex-end;padding-top:0.25rem;">
-            <button type="submit" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.9rem;">+ Add Item</button>
+            <button type="submit" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.9rem;">+ Add Step</button>
           </div>
         </form>
       </div>` : ''}
@@ -3278,28 +3305,60 @@ async function _reloadPmcsEditor(tmplId, selectedEqId) {
   modal(html);
 }
 
-function pmcsSelectEq(eqId) {
+function pmcsSelectGroup(name) {
   const { tmplId } = _pmcsEditorState;
-  _reloadPmcsEditor(tmplId, eqId);
+  _reloadPmcsEditor(tmplId, name);
 }
+
+// Keep legacy alias so any stale inline onclick="pmcsSelectEq(...)" still works
+function pmcsSelectEq(eqId) { const { tmplId } = _pmcsEditorState; _reloadPmcsEditor(tmplId, eqId); }
 
 async function addPmcsEquipment(tmplId) {
   const sel = document.getElementById('pmcs-eq-picker');
-  const eqId = parseInt(sel?.value);
-  if (!eqId) return;
+  const val = sel?.value;
+  if (!val) return;
   try {
-    await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eqId });
-
-    toast('Equipment added — use the library chips to add steps.');
-    await _reloadPmcsEditor(tmplId, eqId);
+    if (val.startsWith('bulk:')) {
+      const name = val.slice(5);
+      const { allEquip, tmpl } = _pmcsEditorState;
+      const linkedIds = new Set((tmpl.linked_equipment || []).map(e => e.id));
+      const toAdd = allEquip.filter(e => e.name === name && !linkedIds.has(e.id));
+      for (const eq of toAdd) {
+        await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eq.id });
+      }
+      toast(`Added ${toAdd.length} ${name} unit${toAdd.length!==1?'s':''} — use library chips or Paste Steps to add check items.`);
+      await _reloadPmcsEditor(tmplId, name);
+    } else {
+      const eqId = parseInt(val);
+      if (!eqId) return;
+      await api('POST', `/api/pmcs/templates/${tmplId}/equipment`, { equipment_id: eqId });
+      const eq = _pmcsEditorState.allEquip.find(e => e.id === eqId);
+      toast('Equipment added — use the library chips to add steps.');
+      await _reloadPmcsEditor(tmplId, eq?.name || eqId);
+    }
   } catch(err) { toast(err.message, false); }
 }
 
-async function removePmcsEquipment(tmplId, eqId) {
-  if (!confirm('Remove this equipment and all its check items from this PMCS?')) return;
-  await api('DELETE', `/api/pmcs/templates/${tmplId}/equipment/${eqId}`);
-  toast('Equipment removed.');
+async function removePmcsGroup(tmplId, groupName) {
+  const { tmpl } = _pmcsEditorState;
+  const group = (tmpl.linked_equipment || []).filter(e => e.name === groupName);
+  const itemCount = tmpl.items.filter(i => group.some(e => e.id === i.equipment_id)).length;
+  const msg = group.length > 1
+    ? `Remove all ${group.length} ${groupName} units and their ${itemCount} check items from this PMCS?`
+    : `Remove ${groupName} and its ${itemCount} check item${itemCount!==1?'s':''} from this PMCS?`;
+  if (!confirm(msg)) return;
+  for (const eq of group) {
+    await api('DELETE', `/api/pmcs/templates/${tmplId}/equipment/${eq.id}`);
+  }
+  toast(`Removed ${group.length} unit${group.length!==1?'s':''}.`);
   await _reloadPmcsEditor(tmplId, null);
+}
+
+// Keep legacy alias
+async function removePmcsEquipment(tmplId, eqId) {
+  const { tmpl } = _pmcsEditorState;
+  const eq = (tmpl.linked_equipment||[]).find(e => e.id === eqId);
+  if (eq) await removePmcsGroup(tmplId, eq.name);
 }
 
 function pmcsItemRow(it, idx, total) {
@@ -3328,7 +3387,7 @@ async function movePmcsEq(tmplId, idx, dir) {
   if (newIdx < 0 || newIdx >= linked.length) return;
   [linked[idx], linked[newIdx]] = [linked[newIdx], linked[idx]];
   await api('PUT', `/api/pmcs/templates/${tmplId}/equipment/reorder`, linked.map(e => e.id));
-  await _reloadPmcsEditor(tmplId, s.selectedEqId);
+  await _reloadPmcsEditor(tmplId, s.selectedGroupName);
 }
 
 async function movePmcsItem(itemId, idx, dir) {
@@ -3338,7 +3397,7 @@ async function movePmcsItem(itemId, idx, dir) {
   if (newIdx < 0 || newIdx >= eqItems.length) return;
   [eqItems[idx], eqItems[newIdx]] = [eqItems[newIdx], eqItems[idx]];
   await api('PUT', `/api/pmcs/templates/${s.tmplId}/items/reorder`, eqItems.map(i => i.id));
-  await _reloadPmcsEditor(s.tmplId, s.selectedEqId);
+  await _reloadPmcsEditor(s.tmplId, s.selectedGroupName);
 }
 
 function togglePmcsMultiEq(checked) {
@@ -3351,32 +3410,29 @@ async function addPmcsItem(e, tmplId, eqId) {
   const fd = new FormData(e.target);
   const body = Object.fromEntries(fd);
   body.creates_task = fd.has('creates_task');
-  delete body.extra_eq;  // handled separately below
 
-  // Collect any extra equipment IDs from the multi-select picker
-  const extraIds = [...fd.getAll('extra_eq')].map(Number).filter(Boolean);
+  const { groupEqIds, selectedGroupName } = _pmcsEditorState;
 
   try {
-    if (extraIds.length > 0) {
-      // Bulk create: apply to this equipment + all checked extras
-      const bulkBody = {
-        equipment_ids: [eqId, ...extraIds],
-        item_no: body.item_no || null,
-        interval: body.interval,
-        check_item: body.check_item,
-        procedure: body.procedure || null,
+    if (groupEqIds.length > 1) {
+      // Group mode: apply to all units automatically
+      const res = await api('POST', `/api/pmcs/templates/${tmplId}/items/bulk`, {
+        equipment_ids: groupEqIds,
+        item_no:      body.item_no || null,
+        interval:     body.interval,
+        check_item:   body.check_item,
+        procedure:    body.procedure || null,
         not_ready_if: body.not_ready_if || null,
         creates_task: body.creates_task,
-      };
-      const res = await api('POST', `/api/pmcs/templates/${tmplId}/items/bulk`, bulkBody);
-      toast(`Item added to ${res.created} piece${res.created !== 1 ? 's' : ''} of equipment.`);
+      });
+      toast(`Step added to all ${res.created} unit${res.created!==1?'s':''}.`);
     } else {
       body.equipment_id = eqId;
-      body.order_index = document.querySelectorAll('[id^="pmcs-row-"]').length;
+      body.order_index  = document.querySelectorAll('[id^="pmcs-row-"]').length;
       await api('POST', `/api/pmcs/templates/${tmplId}/items`, body);
-      toast('Item added.');
+      toast('Step added.');
     }
-    await _reloadPmcsEditor(tmplId, eqId);
+    await _reloadPmcsEditor(tmplId, selectedGroupName);
   } catch(err) { toast(err.message, false); }
 }
 
@@ -3420,16 +3476,16 @@ async function confirmPmcsCopyFrom(tmplId, srcEqId, targetEqId, srcName) {
   try {
     const res = await api('POST', `/api/pmcs/templates/${tmplId}/equipment/${targetEqId}/copy-from/${srcEqId}`);
     toast(`Copied ${res.copied} item${res.copied!==1?'s':''} from ${srcName}.`);
-    await _reloadPmcsEditor(tmplId, targetEqId);
+    await _reloadPmcsEditor(tmplId, _pmcsEditorState.selectedGroupName);
   } catch(err) { toast(err.message, false); }
 }
 
 async function deletePmcsItem(itemId) {
   if (!confirm('Delete this check item?')) return;
   await api('DELETE', `/api/pmcs/items/${itemId}`);
-  const { tmplId, selectedEqId } = _pmcsEditorState;
+  const { tmplId, selectedGroupName } = _pmcsEditorState;
   toast('Item removed.');
-  await _reloadPmcsEditor(tmplId, selectedEqId);
+  await _reloadPmcsEditor(tmplId, selectedGroupName);
 }
 
 // ── Library chip: add a single step from the equipment-type library ───────────
@@ -3438,17 +3494,24 @@ async function pmcsAddLibStep(tmplId, eqId, idx) {
   if (!step) return;
   const btn = document.querySelector(`[data-lib-idx="${idx}"]`);
   if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+  const { groupEqIds, selectedGroupName } = _pmcsEditorState;
   try {
-    await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
-      item_no:      step.step_no || '',
-      interval:     step.interval || 'B',
-      check_item:   step.title,
-      procedure:    step.procedure || '',
-      not_ready_if: '',
-      equipment_id: eqId,
-      order_index:  document.querySelectorAll('[id^="pmcs-row-"]').length,
-    });
-    await _reloadPmcsEditor(tmplId, eqId);
+    if (groupEqIds.length > 1) {
+      await api('POST', `/api/pmcs/templates/${tmplId}/items/bulk`, {
+        equipment_ids: groupEqIds,
+        item_no: step.step_no || '', interval: step.interval || 'B',
+        check_item: step.title, procedure: step.procedure || '',
+        not_ready_if: '', creates_task: false,
+      });
+    } else {
+      await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+        item_no: step.step_no || '', interval: step.interval || 'B',
+        check_item: step.title, procedure: step.procedure || '',
+        not_ready_if: '', equipment_id: eqId,
+        order_index: document.querySelectorAll('[id^="pmcs-row-"]').length,
+      });
+    }
+    await _reloadPmcsEditor(tmplId, selectedGroupName);
   } catch(err) { toast(err.message, false); if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
 }
 
@@ -3458,17 +3521,27 @@ async function pmcsAddAllLibrary(tmplId, eqId) {
   if (!steps.length) return;
   const btn = document.querySelector('#pmcs-lib-chips')?.closest('div')?.querySelector('button');
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  const { groupEqIds, selectedGroupName } = _pmcsEditorState;
   try {
     for (const s of steps) {
-      await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
-        item_no: s.step_no || '', interval: s.interval || 'B',
-        check_item: s.title, procedure: s.procedure || '',
-        not_ready_if: '', equipment_id: eqId,
-        order_index: 0,
-      });
+      if (groupEqIds.length > 1) {
+        await api('POST', `/api/pmcs/templates/${tmplId}/items/bulk`, {
+          equipment_ids: groupEqIds,
+          item_no: s.step_no || '', interval: s.interval || 'B',
+          check_item: s.title, procedure: s.procedure || '',
+          not_ready_if: '', creates_task: false,
+        });
+      } else {
+        await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+          item_no: s.step_no || '', interval: s.interval || 'B',
+          check_item: s.title, procedure: s.procedure || '',
+          not_ready_if: '', equipment_id: eqId, order_index: 0,
+        });
+      }
     }
-    toast(`Added ${steps.length} step${steps.length !== 1 ? 's' : ''} from library.`);
-    await _reloadPmcsEditor(tmplId, eqId);
+    const suffix = groupEqIds.length > 1 ? ` to all ${groupEqIds.length} units` : '';
+    toast(`Added ${steps.length} step${steps.length!==1?'s':''}${suffix} from library.`);
+    await _reloadPmcsEditor(tmplId, selectedGroupName);
   } catch(err) { toast(err.message, false); }
 }
 
@@ -3529,7 +3602,6 @@ async function submitPmcsPaste(tmplId, eqId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
   const parsed = lines.map((line, i) => {
-    // Match optional "B: " or "B - " prefix
     const m = line.match(/^([BDAWM])\s*[:–-]\s*/i);
     if (m && VALID_INT.has(m[1].toUpperCase())) {
       return { interval: m[1].toUpperCase(), check_item: line.slice(m[0].length).trim(), order_index: i };
@@ -3537,16 +3609,26 @@ async function submitPmcsPaste(tmplId, eqId) {
     return { interval: defaultInterval, check_item: line, order_index: i };
   });
 
+  const { groupEqIds, selectedGroupName } = _pmcsEditorState;
   try {
     for (const p of parsed) {
-      await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
-        item_no: '', interval: p.interval, check_item: p.check_item,
-        procedure: '', not_ready_if: '', equipment_id: eqId, order_index: p.order_index,
-      });
+      if (groupEqIds.length > 1) {
+        await api('POST', `/api/pmcs/templates/${tmplId}/items/bulk`, {
+          equipment_ids: groupEqIds,
+          item_no: '', interval: p.interval, check_item: p.check_item,
+          procedure: '', not_ready_if: '', creates_task: false,
+        });
+      } else {
+        await api('POST', `/api/pmcs/templates/${tmplId}/items`, {
+          item_no: '', interval: p.interval, check_item: p.check_item,
+          procedure: '', not_ready_if: '', equipment_id: eqId, order_index: p.order_index,
+        });
+      }
     }
     document.getElementById('pmcs-paste-backdrop')?.remove();
-    toast(`Added ${parsed.length} step${parsed.length !== 1 ? 's' : ''}.`);
-    await _reloadPmcsEditor(tmplId, eqId);
+    const suffix = groupEqIds.length > 1 ? ` to all ${groupEqIds.length} units` : '';
+    toast(`Added ${parsed.length} step${parsed.length!==1?'s':''}${suffix}.`);
+    await _reloadPmcsEditor(tmplId, selectedGroupName);
   } catch(err) { toast(err.message, false); if (btn) { btn.disabled = false; btn.textContent = 'Add Steps'; } }
 }
 
