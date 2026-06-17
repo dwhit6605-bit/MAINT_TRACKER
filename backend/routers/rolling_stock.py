@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 from backend.database import get_db
-from backend.auth import require_admin, require_tech
+from backend.auth import require_admin, require_tech, require_superadmin
 
 router = APIRouter(prefix="/api/rolling-stock", tags=["rolling_stock"])
 
@@ -89,7 +89,7 @@ async def update_vehicle(vid: int, request: Request, data: VehicleCreate, db=Dep
 
 @router.delete("/{vid}", status_code=204)
 async def delete_vehicle(vid: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     await db.execute("DELETE FROM rolling_stock WHERE id=?", (vid,))
     await db.commit()
 

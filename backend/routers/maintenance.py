@@ -5,7 +5,7 @@ from fastapi.responses import Response
 from backend.database import get_db
 from backend.models import MaintenanceTaskCreate, MaintenanceComplete, MaintenanceBulkCreate
 from backend.da2404 import generate_da2404
-from backend.auth import require_admin, require_tech
+from backend.auth import require_admin, require_tech, require_superadmin
 from backend import audit
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
@@ -139,7 +139,7 @@ async def update_task(task_id: int, data: MaintenanceTaskCreate, request: Reques
 
 @router.delete("/{task_id}")
 async def delete_task(task_id: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     await db.execute("DELETE FROM maintenance_tasks WHERE id=?", (task_id,))
     await db.commit()
     return {"ok": True}

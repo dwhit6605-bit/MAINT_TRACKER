@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from backend.database import get_db
-from backend.auth import hash_password, verify_password, create_token, require_admin
+from backend.auth import hash_password, verify_password, create_token, require_admin, require_superadmin, VALID_ROLES
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -57,8 +57,8 @@ async def list_users(request: Request, db=Depends(get_db)):
 @router.post("/users", status_code=201)
 async def create_user(data: UserCreate, request: Request, db=Depends(get_db)):
     require_admin(request)
-    if data.role not in ("admin", "operator"):
-        raise HTTPException(400, "Role must be 'admin' or 'operator'")
+    if data.role not in VALID_ROLES:
+        raise HTTPException(400, f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
     async with db.execute("SELECT id FROM users WHERE username=?", (data.username,)) as cur:
         if await cur.fetchone():
             raise HTTPException(409, "Username already exists")
@@ -76,8 +76,10 @@ async def update_user(uid: int, data: UserUpdate, request: Request, db=Depends(g
     current = getattr(request.state, "user", {}) or {}
     if current.get("sub") != str(uid):
         require_admin(request)
-    if data.role and current.get("role") != "admin":
-        raise HTTPException(403, "Only admins can change roles")
+    if data.role and current.get("role") not in ("admin", "team_chief"):
+        raise HTTPException(403, "Only admins or team chiefs can change roles")
+    if data.role not in VALID_ROLES:
+        raise HTTPException(400, f"Invalid role")
 
     updates, vals = [], []
     if data.username:
@@ -96,7 +98,7 @@ async def update_user(uid: int, data: UserUpdate, request: Request, db=Depends(g
 
 @router.delete("/users/{uid}")
 async def delete_user(uid: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     current = getattr(request.state, "user", {}) or {}
     if current.get("sub") == str(uid):
         raise HTTPException(400, "Cannot delete yourself")

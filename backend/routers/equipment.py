@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import EquipmentCreate, EquipmentUpdate, EquipmentOutFor
-from backend.auth import require_admin, require_tech
+from backend.auth import require_admin, require_tech, require_superadmin
 from backend import audit
 
 router = APIRouter(prefix="/api/equipment", tags=["equipment"])
@@ -113,7 +113,7 @@ async def set_out_for(eq_id: int, data: EquipmentOutFor, request: Request, db=De
 
 @router.delete("/{eq_id}")
 async def delete_equipment(eq_id: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     async with db.execute("SELECT name FROM equipment WHERE id=?", (eq_id,)) as cur:
         row = await cur.fetchone()
     name = row["name"] if row else "unknown"

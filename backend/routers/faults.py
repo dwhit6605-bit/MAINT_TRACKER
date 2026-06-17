@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from backend.database import get_db
-from backend.auth import require_admin, require_tech
+from backend.auth import require_admin, require_tech, require_superadmin
 
 router = APIRouter(prefix="/api/faults", tags=["faults"])
 
@@ -99,7 +99,7 @@ async def update_fault(fault_id: int, data: FaultUpdate, request: Request, db=De
 
 @router.delete("/{fault_id}")
 async def delete_fault(fault_id: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     await db.execute("DELETE FROM fault_reports WHERE id=?", (fault_id,))
     await db.commit()
     return {"ok": True}

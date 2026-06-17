@@ -31,16 +31,33 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
+VALID_ROLES = {"admin", "team_chief", "tech", "operator"}
+
+# Roles with elevated (admin-equivalent) access — user management, etc.
+_ADMIN_ROLES = {"admin", "team_chief"}
+# Roles that can create/edit records
+_TECH_ROLES  = {"admin", "team_chief", "tech"}
+
+
 def require_admin(request: Request):
+    """Admin or Team Chief — can manage users, change roles, etc."""
     user = getattr(request.state, "user", None)
-    if not user or user.get("role") != "admin":
+    if not user or user.get("role") not in _ADMIN_ROLES:
         raise HTTPException(403, "Admin access required")
     return user
 
 
-def require_tech(request: Request):
-    """Allows admin and tech roles. Operators get 403."""
+def require_superadmin(request: Request):
+    """Admin only — destructive ops (delete users, delete equipment)."""
     user = getattr(request.state, "user", None)
-    if not user or user.get("role") not in ("admin", "tech"):
-        raise HTTPException(403, "Tech access required")
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "Super-admin access required")
+    return user
+
+
+def require_tech(request: Request):
+    """Admin, Team Chief, or Technician — create/edit records."""
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") not in _TECH_ROLES:
+        raise HTTPException(403, "Technician access required")
     return user

@@ -2,7 +2,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.models import InventoryItemCreate, InventoryAdjust
-from backend.auth import require_admin, require_tech
+from backend.auth import require_admin, require_tech, require_superadmin
 from backend.notifications import send_low_stock_alert
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
@@ -103,7 +103,7 @@ async def adjust_stock(item_id: int, data: InventoryAdjust, request: Request, db
 
 @router.delete("/{item_id}")
 async def delete_item(item_id: int, request: Request, db=Depends(get_db)):
-    require_admin(request)
+    require_superadmin(request)
     await db.execute("DELETE FROM inventory_items WHERE id=?", (item_id,))
     await db.commit()
     return {"ok": True}
