@@ -1,6 +1,7 @@
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
-from backend.auth import require_admin
+from backend.auth import require_admin, require_tech
 from backend.models import SkoCreate, SkoCheckout, SkoCheckin, SkoPartsUsed
 
 router = APIRouter(prefix="/api/skos", tags=["skos"])
@@ -19,17 +20,28 @@ async def _sko_equipment(sko_id: int, db):
 
 
 async def _sko_with_pmcs(sko_id: int, db):
-    """Return equipment list augmented with their PMCS templates."""
+    """Return equipment list augmented with their equipment-type checklist info."""
     equip = await _sko_equipment(sko_id, db)
+    # Cache type-checklist lookups by name to avoid duplicate queries
+    cl_cache: dict[str, dict | None] = {}
     for e in equip:
-        async with db.execute("""
-            SELECT DISTINCT pt.id, pt.title
-            FROM pmcs_templates pt
-            JOIN pmcs_template_equipment pte ON pte.template_id = pt.id
-            WHERE pte.equipment_id = ?
-            ORDER BY pt.title
-        """, (e["id"],)) as cur:
-            e["pmcs_templates"] = [dict(r) for r in await cur.fetchall()]
+        name = e["name"]
+        if name not in cl_cache:
+            async with db.execute("""
+                SELECT etc.id,
+                       COUNT(etcs.id)                                 AS step_count,
+                       SUM(CASE WHEN etcs.interval='B' THEN 1 ELSE 0 END) AS steps_b,
+                       SUM(CASE WHEN etcs.interval='D' THEN 1 ELSE 0 END) AS steps_d,
+                       SUM(CASE WHEN etcs.interval='A' THEN 1 ELSE 0 END) AS steps_a
+                FROM equipment_type_checklists etc
+                LEFT JOIN equipment_type_checklist_steps etcs ON etcs.checklist_id = etc.id
+                WHERE etc.equipment_name = ?
+                GROUP BY etc.id
+            """, (name,)) as cur:
+                row = await cur.fetchone()
+                cl_cache[name] = dict(row) if row else None
+        e["eq_checklist"] = cl_cache[name]
+
         async with db.execute("""
             SELECT status, next_due FROM maintenance_tasks
             WHERE equipment_id=? AND status IN ('pending','overdue')
@@ -123,6 +135,65 @@ async def delete_sko(sko_id: int, request: Request, db=Depends(get_db)):
     require_admin(request)
     await db.execute("DELETE FROM skos WHERE id=?", (sko_id,))
     await db.commit()
+
+
+# ── SKO PMCS: create a grouped PMCS template from equipment-type library steps ─
+
+@router.post("/{sko_id}/run-pmcs", status_code=201)
+async def run_sko_pmcs(sko_id: int, request: Request, db=Depends(get_db)):
+    """Build (or reuse) a PMCS template for all equipment in this SKO using
+    their equipment-type checklist steps, then return the template id."""
+    require_tech(request)
+
+    async with db.execute("SELECT * FROM skos WHERE id=?", (sko_id,)) as cur:
+        sko = await cur.fetchone()
+    if not sko:
+        raise HTTPException(404, "SKO not found")
+
+    equip = await _sko_equipment(sko_id, db)
+    if not equip:
+        raise HTTPException(400, "SKO has no equipment")
+
+    title = f"{sko['name']} — PMCS {date.today().strftime('%d %b %Y')}"
+
+    # Create template
+    async with db.execute(
+        "INSERT INTO pmcs_templates (title, description) VALUES (?,?)",
+        (title, f"Auto-generated from SKO #{sko_id}")
+    ) as cur:
+        tmpl_id = cur.lastrowid
+
+    # Add each equipment and copy its type-checklist steps
+    step_cache: dict[str, list] = {}
+    for eq in equip:
+        # Link equipment to template
+        await db.execute(
+            "INSERT OR IGNORE INTO pmcs_template_equipment (template_id, equipment_id) VALUES (?,?)",
+            (tmpl_id, eq["id"])
+        )
+        # Fetch type-checklist steps (cached by name)
+        name = eq["name"]
+        if name not in step_cache:
+            async with db.execute("""
+                SELECT etcs.step_no, etcs.interval, etcs.title, etcs.procedure, etcs.order_index
+                FROM equipment_type_checklist_steps etcs
+                JOIN equipment_type_checklists etc ON etc.id = etcs.checklist_id
+                WHERE etc.equipment_name = ?
+                ORDER BY etcs.order_index, etcs.id
+            """, (name,)) as cur:
+                step_cache[name] = [dict(r) for r in await cur.fetchall()]
+
+        for s in step_cache[name]:
+            await db.execute("""
+                INSERT INTO pmcs_items
+                    (template_id, equipment_id, item_no, interval, check_item, procedure, order_index)
+                VALUES (?,?,?,?,?,?,?)
+            """, (tmpl_id, eq["id"],
+                  s["step_no"] or "", s["interval"], s["title"],
+                  s["procedure"] or "", s["order_index"]))
+
+    await db.commit()
+    return {"template_id": tmpl_id, "title": title}
 
 
 # ── Equipment membership ──────────────────────────────────────────────────────

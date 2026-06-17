@@ -4045,23 +4045,24 @@ async function openSkoDetail(skoId) {
 
   const eqStatusColor = { active:'#4ade80', inactive:'#6b7280', maintenance:'#fbbf24' };
 
-  // Group equipment by name so we can show grouped PMCS run buttons
+  // Group by name to show ×N badge
   const eqGroupNames = {};
   (s.equipment||[]).forEach(e => { (eqGroupNames[e.name] = eqGroupNames[e.name] || []).push(e); });
 
-  const eqRows = (s.equipment||[]).map(e => {
-    const tmpls = e.pmcs_templates || [];
-    // Deduplicate templates (same template may cover multiple units)
-    const pmcsBtns = tmpls.map(t =>
-      `<a href="/pmcs/${t.id}" target="_blank"
-         style="display:inline-flex;align-items:center;gap:3px;font-size:0.7rem;background:#1e3a5f;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;text-decoration:none;margin-bottom:2px;">
-         ▶ ${esc(t.title)}</a>`
-    ).join('');
+  // Does any equipment type have checklist steps? (drives "Run PMCS" button state)
+  const anyChecklist = (s.equipment||[]).some(e => e.eq_checklist?.step_count > 0);
 
-    const setupPmcsBtn = isTech() ? `
-      <button onclick="openSkoPmcsMenu(${e.id},${JSON.stringify(e.name)},${skoId})"
-        style="font-size:0.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">
-        ${tmpls.length ? '+ Add PMCS' : '+ Set up PMCS'}</button>` : '';
+  const eqRows = (s.equipment||[]).map(e => {
+    const cl = e.eq_checklist;
+    const stepCount = cl?.step_count || 0;
+
+    // Equipment-type checklist badge
+    const clBadge = stepCount > 0
+      ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:0.7rem;background:#f0fdf4;color:#15803d;border:1px solid #86efac;border-radius:3px;padding:2px 7px;margin-bottom:2px;">
+           ✓ ${stepCount} step${stepCount!==1?'s':''}</span>`
+      : (isTech()
+          ? `<button onclick="openEqFromSko(${e.id},${skoId})" style="font-size:0.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">+ Set up checklist</button>`
+          : `<span style="font-size:0.7rem;color:var(--muted);">No checklist</span>`);
 
     const taskWarn = e.next_task
       ? `<span style="font-size:0.72rem;color:${e.next_task.status==='overdue'?'#f87171':'#fbbf24'};">⚠ ${e.next_task.status}${e.next_task.next_due?' · due '+e.next_task.next_due:''}</span>`
@@ -4083,9 +4084,9 @@ async function openSkoDetail(skoId) {
         </span>
       </td>
       <td style="padding:8px 10px;">${taskWarn}</td>
-      <td style="padding:8px 10px;min-width:180px;">
+      <td style="padding:8px 10px;min-width:160px;">
         <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">
-          ${pmcsBtns}${setupPmcsBtn}
+          ${clBadge}
           <button onclick="openSkoCalModal(${e.id},'${esc(e.name)}')" style="font-size:0.7rem;background:#164e63;color:#a5f3fc;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;margin-bottom:2px;">📐 Log Cal</button>
         </div>
       </td>
@@ -4120,9 +4121,10 @@ async function openSkoDetail(skoId) {
         ${s.nsn?`<div style="font-size:0.78rem;color:var(--muted);">NSN: ${esc(s.nsn)}</div>`:''}
         ${s.description?`<div style="font-size:0.82rem;color:var(--muted);margin-top:2px;">${esc(s.description)}</div>`:''}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        ${anyChecklist && isTech() ? `<button onclick="runSkoPmcs(${s.id},'${esc(s.name)}')" style="font-size:0.75rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;" id="sko-run-pmcs-btn">📋 Run PMCS</button>` : ''}
         ${co
-          ? `<button onclick="openCheckinModal(${s.id},'${esc(s.name)}')" style="font-size:0.75rem;background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">⬇ Check In</button>`
+          ? `<button onclick="openCheckinModal(${s.id},'${esc(s.name)}')" style="font-size:0.75rem;background:#166534;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">⬇ Check In</button>`
           : `<button onclick="openCheckoutModal(${s.id},'${esc(s.name)}')" style="font-size:0.75rem;background:#166534;color:#fff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">⬆ Check Out</button>`}
         <button onclick="openSkoPartsModal(${s.id},'${esc(s.name)}')" style="font-size:0.75rem;background:#854d0e;color:#fef3c7;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;">📦 Log Parts Used</button>
         <button onclick="document.getElementById('sko-detail-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
@@ -4236,6 +4238,20 @@ async function confirmAddEquipment(skoId) {
 
 // ── Create PMCS template from SKO detail ─────────────────────────────────────
 let _pmcsItemIdx = 0;
+
+// ── SKO Run PMCS: build a grouped checklist from equipment-type library steps ──
+async function runSkoPmcs(skoId, skoName) {
+  const btn = document.getElementById('sko-run-pmcs-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Building…'; }
+  try {
+    const res = await api('POST', `/api/skos/${skoId}/run-pmcs`);
+    toast(`Checklist created — opening…`);
+    window.open(`/pmcs/${res.template_id}`, '_blank');
+  } catch(err) {
+    toast(err.message || 'Could not build PMCS — ensure equipment types have checklists set up.', false);
+    if (btn) { btn.disabled = false; btn.textContent = '📋 Run PMCS'; }
+  }
+}
 
 // ── SKO PMCS menu: shows existing templates + options to link or create new ───
 async function openSkoPmcsMenu(eqId, eqName, skoId) {
