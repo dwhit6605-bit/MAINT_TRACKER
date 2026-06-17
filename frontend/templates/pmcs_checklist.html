@@ -9,6 +9,7 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
          background: #f1f5f9; color: #1e293b; min-height: 100vh; }
 
+  /* ── Header ── */
   .header { background: #1e3a5f; color: #fff; padding: 1rem 1.25rem; position: sticky;
              top: 0; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .header h1 { font-size: 1.05rem; font-weight: 700; }
@@ -16,6 +17,13 @@
   .progress-bar { height: 4px; background: rgba(255,255,255,.2); margin-top: 0.75rem; border-radius: 2px; }
   .progress-fill { height: 4px; background: #22c55e; border-radius: 2px; transition: width .3s; }
 
+  /* ── Offline banner ── */
+  #offline-banner { display: none; background: #92400e; color: #fff;
+                     padding: 0.5rem 1rem; text-align: center; font-size: 0.8rem;
+                     font-weight: 600; letter-spacing: .02em; }
+  #offline-banner.show { display: block; }
+
+  /* ── Operator info ── */
   .operator-section { background: #fff; margin: 0.75rem; border-radius: 0.75rem;
                        padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   .operator-section h2 { font-size: 0.8rem; font-weight: 700; color: #64748b;
@@ -27,7 +35,16 @@
                       border-radius: 0.5rem; font-size: 0.9rem; outline: none; transition: border-color .15s; }
   input[type=text]:focus { border-color: #3b82f6; }
 
-  /* Equipment section header */
+  /* ── Advanced / DA 2404 fields (collapsed) ── */
+  .adv-toggle { display: flex; align-items: center; gap: 0.4rem; background: none; border: none;
+                 font-size: 0.75rem; color: #64748b; cursor: pointer; padding: 0.5rem 0 0;
+                 font-weight: 600; -webkit-tap-highlight-color: transparent; }
+  .adv-toggle .chevron { transition: transform .2s; display: inline-block; }
+  .adv-toggle.open .chevron { transform: rotate(90deg); }
+  .adv-fields { display: none; margin-top: 0.65rem; border-top: 1px solid #f1f5f9; padding-top: 0.65rem; }
+  .adv-fields.show { display: block; }
+
+  /* ── Equipment section header ── */
   .eq-section { margin: 0.75rem 0.75rem 0; }
   .eq-section-header { background: #1e3a5f; color: #fff; border-radius: 0.6rem 0.6rem 0 0;
                          padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
@@ -38,7 +55,7 @@
   .eq-section-body { background:#fff; border-radius:0 0 0.6rem 0.6rem; border:1px solid #e2e8f0;
                       border-top:none; padding:0.5rem 0.5rem 0.75rem; }
 
-  /* Ungrouped items (no equipment) */
+  /* ── Ungrouped items ── */
   .items-list { margin: 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.6rem; }
 
   .interval-header { display: flex; align-items: center; gap: 0.6rem; margin: 0.75rem 0 0.4rem;
@@ -52,81 +69,88 @@
   .int-W { background: #7c3aed; }
   .int-M { background: #b45309; }
 
-  .check-card { background: #fff; border-radius: 0.6rem; padding: 0.75rem 0.85rem;
+  /* ── Check cards ── */
+  .check-card { background: #fff; border-radius: 0.6rem; padding: 0.85rem 0.9rem;
                  box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid #e2e8f0;
                  transition: border-color .2s; margin: 0 0 0.5rem; }
   .eq-section-body .check-card { box-shadow: none; border-radius: 0.45rem; margin: 0.35rem 0 0; }
-  .check-card.status-ok    { border-left-color: #22c55e; }
+  .check-card.status-ok    { border-left-color: #22c55e; background: #f0fdf4; }
   .check-card.status-fault { border-left-color: #ef4444; background: #fff5f5; }
-  .check-card.status-na    { border-left-color: #94a3b8; opacity: 0.7; }
+  .check-card.status-na    { border-left-color: #94a3b8; opacity: 0.65; }
 
   .check-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
   .check-text { flex: 1; }
   .item-no { font-size: 0.68rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.2rem; }
-  .check-item { font-size: 0.9rem; font-weight: 600; line-height: 1.35; }
-  .procedure { font-size: 0.78rem; color: #64748b; margin-top: 0.3rem; line-height: 1.4; }
-  .not-ready { font-size: 0.72rem; color: #dc2626; margin-top: 0.3rem;
+  .check-item { font-size: 0.95rem; font-weight: 600; line-height: 1.35; }
+  .procedure { font-size: 0.8rem; color: #64748b; margin-top: 0.35rem; line-height: 1.4; }
+  .not-ready { font-size: 0.75rem; color: #dc2626; margin-top: 0.35rem;
                 background: #fef2f2; padding: 0.3rem 0.5rem; border-radius: 0.35rem; }
   .creates-task-hint { font-size: 0.68rem; color: #d97706; margin-top: 0.2rem; }
 
-  .btn-group { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; }
+  /* ── Status buttons — bigger on all sizes ── */
+  .btn-group { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
   .status-btn { border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 0.5rem;
-                 padding: 0.4rem 0.7rem; font-size: 0.72rem; font-weight: 700;
-                 cursor: pointer; min-width: 58px; text-align: center; transition: all .15s;
+                 padding: 0.55rem 0.8rem; font-size: 0.78rem; font-weight: 800;
+                 cursor: pointer; min-width: 62px; min-height: 44px;
+                 text-align: center; transition: all .15s;
                  -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .status-btn.active-ok    { background: #22c55e; border-color: #22c55e; color: #fff; }
   .status-btn.active-fault { background: #ef4444; border-color: #ef4444; color: #fff; }
   .status-btn.active-na    { background: #94a3b8; border-color: #94a3b8; color: #fff; }
-  .status-btn:active { transform: scale(.96); }
+  .status-btn:active { transform: scale(.93); }
 
-  @media (max-width: 480px) {
-    .header h1 { font-size: 0.95rem; }
-    .operator-section { margin: 0.5rem; padding: 0.75rem; }
-    .field-row { flex-direction: column; gap: 0.5rem; }
-    .eq-section { margin: 0.5rem 0.5rem 0; }
-    .items-list { margin: 0.5rem 0.5rem 0; gap: 0.5rem; }
-    .check-card { padding: 0.75rem; border-radius: 0.6rem; }
-    .check-item { font-size: 0.9rem; }
-    .procedure { font-size: 0.78rem; }
-    .btn-group { flex-direction: row; gap: 0.5rem; margin-top: 0.75rem; }
-    .status-btn { flex: 1; min-width: 0; min-height: 44px; padding: 0.6rem 0.25rem; font-size: 0.8rem; font-weight: 800; border-radius: 0.5rem; }
-    .check-top { flex-direction: column; gap: 0.35rem; }
-    .note-toggle { font-size: 0.78rem; min-height: 36px; }
-    .item-notes input { min-height: 40px; font-size: 0.9rem; }
-    .submit-section { margin: 0 0.5rem 2rem; }
-    .submit-btn { padding: 1.1rem; font-size: 1.05rem; }
-    .status-summary { flex-wrap: wrap; gap: 0.35rem 0.75rem; padding: 0 0.5rem; }
-  }
-
+  /* ── Notes ── */
   .item-notes { margin-top: 0.5rem; display: none; flex-direction: column; gap: 0.3rem; }
   .item-notes.show { display: flex; }
-  .item-notes input { width: 100%; padding: 0.45rem 0.7rem; border: 1.5px solid #e2e8f0;
-                       border-radius: 0.5rem; font-size: 0.82rem; outline: none; box-sizing: border-box; }
+  .item-notes input { width: 100%; padding: 0.5rem 0.75rem; border: 1.5px solid #e2e8f0;
+                       border-radius: 0.5rem; font-size: 0.85rem; outline: none; }
   .item-notes input:focus { border-color: #3b82f6; }
   .item-notes.fault-mode input { border-color: #fca5a5; }
   .item-notes.fault-mode input:focus { border-color: #ef4444; }
-  .note-toggle { background: none; border: none; font-size: 0.72rem; color: #6b7280;
-                  cursor: pointer; padding: 0.2rem 0; text-align: left; margin-top: 0.35rem; }
-  .note-toggle:hover { color: #374151; }
+  .note-toggle { background: none; border: none; font-size: 0.75rem; color: #6b7280;
+                  cursor: pointer; padding: 0.25rem 0; text-align: left; margin-top: 0.35rem;
+                  -webkit-tap-highlight-color: transparent; min-height: 36px; }
 
-  .submit-section { margin: 0.75rem 0.75rem 2rem; }
-  .notes-area { width: 100%; padding: 0.65rem 0.75rem; border: 1.5px solid #e2e8f0;
-                 border-radius: 0.5rem; font-size: 0.875rem; resize: vertical;
-                 min-height: 80px; outline: none; margin-bottom: 0.75rem; }
-  .notes-area:focus { border-color: #3b82f6; }
-
-  .submit-btn { width: 100%; padding: 1rem; background: #1e3a5f; color: #fff;
-                 border: none; border-radius: 0.75rem; font-size: 1rem; font-weight: 700;
-                 cursor: pointer; transition: background .15s; }
-  .submit-btn:hover { background: #1e4d8c; }
-  .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
-
+  /* ── Status summary ── */
   .status-summary { display: flex; gap: 0.5rem; margin: 0.6rem 0.75rem 0;
-                     font-size: 0.75rem; font-weight: 600; }
+                     font-size: 0.78rem; font-weight: 600; }
   .ss-ok    { color: #15803d; }
   .ss-fault { color: #dc2626; }
   .ss-na    { color: #64748b; }
 
+  /* ── Submit section ── */
+  .submit-section { margin: 0.75rem 0.75rem 2rem; }
+  .notes-area { width: 100%; padding: 0.65rem 0.75rem; border: 1.5px solid #e2e8f0;
+                 border-radius: 0.5rem; font-size: 0.875rem; resize: vertical;
+                 min-height: 72px; outline: none; margin-bottom: 0.75rem; }
+  .notes-area:focus { border-color: #3b82f6; }
+  .submit-btn { width: 100%; padding: 1.1rem; background: #1e3a5f; color: #fff;
+                 border: none; border-radius: 0.75rem; font-size: 1.05rem; font-weight: 700;
+                 cursor: pointer; transition: background .15s; min-height: 56px; }
+  .submit-btn:hover { background: #1e4d8c; }
+  .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+  /* ── Draft restore banner ── */
+  #draft-banner { display: none; background: #1e4d8c; color: #fff; margin: 0.75rem 0.75rem 0;
+                   border-radius: 0.75rem; padding: 0.75rem 1rem;
+                   font-size: 0.82rem; }
+  #draft-banner.show { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  #draft-banner strong { font-weight: 700; }
+  .draft-btn { background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.3);
+                color: #fff; border-radius: 0.4rem; padding: 0.3rem 0.75rem; font-size: 0.8rem;
+                font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .draft-btn.dismiss { background: none; border-color: rgba(255,255,255,.2); opacity: 0.7; }
+
+  /* ── Queued-offline screen ── */
+  #queued-screen { display: none; flex-direction: column; align-items: center;
+                    justify-content: center; min-height: 70vh; padding: 2rem; text-align: center; }
+  #queued-screen.show { display: flex; }
+  #queued-screen .q-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+  #queued-screen h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.5rem; }
+  #queued-screen p  { color: #64748b; margin-bottom: 1.25rem; font-size: 0.9rem; max-width: 320px; }
+  .sync-status { font-size: 0.82rem; font-weight: 600; color: #15803d; margin-top: 0.5rem; display: none; }
+
+  /* ── Success screen ── */
   .success-screen { display: none; flex-direction: column; align-items: center; justify-content: center;
                      min-height: 70vh; padding: 2rem; text-align: center; }
   .success-screen.show { display: flex; }
@@ -139,55 +163,91 @@
                   padding: 0.5rem 1rem; font-weight: 700; margin-bottom: 0.5rem; display: inline-block; }
   .task-badge  { background: #fef3c7; color: #92400e; border-radius: 0.5rem;
                   padding: 0.5rem 1rem; font-weight: 700; margin-bottom: 1rem; display: inline-block; }
+
+  /* ── Mobile tweaks ── */
+  @media (max-width: 480px) {
+    .header h1 { font-size: 0.95rem; }
+    .operator-section { margin: 0.5rem; padding: 0.75rem; }
+    .field-row { flex-direction: column; gap: 0.5rem; }
+    .eq-section { margin: 0.5rem 0.5rem 0; }
+    .items-list { margin: 0.5rem 0.5rem 0; gap: 0.5rem; }
+    .check-card { padding: 0.85rem; }
+    .check-item { font-size: 1rem; }
+    .btn-group { flex-direction: row; gap: 0.5rem; margin-top: 0.85rem; }
+    .status-btn { flex: 1; min-width: 0; min-height: 52px; padding: 0.7rem 0.25rem;
+                  font-size: 0.85rem; border-radius: 0.5rem; }
+    .check-top { flex-direction: column; gap: 0.35rem; }
+    .submit-section { margin: 0 0.5rem 2rem; }
+    .submit-btn { padding: 1.2rem; font-size: 1.1rem; }
+    .status-summary { flex-wrap: wrap; gap: 0.35rem 0.75rem; padding: 0 0.5rem; }
+    #draft-banner { margin: 0.5rem 0.5rem 0; }
+  }
 </style>
 </head>
 <body>
+
+<div id="offline-banner">⚠ No network — your work is being saved locally</div>
 
 <div id="checklist-view">
   <div class="header">
     <h1>{{ template.title }}</h1>
     <div class="sub">
       {% if template.equipment_name %}{{ template.equipment_name }} · {% endif %}
-      PMCS Checklist · {{ items | length }} items
-      {% if linked_equipment %} · {{ linked_equipment | length }} piece{% if linked_equipment | length != 1 %}s{% endif %} of equipment{% endif %}
+      PMCS · {{ items | length }} items
+      {% if linked_equipment %} · {{ linked_equipment | length }} equipment{% endif %}
     </div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
   </div>
 
+  <!-- Draft restore offer -->
+  <div id="draft-banner">
+    <div style="flex:1"><strong>Resume inspection?</strong> You have a saved draft from <span id="draft-age"></span>.</div>
+    <button class="draft-btn" onclick="restoreDraft()">Restore</button>
+    <button class="draft-btn dismiss" onclick="dismissDraft()">Discard</button>
+  </div>
+
+  <!-- Operator info — required fields prominent -->
   <div class="operator-section">
     <h2>Operator Info</h2>
     <div class="field-row">
-      <div class="field">
+      <div class="field" style="max-width:100px;">
         <label>Rank</label>
         <input type="text" id="op-rank" placeholder="SGT" autocomplete="off">
       </div>
-      <div class="field" style="flex:2">
-        <label>Name *</label>
+      <div class="field">
+        <label>Name <span style="color:#dc2626;">*</span></label>
         <input type="text" id="op-name" placeholder="Last, First MI" autocomplete="off">
       </div>
     </div>
-    <div class="field-row" style="margin-top:0.5rem;">
-      <div class="field" style="flex:2">
-        <label>Organization</label>
-        <input type="text" id="da-org" value="9th CST(WMD)" autocomplete="off">
+
+    <!-- DA 2404 / admin fields — collapsed by default -->
+    <button class="adv-toggle" id="adv-toggle-btn" onclick="toggleAdv()">
+      <span class="chevron">▶</span> DA 2404 / Admin Fields (optional)
+    </button>
+    <div class="adv-fields" id="adv-fields">
+      <div class="field-row" style="margin-top:0.5rem;">
+        <div class="field" style="flex:2">
+          <label>Organization</label>
+          <input type="text" id="da-org" value="9th CST(WMD)" autocomplete="off">
+        </div>
+        <div class="field" style="flex:2">
+          <label>Supervisor Name</label>
+          <input type="text" id="da-supervisor" placeholder="Last, First" autocomplete="off">
+        </div>
       </div>
-      <div class="field" style="flex:2">
-        <label>Supervisor Name</label>
-        <input type="text" id="da-supervisor" placeholder="Supervisor Last, First" autocomplete="off">
-      </div>
-    </div>
-    <div class="field-row" style="margin-top:0.5rem;">
-      <div class="field" style="flex:2">
-        <label>TM Number</label>
-        <input type="text" id="da-tm-number" placeholder="TM 9-XXXX-XXX-10" autocomplete="off">
-      </div>
-      <div class="field">
-        <label>TM Date</label>
-        <input type="text" id="da-tm-date" placeholder="Jan 2024" autocomplete="off">
-      </div>
-      <div class="field">
-        <label>Man-Hours</label>
-        <input type="text" id="da-manhours" placeholder="2.5" autocomplete="off">
+      <div class="field-row" style="margin-top:0.5rem;">
+        <div class="field" style="flex:2">
+          <label>TM Number</label>
+          <input type="text" id="da-tm-number" placeholder="TM 9-XXXX-XXX-10" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>TM Date</label>
+          <input type="text" id="da-tm-date" placeholder="Jan 2024" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Man-Hours</label>
+          <input type="text" id="da-manhours" placeholder="2.5" autocomplete="off">
+        </div>
       </div>
     </div>
   </div>
@@ -196,11 +256,10 @@
     <span class="ss-ok">✓ <span id="cnt-ok">0</span> OK</span>
     <span class="ss-fault">✕ <span id="cnt-fault">0</span> Fault</span>
     <span class="ss-na">— <span id="cnt-na">0</span> N/A</span>
-    <span style="color:#94a3b8;">· <span id="cnt-rem">{{ items | length }}</span> remaining</span>
+    <span style="color:#94a3b8;">· <span id="cnt-rem">{{ items | length }}</span> left</span>
   </div>
 
   {% if linked_equipment %}
-    {# Render items grouped by equipment #}
     {% for eq in linked_equipment %}
       {% set eq_items = items | selectattr("equipment_id", "equalto", eq.id) | list %}
       {% if eq_items %}
@@ -230,7 +289,7 @@
                   <div class="check-item">{{ item.check_item }}</div>
                   {% if item.procedure %}<div class="procedure">{{ item.procedure }}</div>{% endif %}
                   {% if item.not_ready_if %}<div class="not-ready">⚠ Not ready if: {{ item.not_ready_if }}</div>{% endif %}
-                  {% if item.creates_task %}<div class="creates-task-hint">⚡ Fault will auto-create maintenance task</div>{% endif %}
+                  {% if item.creates_task %}<div class="creates-task-hint">⚡ Fault auto-creates maintenance task</div>{% endif %}
                 </div>
                 <div class="btn-group">
                   <button class="status-btn" onclick="setStatus({{ item.id }}, 'ok')"    id="btn-ok-{{ item.id }}">OK</button>
@@ -238,9 +297,9 @@
                   <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
                 </div>
               </div>
-              <button class="note-toggle" id="note-toggle-{{ item.id }}" onclick="toggleNote({{ item.id }})" style="display:none;">📝 Add observation</button>
+              <button class="note-toggle" id="note-toggle-{{ item.id }}" onclick="toggleNote({{ item.id }})" style="display:none;">📝 Add note</button>
               <div class="item-notes" id="notes-{{ item.id }}">
-                <input type="text" placeholder="Observations / notes…" id="note-{{ item.id }}">
+                <input type="text" placeholder="Observations / notes…" id="note-{{ item.id }}" oninput="saveDraft()">
               </div>
             </div>
           {% endfor %}
@@ -249,7 +308,6 @@
       {% endif %}
     {% endfor %}
 
-    {# Also render any items NOT scoped to equipment #}
     {% set ungrouped = items | selectattr("equipment_id", "none") | list %}
     {% if ungrouped %}
     <div class="items-list">
@@ -280,8 +338,9 @@
               <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
             </div>
           </div>
-          <div class="fault-notes" id="notes-{{ item.id }}">
-            <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+          <button class="note-toggle" id="note-toggle-{{ item.id }}" onclick="toggleNote({{ item.id }})" style="display:none;">📝 Add note</button>
+          <div class="item-notes" id="notes-{{ item.id }}">
+            <input type="text" placeholder="Observations / notes…" id="note-{{ item.id }}" oninput="saveDraft()">
           </div>
         </div>
       {% endfor %}
@@ -289,7 +348,6 @@
     {% endif %}
 
   {% else %}
-    {# Legacy flat list (no linked equipment) #}
     <div class="items-list">
       {% set ns = namespace(last_interval='') %}
       {% for item in items %}
@@ -315,8 +373,9 @@
               <button class="status-btn" onclick="setStatus({{ item.id }}, 'na')"    id="btn-na-{{ item.id }}">N/A</button>
             </div>
           </div>
-          <div class="fault-notes" id="notes-{{ item.id }}">
-            <input type="text" placeholder="Describe the fault…" id="note-{{ item.id }}">
+          <button class="note-toggle" id="note-toggle-{{ item.id }}" onclick="toggleNote({{ item.id }})" style="display:none;">📝 Add note</button>
+          <div class="item-notes" id="notes-{{ item.id }}">
+            <input type="text" placeholder="Observations / notes…" id="note-{{ item.id }}" oninput="saveDraft()">
           </div>
         </div>
       {% endfor %}
@@ -325,16 +384,27 @@
 
   <div class="submit-section" style="margin-top:1.25rem;">
     <div style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.4rem;">Session Notes (optional)</div>
-    <textarea class="notes-area" id="session-notes" placeholder="Any overall notes about this inspection…"></textarea>
+    <textarea class="notes-area" id="session-notes" placeholder="Any overall notes about this inspection…" oninput="saveDraft()"></textarea>
     <button class="submit-btn" id="submit-btn" onclick="submitChecklist()" disabled>
       Complete &amp; Archive
     </button>
-    <div style="font-size:0.72rem;color:#94a3b8;text-align:center;margin-top:0.5rem;">
+    <div style="font-size:0.72rem;color:#94a3b8;text-align:center;margin-top:0.5rem;" id="submit-hint">
       All items must be marked before submitting
     </div>
   </div>
 </div>
 
+<!-- Queued/offline screen -->
+<div id="queued-screen">
+  <div class="q-icon">📶</div>
+  <h2>Results Saved Locally</h2>
+  <p>No network connection. Your completed inspection is saved on this device and will sync automatically when you're back online.</p>
+  <div id="sync-status" class="sync-status"></div>
+  <br>
+  <a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;">Back to checklist</a>
+</div>
+
+<!-- Success screen -->
 <div class="success-screen" id="success-screen">
   <div class="success-icon" id="success-icon">✅</div>
   <h2 id="success-title">Inspection Complete</h2>
@@ -343,7 +413,6 @@
   <div id="task-notice" style="display:none" class="task-badge"></div>
   <a id="dl-link" href="#" class="dl-btn" target="_blank">📄 View / Download PDF</a>
 
-  <!-- Fault report creation panel — shown when faults exist -->
   <div id="fault-report-panel" style="display:none;margin-top:1.25rem;text-align:left;background:#fff5f5;border:1.5px solid #fca5a5;border-radius:0.75rem;padding:1rem 1.25rem;max-width:480px;margin-left:auto;margin-right:auto;">
     <div style="font-weight:700;color:#dc2626;font-size:0.9rem;margin-bottom:0.6rem;">⚠ Open Fault Reports</div>
     <p style="font-size:0.78rem;color:#6b7280;margin-bottom:0.75rem;">Select which faults to log as formal fault reports:</p>
@@ -359,21 +428,123 @@
 </div>
 
 <script>
-const TOTAL = {{ items | length }};
-const statuses = {};
+const TOTAL        = {{ items | length }};
+const TEMPLATE_ID  = {{ template.id }};
+const DRAFT_KEY    = 'pmcs_draft_' + TEMPLATE_ID;
+const QUEUE_KEY    = 'pmcs_queue_' + TEMPLATE_ID;
 
-// Item metadata for fault report creation: {item_id: {check_item, equipment_id, equipment_name}}
+const statuses  = {};        // itemId → 'ok'|'fault'|'na'
+let lastSession = null;      // session id returned by server
+
+// Item metadata for fault reports
 const ITEMS_META = {
   {% for item in items %}
   {{ item.id }}: {
-    check_item: {{ item.check_item | tojson }},
-    equipment_id: {{ item.equipment_id | tojson }},
-    equipment_name: {{ (linked_equipment | selectattr("id","equalto",item.equipment_id) | map(attribute="name") | first) | default("") | tojson }}
+    check_item:     {{ item.check_item | tojson }},
+    equipment_id:   {{ item.equipment_id | tojson }},
+    equipment_name: {{ (linked_equipment | selectattr("id","equalto",item.equipment_id) | map(attribute="name") | first) | default("") | tojson if linked_equipment else "" | tojson }}
   },
   {% endfor %}
 };
 
-function setStatus(itemId, status) {
+// ── Offline detection ─────────────────────────────────────────────────────────
+
+function updateOnlineState() {
+  const banner = document.getElementById('offline-banner');
+  if (navigator.onLine) {
+    banner.classList.remove('show');
+  } else {
+    banner.classList.add('show');
+  }
+}
+window.addEventListener('online',  () => { updateOnlineState(); trySyncQueue(); });
+window.addEventListener('offline', updateOnlineState);
+updateOnlineState();
+
+// ── Advanced / DA 2404 fields toggle ─────────────────────────────────────────
+
+function toggleAdv() {
+  const btn    = document.getElementById('adv-toggle-btn');
+  const fields = document.getElementById('adv-fields');
+  btn.classList.toggle('open');
+  fields.classList.toggle('show');
+}
+
+// ── Draft persistence ─────────────────────────────────────────────────────────
+
+function saveDraft() {
+  const notes = {};
+  Object.keys(statuses).forEach(id => {
+    notes[id] = document.getElementById('note-' + id)?.value?.trim() || '';
+  });
+  const draft = {
+    ts:       Date.now(),
+    statuses: { ...statuses },
+    notes,
+    opRank:   document.getElementById('op-rank').value,
+    opName:   document.getElementById('op-name').value,
+    sessionNotes: document.getElementById('session-notes').value,
+    org:      document.getElementById('da-org').value,
+    supervisor: document.getElementById('da-supervisor').value,
+    tmNumber: document.getElementById('da-tm-number').value,
+    tmDate:   document.getElementById('da-tm-date').value,
+    manhours: document.getElementById('da-manhours').value,
+  };
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch(e) {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch(e) {}
+}
+
+function checkDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch(e) {}
+  if (!draft || !Object.keys(draft.statuses || {}).length) return;
+
+  const ageMs  = Date.now() - (draft.ts || 0);
+  const ageMin = Math.round(ageMs / 60000);
+  const ageStr = ageMin < 60 ? ageMin + ' min ago'
+               : Math.round(ageMin / 60) + ' hr ago';
+
+  document.getElementById('draft-age').textContent = ageStr;
+  document.getElementById('draft-banner').classList.add('show');
+  window._pendingDraft = draft;
+}
+
+function restoreDraft() {
+  const draft = window._pendingDraft;
+  if (!draft) return;
+  document.getElementById('draft-banner').classList.remove('show');
+
+  // Restore operator fields
+  if (draft.opRank)       document.getElementById('op-rank').value       = draft.opRank;
+  if (draft.opName)       document.getElementById('op-name').value       = draft.opName;
+  if (draft.sessionNotes) document.getElementById('session-notes').value  = draft.sessionNotes;
+  if (draft.org)          document.getElementById('da-org').value         = draft.org;
+  if (draft.supervisor)   document.getElementById('da-supervisor').value  = draft.supervisor;
+  if (draft.tmNumber)     document.getElementById('da-tm-number').value   = draft.tmNumber;
+  if (draft.tmDate)       document.getElementById('da-tm-date').value     = draft.tmDate;
+  if (draft.manhours)     document.getElementById('da-manhours').value    = draft.manhours;
+
+  // Restore statuses and notes
+  Object.entries(draft.statuses || {}).forEach(([id, status]) => {
+    const noteVal = (draft.notes || {})[id] || '';
+    // Set note field first so setStatus can read it
+    const noteEl = document.getElementById('note-' + id);
+    if (noteEl) noteEl.value = noteVal;
+    setStatus(parseInt(id), status, true);
+  });
+}
+
+function dismissDraft() {
+  document.getElementById('draft-banner').classList.remove('show');
+  clearDraft();
+}
+
+// ── Checklist logic ───────────────────────────────────────────────────────────
+
+function setStatus(itemId, status, fromRestore) {
   statuses[itemId] = status;
   const card = document.getElementById('card-' + itemId);
   card.className = 'check-card status-' + status;
@@ -381,8 +552,8 @@ function setStatus(itemId, status) {
     const btn = document.getElementById('btn-' + s + '-' + itemId);
     btn.className = 'status-btn' + (s === status ? ' active-' + s : '');
   });
-  const notesEl  = document.getElementById('notes-' + itemId);
-  const toggleEl = document.getElementById('note-toggle-' + itemId);
+  const notesEl   = document.getElementById('notes-' + itemId);
+  const toggleEl  = document.getElementById('note-toggle-' + itemId);
   const noteInput = document.getElementById('note-' + itemId);
   if (status === 'fault') {
     notesEl.className = 'item-notes fault-mode show';
@@ -392,12 +563,12 @@ function setStatus(itemId, status) {
   } else {
     noteInput.required = false;
     noteInput.placeholder = 'Observations / notes…';
-    // Keep notes visible if user already typed something
     const hasNote = noteInput.value.trim();
     notesEl.className = 'item-notes' + (hasNote ? ' show' : '');
     if (toggleEl) toggleEl.style.display = hasNote ? 'none' : 'block';
   }
   updateCounts();
+  if (!fromRestore) saveDraft();
 }
 
 function toggleNote(itemId) {
@@ -416,15 +587,44 @@ function updateCounts() {
   document.getElementById('cnt-na').textContent    = counts.na    || 0;
   const done = Object.keys(statuses).length;
   document.getElementById('cnt-rem').textContent   = TOTAL - done;
-  const pct = TOTAL ? (done / TOTAL * 100) : 0;
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('submit-btn').disabled = done < TOTAL;
+  document.getElementById('progress-fill').style.width = TOTAL ? (done / TOTAL * 100) + '%' : '0%';
+  const allDone = done >= TOTAL;
+  document.getElementById('submit-btn').disabled = !allDone;
+  document.getElementById('submit-hint').textContent = allDone
+    ? (navigator.onLine ? 'Tap to archive your results' : 'You\'re offline — results will sync when back online')
+    : (TOTAL - done) + ' item' + (TOTAL - done === 1 ? '' : 's') + ' remaining';
 }
+
+// ── Build payload ─────────────────────────────────────────────────────────────
+
+function buildPayload() {
+  const results = Object.entries(statuses).map(([itemId, status]) => ({
+    item_id: parseInt(itemId),
+    status,
+    notes: document.getElementById('note-' + itemId)?.value?.trim() || null,
+  }));
+  return {
+    operator_name:   document.getElementById('op-name').value.trim(),
+    operator_rank:   document.getElementById('op-rank').value.trim(),
+    notes:           document.getElementById('session-notes').value.trim(),
+    organization:    document.getElementById('da-org').value.trim(),
+    supervisor_name: document.getElementById('da-supervisor').value.trim(),
+    tm_number:       document.getElementById('da-tm-number').value.trim(),
+    tm_date:         document.getElementById('da-tm-date').value.trim(),
+    manhours:        document.getElementById('da-manhours').value.trim(),
+    results,
+  };
+}
+
+// ── Submit (online or queue) ──────────────────────────────────────────────────
 
 async function submitChecklist() {
   const name = document.getElementById('op-name').value.trim();
-  if (!name) { document.getElementById('op-name').focus(); return; }
-  // Fault notes are required
+  if (!name) {
+    document.getElementById('op-name').focus();
+    document.getElementById('op-name').style.borderColor = '#ef4444';
+    return;
+  }
   const missingFault = Object.entries(statuses).find(([id, s]) =>
     s === 'fault' && !document.getElementById('note-' + id)?.value?.trim()
   );
@@ -439,57 +639,98 @@ async function submitChecklist() {
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Archiving…';
+  btn.textContent = navigator.onLine ? 'Archiving…' : 'Saving locally…';
 
-  const results = Object.entries(statuses).map(([itemId, status]) => ({
-    item_id: parseInt(itemId),
-    status,
-    notes: document.getElementById('note-' + itemId)?.value?.trim() || null,
-  }));
+  const payload = buildPayload();
 
-  const payload = {
-    operator_name: name,
-    operator_rank: document.getElementById('op-rank').value.trim(),
-    notes: document.getElementById('session-notes').value.trim(),
-    organization: document.getElementById('da-org').value.trim(),
-    supervisor_name: document.getElementById('da-supervisor').value.trim(),
-    tm_number: document.getElementById('da-tm-number').value.trim(),
-    tm_date: document.getElementById('da-tm-date').value.trim(),
-    manhours: document.getElementById('da-manhours').value.trim(),
-    results,
-  };
+  if (!navigator.onLine) {
+    queuePayload(payload);
+    showQueuedScreen();
+    return;
+  }
 
-  const startRes = await fetch('/api/pmcs/templates/{{ template.id }}/sessions', {
+  try {
+    await doSubmit(payload);
+  } catch(err) {
+    // Network failed mid-submit — queue it
+    queuePayload(payload);
+    showQueuedScreen();
+  }
+}
+
+async function doSubmit(payload) {
+  const startRes = await fetch('/api/pmcs/templates/' + TEMPLATE_ID + '/sessions', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ operator_name: payload.operator_name, operator_rank: payload.operator_rank }),
-  }).then(r => r.json());
+  });
+  if (!startRes.ok) throw new Error('start failed');
+  const { id: sessionId } = await startRes.json();
+  lastSession = sessionId;
 
-  const completeRes = await fetch('/api/pmcs/sessions/' + startRes.id + '/complete', {
+  const completeRes = await fetch('/api/pmcs/sessions/' + sessionId + '/complete', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(payload),
-  }).then(r => r.json());
+  });
+  if (!completeRes.ok) throw new Error('complete failed');
+  const result = await completeRes.json();
 
+  clearDraft();
+  try { localStorage.removeItem(QUEUE_KEY); } catch(e) {}
+  showSuccessScreen(result, sessionId);
+}
+
+// ── Queue / sync ──────────────────────────────────────────────────────────────
+
+function queuePayload(payload) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify({ ts: Date.now(), payload })); } catch(e) {}
+  clearDraft();
+}
+
+async function trySyncQueue() {
+  let queued;
+  try { queued = JSON.parse(localStorage.getItem(QUEUE_KEY)); } catch(e) {}
+  if (!queued) return;
+
+  const statusEl = document.getElementById('sync-status');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = '⟳ Syncing…'; }
+
+  try {
+    await doSubmit(queued.payload);
+    try { localStorage.removeItem(QUEUE_KEY); } catch(e) {}
+    if (statusEl) statusEl.textContent = '✓ Synced successfully!';
+  } catch(err) {
+    if (statusEl) { statusEl.style.color = '#dc2626'; statusEl.textContent = 'Sync failed — will retry when online'; }
+  }
+}
+
+// ── Screen transitions ────────────────────────────────────────────────────────
+
+function showQueuedScreen() {
+  document.getElementById('checklist-view').style.display = 'none';
+  document.getElementById('queued-screen').classList.add('show');
+}
+
+function showSuccessScreen(result, sessionId) {
   document.getElementById('checklist-view').style.display = 'none';
   const ss = document.getElementById('success-screen');
   ss.classList.add('show');
 
-  if (completeRes.fault_count > 0) {
+  if (result.fault_count > 0) {
     document.getElementById('success-icon').textContent = '⚠️';
     document.getElementById('success-title').textContent = 'Inspection Complete — Faults Found';
-    document.getElementById('fault-notice').textContent =
-      completeRes.fault_count + ' fault' + (completeRes.fault_count > 1 ? 's' : '') + ' recorded';
-    document.getElementById('fault-notice').style.display = 'inline-block';
+    const fn = document.getElementById('fault-notice');
+    fn.textContent = result.fault_count + ' fault' + (result.fault_count > 1 ? 's' : '') + ' recorded';
+    fn.style.display = 'inline-block';
 
-    // Build fault report panel
     const faultedItems = Object.entries(statuses).filter(([,s]) => s === 'fault');
     const list = document.getElementById('fault-report-list');
     list.innerHTML = '';
     faultedItems.forEach(([itemId]) => {
       const meta = ITEMS_META[itemId] || {};
       const note = document.getElementById('note-' + itemId)?.value?.trim() || '';
-      const row = document.createElement('label');
+      const row  = document.createElement('label');
       row.style.cssText = 'display:flex;align-items:flex-start;gap:0.6rem;background:#fff;border:1px solid #fca5a5;border-radius:0.5rem;padding:0.6rem 0.75rem;cursor:pointer;';
       row.innerHTML = `
         <input type="checkbox" checked data-item-id="${itemId}" data-equipment-id="${meta.equipment_id||''}"
@@ -504,19 +745,21 @@ async function submitChecklist() {
     });
     document.getElementById('fault-report-panel').style.display = 'block';
   }
-  if (completeRes.tasks_created > 0) {
-    document.getElementById('task-notice').textContent =
-      completeRes.tasks_created + ' maintenance task' + (completeRes.tasks_created > 1 ? 's' : '') + ' created automatically';
-    document.getElementById('task-notice').style.display = 'inline-block';
+
+  if (result.tasks_created > 0) {
+    const tn = document.getElementById('task-notice');
+    tn.textContent = result.tasks_created + ' maintenance task' + (result.tasks_created > 1 ? 's' : '') + ' auto-created';
+    tn.style.display = 'inline-block';
   }
 
-  document.getElementById('dl-link').href =
-    '/api/pmcs/sessions/' + startRes.id + '/archive';
+  document.getElementById('dl-link').href = '/api/pmcs/sessions/' + sessionId + '/archive';
 }
 
+// ── Fault reports ─────────────────────────────────────────────────────────────
+
 async function submitFaultReports() {
-  const opName = document.getElementById('op-name')?.value?.trim() || 'PMCS Operator';
-  const checks = document.querySelectorAll('#fault-report-list input[type=checkbox]:checked');
+  const opName  = document.getElementById('op-name')?.value?.trim() || 'PMCS Operator';
+  const checks  = document.querySelectorAll('#fault-report-list input[type=checkbox]:checked');
   if (!checks.length) return;
   const btn = document.querySelector('#fault-report-panel button');
   btn.disabled = true; btn.textContent = 'Creating…';
@@ -528,16 +771,39 @@ async function submitFaultReports() {
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         equipment_id: eqId,
-        reported_by: opName,
-        severity: 'routine',
-        title: cb.dataset.title || 'PMCS Fault',
-        description: cb.dataset.desc || null,
+        reported_by:  opName,
+        severity:     'routine',
+        title:        cb.dataset.title || 'PMCS Fault',
+        description:  cb.dataset.desc  || null,
       })
     });
   }
   btn.style.display = 'none';
   document.getElementById('fault-report-done').style.display = 'block';
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+// Check for queued submission first (they closed the tab after going offline)
+(async function init() {
+  let queued;
+  try { queued = JSON.parse(localStorage.getItem(QUEUE_KEY)); } catch(e) {}
+  if (queued && navigator.onLine) {
+    // Auto-sync without showing checklist again
+    document.getElementById('checklist-view').style.display = 'none';
+    showQueuedScreen();
+    await trySyncQueue();
+    return;
+  }
+  if (queued && !navigator.onLine) {
+    showQueuedScreen();
+    return;
+  }
+
+  // Normal start — check for a draft
+  checkDraft();
+  updateCounts();
+})();
 </script>
 </body>
 </html>
