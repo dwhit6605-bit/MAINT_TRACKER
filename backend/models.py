@@ -15,10 +15,18 @@ class EquipmentCreate(BaseModel):
     purchase_date: Optional[str] = None
     warranty_expiry: Optional[str] = None
     end_of_life_date: Optional[str] = None
+    out_for: Optional[str] = None          # "service" | "calibration" | null
+    out_since: Optional[str] = None
+    expected_return: Optional[str] = None
 
 
 class EquipmentUpdate(EquipmentCreate):
     pass
+
+
+class EquipmentOutFor(BaseModel):
+    out_for: Optional[str] = None          # "service" | "calibration" | null clears
+    expected_return: Optional[str] = None
 
 
 class MaintenanceTaskCreate(BaseModel):

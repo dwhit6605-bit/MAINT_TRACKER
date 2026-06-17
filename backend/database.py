@@ -335,6 +335,12 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN warranty_expiry TEXT")
         if "end_of_life_date" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN end_of_life_date TEXT")
+        if "out_for" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN out_for TEXT")
+        if "out_since" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN out_since TEXT")
+        if "expected_return" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN expected_return TEXT")
 
         pmcs_item_cols = {row[1] async for row in await db.execute("PRAGMA table_info(pmcs_items)")}
         if "equipment_id" not in pmcs_item_cols:

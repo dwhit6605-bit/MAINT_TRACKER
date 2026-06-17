@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
-from backend.models import EquipmentCreate, EquipmentUpdate
+from backend.models import EquipmentCreate, EquipmentUpdate, EquipmentOutFor
 from backend.auth import require_admin, require_tech
 from backend import audit
 
@@ -81,13 +81,32 @@ async def update_equipment(eq_id: int, data: EquipmentUpdate, request: Request, 
         UPDATE equipment SET name=?, category=?, serial_num=?, model=?, manufacturer=?,
             location=?, assigned_to=?, status=?, notes=?,
             purchase_date=?, warranty_expiry=?, end_of_life_date=?,
+            out_for=?, out_since=?, expected_return=?,
             updated_at=datetime('now')
         WHERE id=?
     """, (data.name, data.category, data.serial_num, data.model,
           data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
-          data.purchase_date, data.warranty_expiry, data.end_of_life_date, eq_id))
+          data.purchase_date, data.warranty_expiry, data.end_of_life_date,
+          data.out_for, data.out_since, data.expected_return, eq_id))
     await audit.log(db, "equipment", eq_id, "updated", equipment_id=eq_id,
                     detail={"name": data.name, "status": data.status})
+    await db.commit()
+    return {"ok": True}
+
+
+@router.patch("/{eq_id}/out-for")
+async def set_out_for(eq_id: int, data: EquipmentOutFor, request: Request, db=Depends(get_db)):
+    require_tech(request)
+    from datetime import date
+    out_since = date.today().isoformat() if data.out_for else None
+    await db.execute("""
+        UPDATE equipment SET out_for=?, out_since=?, expected_return=?, updated_at=datetime('now')
+        WHERE id=?
+    """, (data.out_for or None, out_since, data.expected_return or None, eq_id))
+    await audit.log(db, "equipment", eq_id,
+                    f"marked out-for-{data.out_for}" if data.out_for else "marked returned",
+                    equipment_id=eq_id,
+                    detail={"out_for": data.out_for, "expected_return": data.expected_return})
     await db.commit()
     return {"ok": True}
 

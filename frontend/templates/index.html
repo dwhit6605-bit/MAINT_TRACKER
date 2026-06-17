@@ -787,6 +787,7 @@ function equipmentRows(rows) {
       ${isTech() ? `<td class="px-3 py-3"><input type="checkbox" class="eq-row-check" data-id="${e.id}" onchange="updateBulkBar()" style="cursor:pointer;"></td>` : ''}
       <td class="px-4 py-3">
         <button onclick="openEqDetail(${e.id})" style="font-weight:600;color:#141414;background:none;border:none;cursor:pointer;padding:0;text-align:left;">${esc(e.name)}</button>
+        ${e.out_for ? `<span style="margin-left:0.4rem;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:9999px;background:${e.out_for==='calibration'?'#eff6ff':'#fff7ed'};color:${e.out_for==='calibration'?'#1d4ed8':'#c2410c'};border:1px solid ${e.out_for==='calibration'?'#bfdbfe':'#fed7aa'};">OUT: ${e.out_for.toUpperCase()}</span>` : ''}
       </td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.category)}</td>
       <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(e.serial_num||'—')}</td>
@@ -881,6 +882,22 @@ async function eqTab(tab) {
     const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
     const lcDate = (d, label) => d ? `<div><div class="label">${label}</div><div style="font-size:0.875rem;">${fmtDate(d)} ${daysUntil(d)<0?'<span style="color:#dc2626;font-size:0.72rem;font-weight:700;">EXPIRED</span>':daysUntil(d)<=90?`<span style="color:#b45309;font-size:0.72rem;font-weight:600;">(${daysUntil(d)}d)</span>`:''}</div></div>` : '';
     body.innerHTML = `
+      ${eq.out_for ? `
+      <div style="background:${eq.out_for==='calibration'?'#eff6ff':'#fff7ed'};border:1px solid ${eq.out_for==='calibration'?'#bfdbfe':'#fed7aa'};border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:700;font-size:0.88rem;color:${eq.out_for==='calibration'?'#1d4ed8':'#c2410c'};">
+            ${eq.out_for==='calibration'?'🔬':'🔧'} OUT FOR ${eq.out_for.toUpperCase()}
+          </div>
+          <div style="font-size:0.75rem;color:#6b7280;margin-top:0.15rem;">
+            Since ${fmtDate(eq.out_since)}${eq.expected_return?' · Expected return: '+fmtDate(eq.expected_return):''}
+          </div>
+        </div>
+        <button onclick="markEquipmentReturned(${eq.id})" style="font-size:0.78rem;font-weight:700;background:#fff;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.4rem 0.9rem;cursor:pointer;color:#374151;">✓ Mark Returned</button>
+      </div>` : `
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <button onclick="openMarkOutFor(${eq.id},'service')" style="font-size:0.75rem;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:0.375rem;padding:0.35rem 0.8rem;cursor:pointer;font-weight:600;">🔧 Mark Out for Service</button>
+        <button onclick="openMarkOutFor(${eq.id},'calibration')" style="font-size:0.75rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:0.375rem;padding:0.35rem 0.8rem;cursor:pointer;font-weight:600;">🔬 Mark Out for Calibration</button>
+      </div>`}
       <div class="eq-detail-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
         <div><div class="label">Status</div><span class="${sc[eq.status]||'badge-gray'}" style="font-size:0.8rem;">${eq.status}</span></div>
         <div><div class="label">Assigned To</div><div style="font-size:0.875rem;font-weight:${eq.assigned_to?'600':'400'};color:${eq.assigned_to?'#141414':'#9ca3af'};">${esc(eq.assigned_to||'—')}</div></div>
@@ -907,7 +924,6 @@ async function eqTab(tab) {
   }
 
   else if (tab === 'maintenance') {
-    // Load the shared type checklist template for this equipment name
     body.innerHTML = '<div style="padding:1rem;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
     const eqName = equipmentData.find(e=>e.id===id)?.name || '';
     const clData = await api('GET', `/api/eq-checklists/by-name?name=${encodeURIComponent(eqName)}`).catch(()=>({checklist:null,steps:[]}));
@@ -1724,6 +1740,45 @@ async function _refreshEqDetail(eqId) {
   eqTab(prevTab);
 }
 
+// ── Out-for-service / calibration ────────────────────────────────────────────
+function openMarkOutFor(eqId, type) {
+  modal(`<div class="modal" style="max-width:380px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">${type==='calibration'?'🔬 Out for Calibration':'🔧 Out for Service'}</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form class="px-6 py-4 space-y-3" onsubmit="submitMarkOutFor(event,${eqId},'${type}')">
+      <div>
+        <label class="label">Expected Return Date</label>
+        <input class="input" type="date" name="expected_return" placeholder="Optional">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Confirm</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function submitMarkOutFor(e, eqId, type) {
+  e.preventDefault();
+  const expected_return = new FormData(e.target).get('expected_return') || null;
+  await api('PATCH', `/api/equipment/${eqId}/out-for`, { out_for: type, expected_return });
+  closeModal();
+  toast(`Marked out for ${type}.`);
+  await refreshEquipment();
+  // Re-open detail with fresh data
+  openEqDetail(eqId);
+}
+
+async function markEquipmentReturned(eqId) {
+  if (!confirm('Mark this equipment as returned?')) return;
+  await api('PATCH', `/api/equipment/${eqId}/out-for`, { out_for: null });
+  toast('Equipment marked as returned.');
+  await refreshEquipment();
+  openEqDetail(eqId);
+}
+
 // ── Equipment add/edit modal (separate from detail) ───────────────────────────
 async function openEquipmentModal(id) {
   let eq = id ? equipmentData.find(e=>e.id===id) : {};
@@ -2392,11 +2447,16 @@ function calEquipRowsHtml(rows) {
   return rows.map(({eq, cal}) => {
     const calId = cal?.id;
     const neverCal = !cal;
+    const outForCal = eq.out_for === 'calibration';
     const overdue  = cal?.next_due && cal.next_due.slice(0,10) < today;
-    const rowBg    = neverCal ? '' : overdue ? 'background:#fff5f5;' : '';
+    const rowBg    = outForCal ? 'background:#eff6ff;' : neverCal ? '' : overdue ? 'background:#fff5f5;' : '';
     return `<tr class="table-row border-b last:border-0" style="${rowBg}">
       ${isTech() ? `<td class="px-4 py-3"><input type="checkbox" class="cal-row-check" data-eq-id="${eq.id}" data-cal-id="${calId||''}" ${calSelected.has(eq.id)?'checked':''} onchange="calToggleRow(${eq.id},this.checked)" style="cursor:pointer;"></td>` : ''}
-      <td class="px-4 py-3 font-medium">${esc(eq.name)}</td>
+      <td class="px-4 py-3 font-medium">
+        ${esc(eq.name)}
+        ${outForCal ? `<span style="margin-left:0.4rem;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:9999px;background:#bfdbfe;color:#1d4ed8;">OUT FOR CAL</span>` : ''}
+        ${eq.out_for==='service' ? `<span style="margin-left:0.4rem;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:9999px;background:#fed7aa;color:#c2410c;">OUT FOR SVC</span>` : ''}
+      </td>
       <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(eq.serial_num||'—')}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${cal ? fmtDate(cal.calibrated_at) : '<span style="color:#9ca3af;">Never</span>'}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${cal ? esc(cal.calibrated_by||'—') : '—'}</td>
@@ -2619,6 +2679,7 @@ async function inventoryPage(tab) {
   $('page-actions').innerHTML = `
     ${isTech() ? `<button onclick="openCsvImport('inventory')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
+    <button onclick="openOrderForm()" class="btn-secondary" style="font-size:0.8rem;">📋 Order Form</button>
     ${isTech() ? `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>` : ''}`;
   inventoryData = await api('GET', '/api/inventory');
   // Tab bar
@@ -2834,6 +2895,79 @@ async function deleteItem(id) {
   toast('Deleted.');
   inventoryData = await api('GET', '/api/inventory');
   renderInventoryTable(inventoryData);
+}
+
+function openOrderForm() {
+  const lowItems = inventoryData.filter(i => i.min_stock > 0 && i.quantity <= i.min_stock);
+  if (!lowItems.length) {
+    toast('No items currently below minimum stock.');
+    return;
+  }
+  // Group by supplier
+  const bySupplier = {};
+  for (const i of lowItems) {
+    const sup = i.supplier?.trim() || '(No Supplier Listed)';
+    if (!bySupplier[sup]) bySupplier[sup] = [];
+    bySupplier[sup].push(i);
+  }
+  const today = new Date().toLocaleDateString();
+  const suppliersHtml = Object.entries(bySupplier).map(([sup, items]) => {
+    const rows = items.map(i => {
+      const needed = Math.max(0, i.min_stock - i.quantity);
+      const cost = i.unit_cost ? `$${(i.unit_cost * needed).toFixed(2)}` : '—';
+      return `<tr style="border-bottom:1px solid #e5e7eb;">
+        <td style="padding:0.5rem 0.75rem;">${esc(i.name)}</td>
+        <td style="padding:0.5rem 0.75rem;font-family:monospace;font-size:0.8rem;color:#6b7280;">${esc(i.part_number||'—')}</td>
+        <td style="padding:0.5rem 0.75rem;text-align:center;">${i.quantity} ${esc(i.unit)}</td>
+        <td style="padding:0.5rem 0.75rem;text-align:center;">${i.min_stock}</td>
+        <td style="padding:0.5rem 0.75rem;text-align:center;font-weight:700;color:#dc2626;">${needed} ${esc(i.unit)}</td>
+        <td style="padding:0.5rem 0.75rem;text-align:right;color:#6b7280;">${i.unit_cost ? '$'+i.unit_cost.toFixed(2) : '—'}</td>
+        <td style="padding:0.5rem 0.75rem;text-align:right;font-weight:600;">${cost}</td>
+        <td style="padding:0.5rem 0.75rem;color:#6b7280;font-size:0.8rem;">${esc(i.location||'—')}</td>
+      </tr>`;
+    }).join('');
+    const totalCost = items.reduce((sum, i) => {
+      if (!i.unit_cost) return sum;
+      return sum + i.unit_cost * Math.max(0, i.min_stock - i.quantity);
+    }, 0);
+    return `<div style="margin-bottom:1.5rem;">
+      <div style="font-weight:700;font-size:0.9rem;color:#1e3a5f;background:#f0f7ff;padding:0.45rem 0.75rem;border-radius:0.4rem 0.4rem 0 0;border:1px solid #bfdbfe;">${esc(sup)}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-top:none;font-size:0.82rem;">
+        <thead style="background:#f9fafb;"><tr>
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Item</th>
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Part #</th>
+          <th style="padding:0.4rem 0.75rem;text-align:center;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">On Hand</th>
+          <th style="padding:0.4rem 0.75rem;text-align:center;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Min</th>
+          <th style="padding:0.4rem 0.75rem;text-align:center;font-size:0.72rem;color:#dc2626;text-transform:uppercase;">Order Qty</th>
+          <th style="padding:0.4rem 0.75rem;text-align:right;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Unit $</th>
+          <th style="padding:0.4rem 0.75rem;text-align:right;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Est. Total</th>
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Location</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        ${totalCost > 0 ? `<tfoot><tr style="background:#f9fafb;">
+          <td colspan="6" style="padding:0.4rem 0.75rem;text-align:right;font-weight:700;font-size:0.8rem;">Supplier Subtotal:</td>
+          <td style="padding:0.4rem 0.75rem;text-align:right;font-weight:700;">$${totalCost.toFixed(2)}</td>
+          <td></td>
+        </tr></tfoot>` : ''}
+      </table>
+    </div>`;
+  }).join('');
+
+  modal(`<div class="modal" style="max-width:760px;max-height:92vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="position:sticky;top:0;background:#fff;z-index:10;">
+      <div>
+        <h2 class="font-semibold">Inventory Order Form</h2>
+        <div style="font-size:0.72rem;color:#6b7280;">9th CST(WMD) · Generated ${today} · ${lowItems.length} item${lowItems.length!==1?'s':''} below minimum</div>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button onclick="window.print()" class="btn-secondary" style="font-size:0.8rem;">🖨 Print</button>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+    </div>
+    <div class="px-6 py-4" id="order-form-body">
+      ${suppliersHtml}
+    </div>
+  </div>`);
 }
 
 
