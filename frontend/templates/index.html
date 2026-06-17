@@ -685,6 +685,7 @@ async function equipmentPage() {
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/equipment/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <a href="/labels?token=${getToken()}" target="_blank" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">&#9641; QR Labels</a>
     ${isTech() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
+  if (!_userList.length) api('GET', '/api/users').then(u => { _userList = u || []; }).catch(()=>{});
   await refreshEquipment();
 }
 
@@ -1220,7 +1221,7 @@ function openEqTaskModal(eqId) {
       </div>
       <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1"></div>
-      <div><label class="label">Assigned To</label><input class="input" name="assigned_to"></div>
+      <div><label class="label">Assigned To</label>${_assignedToSelect('')}</div>
       <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
         <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
@@ -1269,7 +1270,7 @@ function eqUpdateTaskDue(taskId) {
       </div>
       <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${task.next_due||''}"></div>
       <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1" value="${task.interval_days||''}"></div>
-      <div><label class="label">Assigned To</label><input class="input" name="assigned_to" value="${esc(task.assigned_to||'')}"></div>
+      <div><label class="label">Assigned To</label>${_assignedToSelect(task.assigned_to||'')}</div>
       <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(task.notes||'')}</textarea></div>
       <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
         <button type="button" onclick="document.getElementById('subtask-backdrop').remove()" class="btn-secondary">Cancel</button>
@@ -1382,7 +1383,7 @@ async function dashEditTask(taskId) {
       </div>
       <div><label class="label">Next Due</label><input class="input" type="date" name="next_due" value="${task.next_due||''}"></div>
       <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1" value="${task.interval_days||''}"></div>
-      <div><label class="label">Assigned To</label><input class="input" name="assigned_to" value="${esc(task.assigned_to||'')}"></div>
+      <div><label class="label">Assigned To</label>${_assignedToSelect(task.assigned_to||'')}</div>
       <div style="grid-column:1/-1"><label class="label">Notes</label><textarea class="input" name="notes" rows="2">${esc(task.notes||'')}</textarea></div>
       <div style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding-top:0.5rem;">
         <button type="button" onclick="dashMarkComplete(${taskId},${task.equipment_id})" class="btn-secondary" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;">✓ Mark Complete</button>
@@ -1955,15 +1956,27 @@ function printQR(eqId, eqName) {
 // ─── Maintenance ──────────────────────────────────────────────────────────────
 let maintenanceData = [], equipList = [];
 
+let _userList = [];
+let _myTasksOnly = false;
+
 async function maintenancePage() {
   $('page-actions').innerHTML = `
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/maintenance/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     ${isTech() ? `<button onclick="openTaskModal()" class="btn-primary">+ Add Task</button>` : ''}`;
-  [maintenanceData, equipList] = await Promise.all([
+  [maintenanceData, equipList, _userList] = await Promise.all([
     api('GET', '/api/maintenance'),
     api('GET', '/api/equipment'),
+    api('GET', '/api/users').catch(() => []),
   ]);
   renderMaintenanceTable(maintenanceData);
+}
+
+function _assignedToSelect(current = '', name = 'assigned_to', includeBlank = true) {
+  const opts = (includeBlank ? `<option value="">— Unassigned —</option>` : '') +
+    _userList.map(u =>
+      `<option value="${esc(u.username)}" ${u.username === current ? 'selected' : ''}>${esc(u.username)} (${u.role})</option>`
+    ).join('');
+  return `<select class="input" name="${name}">${opts}</select>`;
 }
 
 function renderMaintenanceTable(rows) {
@@ -1976,6 +1989,12 @@ function renderMaintenanceTable(rows) {
         <select id="mt-status-filter" class="input w-36" onchange="filterMaintenance()">
           <option value="">All statuses</option>
           <option>overdue</option><option>pending</option><option>completed</option>
+        </select>
+        <select id="mt-assignee-filter" class="input w-40" onchange="filterMaintenance()">
+          <option value="">All assignees</option>
+          <option value="__me__" ${_myTasksOnly?'selected':''}>My Tasks</option>
+          <option value="__unassigned__">Unassigned</option>
+          ${_userList.map(u=>`<option value="${esc(u.username)}">${esc(u.username)}</option>`).join('')}
         </select>
         <button onclick="refreshOverdue()" class="btn-secondary text-xs">Refresh Overdue</button>
       </div>
@@ -2023,9 +2042,12 @@ function maintenanceRows(rows) {
 function filterMaintenance() {
   const s = $('mt-search').value.toLowerCase();
   const st = $('mt-status-filter').value;
+  const af = $('mt-assignee-filter') ? $('mt-assignee-filter').value : '';
+  const me = currentUser && currentUser.username;
   const filtered = maintenanceData.filter(t =>
     (!s || t.title.toLowerCase().includes(s) || t.equipment_name.toLowerCase().includes(s)) &&
-    (!st || t.status === st)
+    (!st || t.status === st) &&
+    (!af || (af === '__me__' ? t.assigned_to === me : af === '__unassigned__' ? !t.assigned_to : t.assigned_to === af))
   );
   $('mt-tbody').innerHTML = maintenanceRows(filtered);
 }
@@ -2091,7 +2113,7 @@ function openTaskModal() {
         </div>
         <div><label class="label">Next Due</label><input class="input" type="date" name="next_due"></div>
         <div><label class="label">Interval (days)</label><input class="input" type="number" name="interval_days" min="1"></div>
-        <div><label class="label">Assigned To</label><input class="input" name="assigned_to"></div>
+        <div><label class="label">Assigned To</label>${_assignedToSelect('')}</div>
         <div class="col-span-2"><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       </div>
       <div class="flex justify-end gap-3 pt-2">
