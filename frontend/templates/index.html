@@ -70,6 +70,7 @@
     /* Table */
     .table-row { transition:background-color 150ms; }
     .table-row:hover { background-color:#f4f8fc; }
+    .col-m-show { display:none; }
 
     /* Modal */
     .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.55); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
@@ -103,6 +104,26 @@
       #bottom-nav { display:flex; }
       /* Cards stack full-width */
       .card { border-radius:0.5rem; }
+      /* Toast above bottom nav */
+      #toast { bottom: calc(56px + 0.75rem) !important; right: 0.75rem !important; left: 0.75rem !important; max-width:calc(100vw - 1.5rem); }
+      #toast-inner { text-align:center; }
+      /* Equipment name sub-line on mobile (dashboard upcoming table) */
+      .col-m-show { display:block; }
+      /* Equipment filter — stack search + category filter vertically */
+      .eq-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+      .eq-filter-bar input, .eq-filter-bar select { max-width: 100% !important; width: 100% !important; }
+      /* Equipment detail modal inline 2-col grids → 1 col */
+      .eq-detail-grid { grid-template-columns: 1fr !important; }
+      /* Equipment detail lifecycle 3-col → 2 col */
+      .eq-lifecycle-grid { grid-template-columns: 1fr 1fr !important; }
+      /* Readiness 2-col grids → 1 col */
+      .readiness-2col { grid-template-columns: 1fr !important; }
+      /* Fault action buttons — bigger tap targets */
+      .fault-card-actions button { min-height: 36px !important; padding: 0.35rem 0.75rem !important; font-size: 0.78rem !important; }
+      /* Header search button — full tap height */
+      #gsearch-btn { padding: 0.5rem 0.75rem !important; min-height: 40px; }
+      /* Eq tab buttons — taller tap targets */
+      .eq-tab { padding: 0.75rem 0.85rem !important; font-size: 0.82rem !important; }
     }
     @media (max-width: 600px) {
       /* Rolling Stock dispatch form — collapse 3-col header to single column */
@@ -238,7 +259,7 @@
         <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
       </div>
       <div class="flex items-center gap-3">
-        <button onclick="openGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.3rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;color:#6b7280;font-size:0.8rem;">
+        <button id="gsearch-btn" onclick="openGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.3rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;color:#6b7280;font-size:0.8rem;">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <span class="col-m-hide">Search…</span>
           <kbd class="col-m-hide" style="font-size:0.65rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:3px;padding:1px 4px;">Ctrl K</kbd>
@@ -566,19 +587,20 @@ async function dashboardPage() {
       <div class="card">
         <h2 class="font-semibold text-gray-700 mb-3">Upcoming Maintenance</h2>
         ${data.upcoming_tasks.length ? `
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead><tr class="text-xs text-gray-500 border-b">
-            <th class="pb-2 text-left">Task</th><th class="pb-2 text-left">Equipment</th><th class="pb-2 text-left">Due</th><th></th>
+            <th class="pb-2 text-left">Task</th><th class="pb-2 text-left col-m-hide">Equipment</th><th class="pb-2 text-left">Due</th><th></th>
           </tr></thead>
           <tbody>${data.upcoming_tasks.map(t=>`
             <tr class="table-row border-b last:border-0" ondblclick="dashEditTask(${t.id})" title="Double-click to edit" style="cursor:pointer;">
-              <td class="py-2 pr-4 font-medium">${esc(t.title)}</td>
-              <td class="py-2 pr-4 text-gray-500">${esc(t.equipment_name)}</td>
+              <td class="py-2 pr-4 font-medium">${esc(t.title)}<div class="col-m-show text-xs text-gray-400">${esc(t.equipment_name)}</div></td>
+              <td class="py-2 pr-4 text-gray-500 col-m-hide">${esc(t.equipment_name)}</td>
               <td class="py-2">${dueBadge(t.next_due, t.status)}</td>
-              <td class="py-2 pl-2">${isTech() && t.status!=='completed' ? `<button onclick="event.stopPropagation();dashMarkComplete(${t.id},${t.equipment_id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.55rem;cursor:pointer;" title="Quick complete">✓</button>` : ''}</td>
+              <td class="py-2 pl-2">${isTech() && t.status!=='completed' ? `<button onclick="event.stopPropagation();dashMarkComplete(${t.id},${t.equipment_id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.55rem;cursor:pointer;min-height:32px;padding:0.3rem 0.6rem;" title="Quick complete">✓</button>` : ''}</td>
             </tr>`).join('')}
           </tbody>
-        </table>` : '<p class="text-sm text-gray-400">No upcoming tasks.</p>'}
+        </table></div>` : '<p class="text-sm text-gray-400">No upcoming tasks.</p>'}
       </div>
 
       <!-- Calibration due -->
@@ -693,7 +715,7 @@ function renderEquipmentTable(rows) {
       <button onclick="clearEqSelection()"           style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.78rem;">✕ Clear</button>
     </div>
     <div class="card overflow-hidden p-0">
-      <div class="px-5 py-4 border-b flex items-center gap-3">
+      <div class="px-5 py-4 border-b flex items-center gap-3 eq-filter-bar">
         <input id="eq-search" class="input max-w-xs" placeholder="Search equipment…" oninput="filterEquipment(this.value)">
         <select id="eq-cat-filter" class="input w-44" onchange="filterEquipment()">
           <option value="">All categories</option>
@@ -859,7 +881,7 @@ async function eqTab(tab) {
     const sc = {active:'badge-green',inactive:'badge-gray',retired:'badge-red'};
     const lcDate = (d, label) => d ? `<div><div class="label">${label}</div><div style="font-size:0.875rem;">${fmtDate(d)} ${daysUntil(d)<0?'<span style="color:#dc2626;font-size:0.72rem;font-weight:700;">EXPIRED</span>':daysUntil(d)<=90?`<span style="color:#b45309;font-size:0.72rem;font-weight:600;">(${daysUntil(d)}d)</span>`:''}</div></div>` : '';
     body.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <div class="eq-detail-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
         <div><div class="label">Status</div><span class="${sc[eq.status]||'badge-gray'}" style="font-size:0.8rem;">${eq.status}</span></div>
         <div><div class="label">Assigned To</div><div style="font-size:0.875rem;font-weight:${eq.assigned_to?'600':'400'};color:${eq.assigned_to?'#141414':'#9ca3af'};">${esc(eq.assigned_to||'—')}</div></div>
         <div><div class="label">Location</div><div style="font-size:0.875rem;">${esc(eq.location||'—')}</div></div>
@@ -872,7 +894,7 @@ async function eqTab(tab) {
       ${(eq.purchase_date||eq.warranty_expiry||eq.end_of_life_date) ? `
       <div style="background:#f8fafc;border:1px solid #dce8f5;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:1rem;">
         <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">Lifecycle</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+        <div class="eq-lifecycle-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
           ${eq.purchase_date?`<div><div class="label" style="font-size:0.72rem;">Purchased</div><div style="font-size:0.8rem;">${fmtDate(eq.purchase_date)}</div></div>`:''}
           ${lcDate(eq.warranty_expiry,'Warranty Expiry')}
           ${lcDate(eq.end_of_life_date,'End of Life')}
@@ -4199,11 +4221,11 @@ async function faultsPage() {
                 <div style="font-size:0.75rem;color:#9ca3af;">Reported by ${esc(f.reported_by)} · ${f.created_at.slice(0,10)}</div>
                 ${f.resolution ? `<div style="font-size:0.78rem;color:#059669;margin-top:0.3rem;">✓ ${esc(f.resolution)}</div>` : ''}
               </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;flex-shrink:0;">
+              <div class="fault-card-actions" style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;flex-shrink:0;">
                 <span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:9999px;text-transform:uppercase;background:${SEVERITY_COLOR[f.severity]}22;color:${SEVERITY_COLOR[f.severity]};">${f.severity}</span>
                 <span style="font-size:0.7rem;padding:2px 8px;border-radius:9999px;text-transform:uppercase;background:#e5e7eb;color:#374151;">${f.status.replace('_',' ')}</span>
-                ${isTech() ? `<button onclick="openFaultUpdate(${f.id},'${esc(f.status)}')" style="font-size:0.72rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.2rem 0.6rem;cursor:pointer;">Update</button>` : ''}
-                ${isAdmin() ? `<button onclick="deleteFault(${f.id})" style="font-size:0.72rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.2rem 0.6rem;cursor:pointer;">Delete</button>` : ''}
+                ${isTech() ? `<button onclick="openFaultUpdate(${f.id},'${esc(f.status)}')" style="font-size:0.78rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.4rem 0.75rem;cursor:pointer;min-height:36px;">Update</button>` : ''}
+                ${isAdmin() ? `<button onclick="deleteFault(${f.id})" style="font-size:0.78rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.4rem 0.75rem;cursor:pointer;min-height:36px;">Delete</button>` : ''}
               </div>
             </div>
           </div>`).join('')}
@@ -5040,7 +5062,7 @@ async function readinessPage() {
       ${kpiCard('PMCS (30d)', pmcsPct !== null ? pmcsPct+'%' : '—', pmcsColor, `${pmcs30.clean}/${pmcs30.total} clean`)}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+    <div class="readiness-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
       <!-- Equipment status -->
       <div class="card">
         <div style="display:flex;align-items:center;gap:1rem;">
@@ -5068,7 +5090,7 @@ async function readinessPage() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+    <div class="readiness-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
       <!-- Overdue maintenance -->
       <div class="card">
         <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">Overdue Maintenance <span style="font-weight:400;color:#6b7280;font-size:0.78rem;">(${maint.overdue_items.length})</span></div>
