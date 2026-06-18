@@ -601,12 +601,32 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
                 VALUES (?, ?, ?, 'application/pdf', ?)
             """, (eq["id"], da_stored, da_original, len(da_bytes)))
 
+    # Build fault summary for the response
+    fault_details = []
+    for r in data.results:
+        if r.status == "fault":
+            item = items_by_id.get(r.item_id)
+            if item:
+                eq = next((e for e in linked_equipment if e["id"] == item.get("equipment_id")), None)
+                fault_details.append({
+                    "check_item": item.get("check_item", ""),
+                    "equipment_name": eq["name"] if eq else "",
+                    "serial_num": eq.get("serial_num", "") if eq else "",
+                    "notes": r.notes or "",
+                })
+
+    ok_count  = sum(1 for r in data.results if r.status == "ok")
+    na_count  = sum(1 for r in data.results if r.status == "na")
+
     await db.commit()
     return {
         "ok": True,
         "session_id": session_id,
         "fault_count": fault_count,
+        "ok_count": ok_count,
+        "na_count": na_count,
         "tasks_created": tasks_created,
+        "fault_details": fault_details,
         "filename": filename,
     }
 

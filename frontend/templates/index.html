@@ -3057,6 +3057,7 @@ function pmcsCard(t) {
       <button onclick="openPmcsItems(${t.id})" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Edit Items</button>
       <button onclick="openPmcsQR(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">&#9641; QR Code</button>
       <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
+      <button onclick="openPmcsRuns(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">📋 Past Runs</button>
       <button onclick="openPmcsArchive(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🗂 Archive</button>
       <button onclick="openCsvImport('pmcs-items',${t.id})" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">⬆ Import Items</button>
       <a href="#" onclick="event.preventDefault();window.open('/api/csv/pmcs/${t.id}/items/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">⬇ Export Items</a>
@@ -3687,6 +3688,46 @@ async function pmcsCopyToSimilar(tmplId, srcEqId) {
 }
 
 // ── Archive viewer ────────────────────────────────────────────────────────────
+async function openPmcsRuns(tmplId, title) {
+  const sessions = await api('GET', `/api/pmcs/sessions?template_id=${tmplId}`);
+  const rows = sessions.length ? sessions.map(s => {
+    const date = s.completed_at ? s.completed_at.slice(0,10) : '—';
+    const faultBadge = s.fault_count > 0
+      ? `<span style="background:#fee2e2;color:#b91c1c;border-radius:9999px;padding:1px 8px;font-size:0.72rem;font-weight:600;">⚠ ${s.fault_count} fault${s.fault_count!==1?'s':''}</span>`
+      : `<span style="background:#d1fae5;color:#065f46;border-radius:9999px;padding:1px 8px;font-size:0.72rem;font-weight:600;">✓ No faults</span>`;
+    return `<tr style="border-bottom:1px solid #f3f4f6;">
+      <td style="padding:0.55rem 0.75rem;font-size:0.82rem;font-weight:500;">${date}</td>
+      <td style="padding:0.55rem 0.75rem;font-size:0.82rem;color:#374151;">${esc((s.operator_rank?s.operator_rank+' ':'') + (s.operator_name||'—'))}</td>
+      <td style="padding:0.55rem 0.75rem;">${faultBadge}</td>
+      <td style="padding:0.55rem 0.75rem;">
+        <a href="/api/pmcs/sessions/${s.id}/archive?token=${getToken()}" target="_blank"
+           style="font-size:0.75rem;color:#1d4ed8;text-decoration:none;">📄 PDF</a>
+      </td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="4" style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">No completed runs yet.</td></tr>`;
+
+  modal(`<div class="modal" style="max-width:600px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Past Runs — ${esc(title)}</h2>
+        <div style="font-size:0.75rem;color:#6b7280;margin-top:0.1rem;">${sessions.length} completed inspection${sessions.length!==1?'s':''}</div>
+      </div>
+      <button onclick="closeModal()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
+    </div>
+    <div class="px-6 py-4" style="overflow-y:auto;max-height:60vh;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="font-size:0.72rem;color:#6b7280;border-bottom:1px solid #e5e7eb;">
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-weight:600;">Date</th>
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-weight:600;">Operator</th>
+          <th style="padding:0.4rem 0.75rem;text-align:left;font-weight:600;">Result</th>
+          <th style="padding:0.4rem 0.75rem;"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`);
+}
+
 async function openPmcsArchive(tmplId, title) {
   const sessions = await api('GET', `/api/pmcs/sessions?template_id=${tmplId}`);
   modal(`<div class="modal" style="max-width:620px;">

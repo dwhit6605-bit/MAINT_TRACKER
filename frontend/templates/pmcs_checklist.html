@@ -260,17 +260,55 @@
   <div class="success-icon" id="success-icon">✅</div>
   <h2 id="success-title">Inspection Complete</h2>
   <p id="success-msg">Your PMCS record has been archived.</p>
-  <div id="fault-notice" style="display:none" class="fault-badge"></div>
-  <div id="task-notice" style="display:none" class="task-badge"></div>
+
+  <!-- Summary stats -->
+  <div id="result-summary" style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;justify-content:center;">
+    <div style="background:#d1fae5;border-radius:0.5rem;padding:0.5rem 1.1rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:800;color:#065f46;" id="sum-ok">—</div>
+      <div style="font-size:0.72rem;color:#065f46;font-weight:600;">OK</div>
+    </div>
+    <div style="background:#fef3c7;border-radius:0.5rem;padding:0.5rem 1.1rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:800;color:#92400e;" id="sum-fault">—</div>
+      <div style="font-size:0.72rem;color:#92400e;font-weight:600;">FAULTS</div>
+    </div>
+    <div style="background:#f3f4f6;border-radius:0.5rem;padding:0.5rem 1.1rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:800;color:#374151;" id="sum-na">—</div>
+      <div style="font-size:0.72rem;color:#374151;font-weight:600;">N/A</div>
+    </div>
+    <div id="sum-tasks-box" style="display:none;background:#dce8f5;border-radius:0.5rem;padding:0.5rem 1.1rem;text-align:center;">
+      <div style="font-size:1.4rem;font-weight:800;color:#1d4ed8;" id="sum-tasks">—</div>
+      <div style="font-size:0.72rem;color:#1d4ed8;font-weight:600;">TASKS CREATED</div>
+    </div>
+  </div>
+
+  <!-- Fault detail list -->
+  <div id="fault-detail-panel" style="display:none;width:100%;max-width:520px;margin-bottom:1rem;text-align:left;background:#fff5f5;border:1.5px solid #fca5a5;border-radius:0.75rem;padding:1rem 1.25rem;">
+    <div style="font-weight:700;color:#dc2626;font-size:0.88rem;margin-bottom:0.5rem;">⚠ Faulted Items</div>
+    <div id="fault-detail-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+  </div>
+
   <a id="dl-link" href="#" class="dl-btn" target="_blank">📄 View / Download PDF</a>
-  <div id="fault-report-panel" style="display:none;margin-top:1.25rem;text-align:left;background:#fff5f5;border:1.5px solid #fca5a5;border-radius:0.75rem;padding:1rem 1.25rem;max-width:480px;margin-left:auto;margin-right:auto;">
-    <div style="font-weight:700;color:#dc2626;font-size:0.9rem;margin-bottom:0.6rem;">⚠ Open Fault Reports</div>
+
+  <!-- Fault reports -->
+  <div id="fault-report-panel" style="display:none;margin-top:1.25rem;text-align:left;background:#fff5f5;border:1.5px solid #fca5a5;border-radius:0.75rem;padding:1rem 1.25rem;max-width:520px;width:100%;">
+    <div style="font-weight:700;color:#dc2626;font-size:0.9rem;margin-bottom:0.6rem;">📋 Log Formal Fault Reports</div>
     <p style="font-size:0.78rem;color:#6b7280;margin-bottom:0.75rem;">Select which faults to log as formal fault reports:</p>
     <div id="fault-report-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;"></div>
     <button onclick="submitFaultReports()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:0.5rem;padding:0.6rem 1rem;font-weight:700;font-size:0.85rem;cursor:pointer;">Create Selected Fault Reports</button>
     <div id="fault-report-done" style="display:none;color:#15803d;font-size:0.82rem;font-weight:600;text-align:center;margin-top:0.5rem;">✓ Fault reports created</div>
   </div>
-  <br><a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;">Run another inspection</a>
+
+  <!-- Expend inventory supplies -->
+  <div id="expend-panel" style="margin-top:1.25rem;text-align:left;background:#f0fdf4;border:1.5px solid #86efac;border-radius:0.75rem;padding:1rem 1.25rem;max-width:520px;width:100%;">
+    <div style="font-weight:700;color:#15803d;font-size:0.88rem;margin-bottom:0.5rem;">📦 Expend Supplies Used</div>
+    <p style="font-size:0.78rem;color:#6b7280;margin-bottom:0.75rem;">Log any consumables used during this inspection (batteries, sieve packs, etc.).</p>
+    <div id="expend-rows" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;"></div>
+    <button onclick="addExpendRow()" style="font-size:0.78rem;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:0.375rem;padding:0.3rem 0.8rem;cursor:pointer;">+ Add Item</button>
+    <button onclick="submitExpend()" id="expend-submit-btn" style="margin-left:0.5rem;font-size:0.78rem;background:#15803d;color:#fff;border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;cursor:pointer;">Record Usage</button>
+    <div id="expend-done" style="display:none;color:#15803d;font-size:0.82rem;font-weight:600;margin-top:0.5rem;">✓ Inventory updated</div>
+  </div>
+
+  <br><a href="" onclick="location.reload()" style="color:#64748b;font-size:0.85rem;margin-top:0.5rem;">Run another inspection</a>
 </div>
 
 <script>
@@ -844,14 +882,32 @@ function showSuccessScreen(result, sid, payload) {
   const ss = document.getElementById('success-screen');
   ss.classList.add('show');
 
-  if (result.fault_count > 0) {
-    document.getElementById('success-icon').textContent = '⚠️';
-    document.getElementById('success-title').textContent = 'Inspection Complete — Faults Found';
-    const fn = document.getElementById('fault-notice');
-    fn.textContent = result.fault_count+' fault'+(result.fault_count>1?'s':'')+' recorded';
-    fn.style.display='inline-block';
+  // Summary counts
+  document.getElementById('sum-ok').textContent    = result.ok_count    ?? 0;
+  document.getElementById('sum-fault').textContent = result.fault_count  ?? 0;
+  document.getElementById('sum-na').textContent    = result.na_count     ?? 0;
+  if (result.tasks_created > 0) {
+    document.getElementById('sum-tasks').textContent = result.tasks_created;
+    document.getElementById('sum-tasks-box').style.display = 'block';
+  }
 
-    // Build fault report panel from the expanded results
+  if (result.fault_count > 0) {
+    document.getElementById('success-icon').textContent  = '⚠️';
+    document.getElementById('success-title').textContent = 'Inspection Complete — Faults Found';
+
+    // Fault detail panel (from backend fault_details)
+    const details = result.fault_details || [];
+    if (details.length) {
+      const dl = document.getElementById('fault-detail-list');
+      dl.innerHTML = details.map(d => `
+        <div style="background:#fff;border:1px solid #fca5a5;border-radius:0.4rem;padding:0.5rem 0.75rem;font-size:0.8rem;">
+          <span style="font-weight:600;">${esc(d.equipment_name)}${d.serial_num?' <span style="color:#9ca3af;font-weight:400;">S/N '+esc(d.serial_num)+'</span>':''} — ${esc(d.check_item)}</span>
+          ${d.notes?`<div style="color:#6b7280;margin-top:0.15rem;">${esc(d.notes)}</div>`:''}
+        </div>`).join('');
+      document.getElementById('fault-detail-panel').style.display = 'block';
+    }
+
+    // Fault report panel (checkbox picker from payload results)
     const faultedResults = payload.results.filter(r => r.status==='fault');
     if (faultedResults.length) {
       const list = document.getElementById('fault-report-list');
@@ -875,12 +931,76 @@ function showSuccessScreen(result, sid, payload) {
       document.getElementById('fault-report-panel').style.display='block';
     }
   }
-  if (result.tasks_created>0) {
-    const tn=document.getElementById('task-notice');
-    tn.textContent=result.tasks_created+' maintenance task'+(result.tasks_created>1?'s':'')+' auto-created';
-    tn.style.display='inline-block';
-  }
+
   document.getElementById('dl-link').href='/api/pmcs/sessions/'+sid+'/archive';
+
+  // Load inventory for expend panel
+  loadInventoryForExpend();
+}
+
+let _invItems = [];
+async function loadInventoryForExpend() {
+  try {
+    const res = await fetch('/api/inventory?token='+getToken());
+    _invItems = await res.json();
+    addExpendRow(); // start with one blank row
+  } catch(e) { /* non-critical */ }
+}
+
+function getToken() {
+  return document.cookie.match(/access_token=([^;]+)/)?.[1] ||
+         localStorage.getItem('pmcs_token') || '';
+}
+
+function addExpendRow() {
+  const container = document.getElementById('expend-rows');
+  const idx = container.children.length;
+  const opts = _invItems.map(i =>
+    `<option value="${i.id}" data-unit="${esc(i.unit||'ea')}">${esc(i.name)} (${i.quantity} ${i.unit||'ea'} on hand)</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:0.4rem;align-items:center;';
+  row.innerHTML = `
+    <select class="expend-item-sel" style="flex:1;font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid #d1d5db;border-radius:0.375rem;">
+      <option value="">— Select item —</option>${opts}
+    </select>
+    <input type="number" min="1" value="1" class="expend-qty" style="width:60px;font-size:0.8rem;padding:0.3rem 0.4rem;border:1px solid #d1d5db;border-radius:0.375rem;">
+    <span class="expend-unit" style="font-size:0.78rem;color:#6b7280;min-width:24px;">ea</span>
+    <button onclick="this.parentElement.remove()" style="font-size:0.85rem;color:#9ca3af;background:none;border:none;cursor:pointer;">✕</button>`;
+  row.querySelector('.expend-item-sel').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    row.querySelector('.expend-unit').textContent = opt.dataset.unit || 'ea';
+  });
+  container.appendChild(row);
+}
+
+async function submitExpend() {
+  const opName = document.getElementById('op-name')?.value?.trim() || 'PMCS Operator';
+  const rows = document.querySelectorAll('#expend-rows > div');
+  const btn  = document.getElementById('expend-submit-btn');
+  const entries = [];
+  rows.forEach(row => {
+    const sel = row.querySelector('.expend-item-sel');
+    const qty = parseInt(row.querySelector('.expend-qty').value) || 0;
+    if (sel.value && qty > 0) entries.push({ item_id: parseInt(sel.value), qty });
+  });
+  if (!entries.length) return;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const token = getToken();
+    for (const e of entries) {
+      await fetch(`/api/inventory/${e.item_id}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'remove', quantity: e.qty, reference: 'PMCS', performed_by: opName }),
+      });
+    }
+    btn.style.display = 'none';
+    document.getElementById('expend-done').style.display = 'block';
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Record Usage';
+    alert('Failed to update inventory — check connection.');
+  }
 }
 
 async function submitFaultReports() {
