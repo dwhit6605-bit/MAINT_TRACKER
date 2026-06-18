@@ -455,25 +455,28 @@ async def complete_session(session_id: int, data: SessionComplete, db=Depends(ge
             VALUES (?, ?, ?, ?)
         """, (session_id, r.item_id, r.status, r.notes))
 
-        # Auto-create a corrective maintenance task for every fault
+        # Auto-create a corrective maintenance task for every fault (skip if open task already exists)
         if r.status == "fault":
             item = items_by_id.get(r.item_id)
             if item and item.get("equipment_id"):
-                fault_detail = r.notes.strip() if r.notes else ""
-                description = f"Fault found during PMCS: {session['title']}"
-                if fault_detail:
-                    description += f"\nDetails: {fault_detail}"
-                await db.execute("""
-                    INSERT INTO maintenance_tasks
-                        (equipment_id, title, description, task_type, status, notes)
-                    VALUES (?, ?, ?, 'corrective', 'pending', ?)
-                """, (
-                    item["equipment_id"],
-                    f"PMCS Fault: {item['check_item']}",
-                    description,
-                    fault_detail,
-                ))
-                tasks_created += 1
+                task_title = f"PMCS Fault: {item['check_item']}"
+                async with db.execute("""
+                    SELECT id FROM maintenance_tasks
+                    WHERE equipment_id=? AND title=? AND status IN ('pending','overdue')
+                    LIMIT 1
+                """, (item["equipment_id"], task_title)) as dup_cur:
+                    already_open = await dup_cur.fetchone()
+                if not already_open:
+                    fault_detail = r.notes.strip() if r.notes else ""
+                    description = f"Fault found during PMCS: {session['title']}"
+                    if fault_detail:
+                        description += f"\nDetails: {fault_detail}"
+                    await db.execute("""
+                        INSERT INTO maintenance_tasks
+                            (equipment_id, title, description, task_type, status, notes)
+                        VALUES (?, ?, ?, 'corrective', 'pending', ?)
+                    """, (item["equipment_id"], task_title, description, fault_detail))
+                    tasks_created += 1
 
     # Build items+results for PDF (grouped by equipment)
     results_by_item = {r.item_id: r for r in data.results}

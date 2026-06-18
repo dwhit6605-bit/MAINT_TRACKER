@@ -546,10 +546,13 @@ initAuth().then(ok => { if (ok) renderPage('{{ page }}'); });
 function showOverdueBanner(overdueTasks, overdueCals) {}
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
+let _dashMyTasks = false;
+
 async function dashboardPage() {
   let data;
+  const meParam = currentUser?.username ? `?me=${encodeURIComponent(currentUser.username)}` : '';
   try {
-    data = await api('GET', '/api/dashboard');
+    data = await api('GET', '/api/dashboard' + meParam);
   } catch(e) {
     $('page-content').innerHTML = `<div class="card" style="border:1px solid #fca5a5;background:#fef2f2;padding:1.5rem;">
       <div style="font-weight:700;color:#dc2626;margin-bottom:0.5rem;">Dashboard error — check server logs</div>
@@ -569,29 +572,36 @@ async function dashboardPage() {
     </div>
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
+      ${statCard('My Tasks', data.my_tasks_count||0, (data.my_tasks_count||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', 'Assigned to me')}
       ${statCard('Vehicles Out', c.rs_dispatched||0, (c.rs_dispatched||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', `of ${c.rs_total||0} rolling stock`)}
-      ${statCard('Veh. In Maint.', c.rs_maint||0, (c.rs_maint||0)?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700', 'Rolling stock')}
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <!-- Upcoming maintenance -->
       <div class="card">
-        <h2 class="font-semibold text-gray-700 mb-3">Upcoming Maintenance</h2>
-        ${data.upcoming_tasks.length ? `
-        <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead><tr class="text-xs text-gray-500 border-b">
-            <th class="pb-2 text-left">Task</th><th class="pb-2 text-left col-m-hide">Equipment</th><th class="pb-2 text-left">Due</th><th></th>
-          </tr></thead>
-          <tbody>${data.upcoming_tasks.map(t=>`
-            <tr class="table-row border-b last:border-0" ondblclick="dashEditTask(${t.id})" title="Double-click to edit" style="cursor:pointer;">
-              <td class="py-2 pr-4 font-medium">${esc(t.title)}<div class="col-m-show text-xs text-gray-400">${esc(t.equipment_name)}</div></td>
-              <td class="py-2 pr-4 text-gray-500 col-m-hide">${esc(t.equipment_name)}</td>
-              <td class="py-2">${dueBadge(t.next_due, t.status)}</td>
-              <td class="py-2 pl-2">${isTech() && t.status!=='completed' ? `<button onclick="event.stopPropagation();dashMarkComplete(${t.id},${t.equipment_id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.55rem;cursor:pointer;min-height:32px;padding:0.3rem 0.6rem;" title="Quick complete">✓</button>` : ''}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table></div>` : '<p class="text-sm text-gray-400">No upcoming tasks.</p>'}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+          <h2 class="font-semibold text-gray-700">Upcoming Maintenance</h2>
+          <button id="dash-my-tasks-btn" onclick="dashToggleMyTasks()" style="font-size:0.72rem;padding:0.2rem 0.7rem;border-radius:9999px;border:1px solid #d1d5db;background:${_dashMyTasks?'#1d4ed8':'#f9fafb'};color:${_dashMyTasks?'#fff':'#374151'};cursor:pointer;">My Tasks${data.my_tasks_count?' ('+data.my_tasks_count+')':''}</button>
+        </div>
+        <div id="dash-tasks-body">
+        ${(()=>{
+          const tasks = _dashMyTasks ? (data.my_upcoming||[]) : data.upcoming_tasks;
+          if (!tasks.length) return '<p class="text-sm text-gray-400">No upcoming tasks.</p>';
+          return `<div class="overflow-x-auto"><table class="w-full text-sm">
+            <thead><tr class="text-xs text-gray-500 border-b">
+              <th class="pb-2 text-left">Task</th><th class="pb-2 text-left col-m-hide">Equipment</th><th class="pb-2 text-left">Due</th><th></th>
+            </tr></thead>
+            <tbody>${tasks.map(t=>`
+              <tr class="table-row border-b last:border-0" ondblclick="dashEditTask(${t.id})" title="Double-click to edit" style="cursor:pointer;">
+                <td class="py-2 pr-4 font-medium">${esc(t.title)}<div class="col-m-show text-xs text-gray-400">${esc(t.equipment_name)}</div></td>
+                <td class="py-2 pr-4 text-gray-500 col-m-hide">${esc(t.equipment_name)}</td>
+                <td class="py-2">${dueBadge(t.next_due, t.status)}</td>
+                <td class="py-2 pl-2">${isTech() && t.status!=='completed' ? `<button onclick="event.stopPropagation();dashMarkComplete(${t.id},${t.equipment_id})" style="font-size:0.72rem;background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.55rem;cursor:pointer;min-height:32px;padding:0.3rem 0.6rem;" title="Quick complete">✓</button>` : ''}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table></div>`;
+        })()}
+        </div>
       </div>
 
       <!-- Calibration due -->
@@ -2050,6 +2060,11 @@ function filterMaintenance() {
     (!af || (af === '__me__' ? t.assigned_to === me : af === '__unassigned__' ? !t.assigned_to : t.assigned_to === af))
   );
   $('mt-tbody').innerHTML = maintenanceRows(filtered);
+}
+
+function dashToggleMyTasks() {
+  _dashMyTasks = !_dashMyTasks;
+  dashboardPage();
 }
 
 async function refreshOverdue() {

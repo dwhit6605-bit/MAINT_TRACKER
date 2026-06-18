@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 from backend.database import get_db
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("")
-async def dashboard_summary(db=Depends(get_db)):
+async def dashboard_summary(db=Depends(get_db), me: Optional[str] = Query(None)):
     async def scalar(sql, params=()):
         async with db.execute(sql, params) as cur:
             row = await cur.fetchone()
@@ -56,6 +57,24 @@ async def dashboard_summary(db=Depends(get_db)):
         LIMIT 10
     """) as cur:
         upcoming_tasks = [dict(r) for r in await cur.fetchall()]
+
+    # My tasks (only when caller passes ?me=username)
+    my_tasks_count   = 0
+    my_upcoming      = []
+    if me:
+        my_tasks_count = await scalar(
+            "SELECT COUNT(*) FROM maintenance_tasks WHERE status IN ('pending','overdue') AND assigned_to=?",
+            (me,)
+        )
+        async with db.execute("""
+            SELECT m.id, m.title, m.next_due, m.status, m.equipment_id, e.name as equipment_name
+            FROM maintenance_tasks m
+            JOIN equipment e ON e.id = m.equipment_id
+            WHERE m.status IN ('overdue','pending') AND m.assigned_to=?
+            ORDER BY CASE m.status WHEN 'overdue' THEN 0 ELSE 1 END, m.next_due ASC
+            LIMIT 10
+        """, (me,)) as cur:
+            my_upcoming = [dict(r) for r in await cur.fetchall()]
 
     async with db.execute("""
         SELECT c.id, c.next_due, c.result, e.name as equipment_name, e.serial_num
@@ -114,6 +133,8 @@ async def dashboard_summary(db=Depends(get_db)):
             "rs_dispatched": rs_dispatched,
             "rs_maint": rs_maint,
         },
+        "my_tasks_count": my_tasks_count,
+        "my_upcoming": my_upcoming,
         "upcoming_tasks": upcoming_tasks,
         "upcoming_cals": upcoming_cals,
         "low_items": low_items,
