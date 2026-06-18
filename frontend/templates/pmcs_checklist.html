@@ -948,8 +948,8 @@ async function loadInventoryForExpend() {
 }
 
 function getToken() {
-  return document.cookie.match(/access_token=([^;]+)/)?.[1] ||
-         localStorage.getItem('pmcs_token') || '';
+  return document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1] ||
+         localStorage.getItem('auth_token') || '';
 }
 
 function addExpendRow() {
