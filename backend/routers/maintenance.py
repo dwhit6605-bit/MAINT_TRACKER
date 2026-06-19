@@ -32,6 +32,20 @@ async def list_tasks(equipment_id: int = None, status: str = None, db=Depends(ge
     return [dict(r) for r in rows]
 
 
+@router.get("/{task_id}")
+async def get_task(task_id: int, db=Depends(get_db)):
+    async with db.execute("""
+        SELECT m.*, e.name as equipment_name, e.location
+        FROM maintenance_tasks m
+        JOIN equipment e ON e.id = m.equipment_id
+        WHERE m.id=?
+    """, (task_id,)) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Task not found")
+    return dict(row)
+
+
 @router.post("", status_code=201)
 async def create_task(data: MaintenanceTaskCreate, request: Request, db=Depends(get_db)):
     require_tech(request)

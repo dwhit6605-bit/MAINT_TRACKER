@@ -1423,17 +1423,32 @@ async function dashSaveTask(e, taskId, eqId) {
 
 async function dashMarkComplete(taskId, eqId) {
   document.getElementById('dash-edit-backdrop')?.remove();
+
+  // Fetch task to get interval_days for recurring hint
+  let task = {};
+  try { task = await api('GET', `/api/maintenance/${taskId}`); } catch(e) {}
+
+  let recurringHint = '';
+  if (task.interval_days) {
+    const nxt = new Date();
+    nxt.setDate(nxt.getDate() + task.interval_days);
+    recurringHint = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.375rem;padding:0.6rem 0.9rem;font-size:0.8rem;color:#15803d;margin-bottom:0.25rem;">
+      🔁 Recurring — next will auto-schedule for <strong>${nxt.toISOString().slice(0,10)}</strong> (${task.interval_days}d). Override below if needed.
+    </div>`;
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop';
   overlay.id = 'dash-edit-backdrop';
   overlay.innerHTML = `<div class="modal" style="max-width:420px;">
     <div class="px-6 py-4 border-b flex items-center justify-between">
-      <h2 style="font-weight:600;">Mark Complete</h2>
+      <h2 style="font-weight:600;">Mark Complete${task.title ? ' — '+esc(task.title) : ''}</h2>
       <button onclick="document.getElementById('dash-edit-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
-    <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="dashSubmitComplete(event,${taskId})">
-      <div><label class="label">Completed By</label><input class="input" name="completed_by" autofocus></div>
-      <div><label class="label">Override Next Due Date</label><input class="input" type="date" name="next_due"></div>
+    <form class="px-6 py-4" style="display:grid;gap:0.75rem;" onsubmit="dashSubmitComplete(event,${taskId},${!!task.interval_days})">
+      ${recurringHint}
+      <div><label class="label">Completed By</label><input class="input" name="completed_by" value="${esc(cu())}" autofocus></div>
+      <div><label class="label">${task.interval_days ? 'Override Next Due (optional)' : 'Next Due'}</label><input class="input" type="date" name="next_due"></div>
       <div><label class="label">Notes</label><textarea class="input" name="notes" rows="2"></textarea></div>
       <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.25rem;">
         <button type="button" onclick="document.getElementById('dash-edit-backdrop').remove()" class="btn-secondary">Cancel</button>
@@ -1445,13 +1460,17 @@ async function dashMarkComplete(taskId, eqId) {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
-async function dashSubmitComplete(e, taskId) {
+async function dashSubmitComplete(e, taskId, isRecurring) {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target));
   try {
-    await api('POST', `/api/maintenance/${taskId}/complete`, body);
+    const res = await api('POST', `/api/maintenance/${taskId}/complete`, body);
     document.getElementById('dash-edit-backdrop')?.remove();
-    toast('Task marked complete.');
+    if (isRecurring && res.next_due) {
+      toast(`✓ Complete — next scheduled for ${res.next_due}`);
+    } else {
+      toast('Task marked complete.');
+    }
     dashboardPage();
   } catch(err) { toast(err.message, false); }
 }
