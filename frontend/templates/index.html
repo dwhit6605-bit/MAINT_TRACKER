@@ -769,6 +769,16 @@ function clearEqSelection() {
   updateBulkBar();
 }
 
+async function quickSetEqStatus(id, status) {
+  const eq = equipmentData.find(e => e.id === id);
+  if (!eq) return;
+  try {
+    await api('PUT', `/api/equipment/${id}`, { ...eq, status });
+    toast(`Status → ${status}`);
+    await refreshEquipment();
+  } catch(err) { toast(err.message, false); }
+}
+
 async function bulkSetStatus(status) {
   const ids = [...document.querySelectorAll('.eq-row-check:checked')].map(cb => parseInt(cb.dataset.id));
   if (!ids.length) return;
@@ -797,7 +807,11 @@ function equipmentRows(rows) {
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.category)}</td>
       <td class="px-4 py-3 text-gray-500 font-mono text-xs col-m-hide">${esc(e.serial_num||'—')}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.location||'—')}</td>
-      <td class="px-4 py-3"><span class="${sc[e.status]||'badge-gray'}">${e.status}</span></td>
+      <td class="px-4 py-3">${isTech() ? `
+        <select onchange="quickSetEqStatus(${e.id},this.value)" style="font-size:0.75rem;padding:0.15rem 0.4rem;border-radius:0.375rem;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;color:#374151;">
+          ${['active','inactive','maintenance','retired'].map(s=>`<option value="${s}" ${e.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>` : `<span class="${sc[e.status]||'badge-gray'}">${e.status}</span>`}
+      </td>
       <td class="px-4 py-3">
         ${e.overdue_tasks ? `<span class="badge-red">${e.overdue_tasks} overdue</span>` :
           e.pending_tasks ? `<span class="badge-blue">${e.pending_tasks} pending</span>` :
@@ -824,6 +838,7 @@ function filterEquipment(search) {
 }
 
 // ── Equipment Detail (tabbed) ─────────────────────────────────────────────────
+let _lastEqTab = 'details';
 async function openEqDetail(id) {
   const eq = equipmentData.find(e=>e.id===id);
   if (!eq) return;
@@ -862,7 +877,7 @@ async function openEqDetail(id) {
   </div>`, () => {
     // store on window for tab switching
     window._eqDetail = { id, eq, tasks, cals, atts, hist };
-    eqTab('details');
+    eqTab(_lastEqTab);
   });
 }
 
@@ -879,6 +894,7 @@ if (!document.getElementById('eq-tab-style')) {
 }
 
 async function eqTab(tab) {
+  _lastEqTab = tab;
   document.querySelectorAll('.eq-tab').forEach(b => b.classList.toggle('active-tab', b.id===`tab-${tab}`));
   const { id, eq, tasks, cals, atts, hist } = window._eqDetail;
   const body = $('eq-detail-body');
@@ -1597,7 +1613,7 @@ function openEqCalModal(eqId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqSaveCal(event,${eqId})">
-      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eqnew" name="calibrated_at" required onchange="applyCalInterval('cal-date-eqnew','next_due-eqnew',document.getElementById('next_due-eqnew-interval')?.value)"></div>
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eqnew" name="calibrated_at" required value="${new Date().toISOString().slice(0,10)}" onchange="applyCalInterval('cal-date-eqnew','next_due-eqnew',document.getElementById('next_due-eqnew-interval')?.value)"></div>
       <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-eqnew','next_due-eqnew','')}</div>
       <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cu())}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num"></div>
@@ -2001,6 +2017,7 @@ async function maintenancePage() {
     api('GET', '/api/users').catch(() => []),
   ]);
   renderMaintenanceTable(maintenanceData);
+  restoreMaintenanceFilters();
 }
 
 function _assignedToSelect(current = '', name = 'assigned_to', includeBlank = true) {
@@ -2063,7 +2080,9 @@ function maintenanceRows(rows) {
       <td class="px-4 py-3">${dueBadge(t.next_due, t.status==='completed'?'completed':t.status)}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(t.assigned_to||'—')}</td>
       <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-        ${t.status!=='completed' && isTech() ?`<button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs">Complete</button>`:''}
+        ${t.status!=='completed' && isTech() ? `
+          <button onclick="quickCompleteTask(${t.id})" title="Quick complete (no notes)" style="background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.5rem;cursor:pointer;font-size:0.78rem;font-weight:700;min-height:28px;">✓</button>
+          <button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs" title="Complete with notes/parts">+notes</button>` : ''}
         ${isTech() ? `<button onclick="dashEditTask(${t.id})" class="text-gray-600 hover:underline text-xs">Edit</button>` : ''}
         <button onclick="openTaskAttachments(${t.id},'${esc(t.title)}')" class="text-blue-500 hover:underline text-xs">📎</button>
         ${isSuperAdmin() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
@@ -2076,12 +2095,24 @@ function filterMaintenance() {
   const st = $('mt-status-filter').value;
   const af = $('mt-assignee-filter') ? $('mt-assignee-filter').value : '';
   const me = currentUser && currentUser.username;
+  try { sessionStorage.setItem('mt_filter', JSON.stringify({ s: $('mt-search').value, st, af })); } catch(e) {}
   const filtered = maintenanceData.filter(t =>
     (!s || t.title.toLowerCase().includes(s) || t.equipment_name.toLowerCase().includes(s)) &&
     (!st || t.status === st) &&
     (!af || (af === '__me__' ? t.assigned_to === me : af === '__unassigned__' ? !t.assigned_to : t.assigned_to === af))
   );
   $('mt-tbody').innerHTML = maintenanceRows(filtered);
+}
+
+function restoreMaintenanceFilters() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('mt_filter'));
+    if (!saved) return;
+    if (saved.s  && $('mt-search'))        $('mt-search').value = saved.s;
+    if (saved.st && $('mt-status-filter')) $('mt-status-filter').value = saved.st;
+    if (saved.af && $('mt-assignee-filter')) $('mt-assignee-filter').value = saved.af;
+    filterMaintenance();
+  } catch(e) {}
 }
 
 function dashToggleMyTasks() {
@@ -2233,6 +2264,15 @@ async function saveTask(e) {
 
 let _completePartsRows = [];
 let _inventoryForComplete = [];
+
+async function quickCompleteTask(id) {
+  try {
+    await api('POST', `/api/maintenance/${id}/complete`, { completed_by: cu() });
+    toast('Task completed.');
+    maintenanceData = await api('GET', '/api/maintenance');
+    renderMaintenanceTable(maintenanceData);
+  } catch(err) { toast(err.message, false); }
+}
 
 async function completeTaskModal(id) {
   _completePartsRows = [];
@@ -2797,7 +2837,10 @@ function inventoryRows(rows) {
       <td class="px-4 py-3 text-right text-gray-400 col-m-hide">${i.min_stock} ${i.unit}</td>
       <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
       <td class="px-4 py-3 text-right space-x-2">
-        ${isTech() ? `<button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
+        ${isTech() ? `
+          <button onclick="quickAdjustInv(${i.id},-1)" title="Remove 1" style="background:#fef2f2;color:#dc2626;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">−</button>
+          <button onclick="quickAdjustInv(${i.id},1)"  title="Add 1"    style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">+</button>
+          <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
         ${isTech() ? `<button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>` : ''}
         ${isSuperAdmin() ? `<button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
@@ -2894,6 +2937,16 @@ async function saveItem(e, id) {
     else await api('POST', '/api/inventory', body);
     closeModal();
     toast(id ? 'Item updated.' : 'Item added.');
+    inventoryData = await api('GET', '/api/inventory');
+    renderInventoryTable(inventoryData);
+  } catch(err) { toast(err.message, false); }
+}
+
+async function quickAdjustInv(id, delta) {
+  const action = delta > 0 ? 'add' : 'remove';
+  try {
+    const res = await api('POST', `/api/inventory/${id}/adjust`, { action, quantity: Math.abs(delta), performed_by: cu() });
+    toast(`Stock updated → ${res.quantity}`);
     inventoryData = await api('GET', '/api/inventory');
     renderInventoryTable(inventoryData);
   } catch(err) { toast(err.message, false); }
