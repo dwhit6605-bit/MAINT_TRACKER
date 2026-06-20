@@ -119,13 +119,14 @@ async def dashboard_summary(db=Depends(get_db), me: Optional[str] = Query(None))
         lifecycle_alerts = [dict(r) for r in await cur.fetchall()]
 
     async with db.execute("""
-        SELECT t.id, t.title,
+        SELECT t.id, t.title, e.category as equipment_category,
                MAX(s.completed_at) as last_run,
                CAST(julianday('now') - julianday(MAX(s.completed_at)) AS INTEGER) as days_since,
                COUNT(s.id) as total_runs
         FROM pmcs_templates t
+        LEFT JOIN equipment e ON e.id = t.equipment_id
         LEFT JOIN pmcs_sessions s ON s.template_id = t.id AND s.status = 'completed'
-        GROUP BY t.id, t.title
+        GROUP BY t.id, t.title, e.category
         ORDER BY last_run ASC NULLS FIRST
         LIMIT 15
     """) as cur:

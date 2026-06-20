@@ -179,6 +179,7 @@
     <h1>{{ template.title }}</h1>
     <div class="sub" id="header-sub">PMCS · loading…</div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div id="autosave-indicator" style="display:none;font-size:0.7rem;color:rgba(255,255,255,0.55);text-align:center;padding:0.2rem 0 0;letter-spacing:.02em;"></div>
   </div>
 
   <div id="draft-banner">
@@ -767,7 +768,14 @@ function saveDraft() {
     tmNumber: document.getElementById('da-tm-number').value,
     tmDate: document.getElementById('da-tm-date').value,
     manhours: document.getElementById('da-manhours').value,
-  })); } catch(e) {}
+  }));
+  const ind = document.getElementById('autosave-indicator');
+  if (ind) {
+    const t = new Date();
+    ind.textContent = `Draft saved ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}`;
+    ind.style.display = 'block';
+  }
+  } catch(e) {}
 }
 
 function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch(e) {} }
