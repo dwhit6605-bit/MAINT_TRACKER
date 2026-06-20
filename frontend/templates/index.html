@@ -417,12 +417,14 @@ async function runGlobalSearch(q) {
   if (!q) { el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">Start typing to search…</div>'; return; }
 
   // Fetch all data sources in parallel (use cached where available)
-  const [equip, tasks, inventory, faults, cals] = await Promise.all([
+  const [equip, tasks, inventory, faults, cals, pmcsTmpls, skos] = await Promise.all([
     api('GET', '/api/equipment').catch(()=>[]),
     api('GET', '/api/maintenance').catch(()=>[]),
     api('GET', '/api/inventory').catch(()=>[]),
     api('GET', '/api/faults').catch(()=>[]),
     api('GET', '/api/calibration').catch(()=>[]),
+    api('GET', '/api/pmcs/templates').catch(()=>[]),
+    api('GET', '/api/skos').catch(()=>[]),
   ]);
 
   const results = [];
@@ -452,12 +454,22 @@ async function runGlobalSearch(q) {
       results.push({ type:'Calibration', icon:'📐', title: c.equipment_name, sub: `Cal by ${c.calibrated_by||'—'}${c.next_due?' · Due '+c.next_due.slice(0,10):''}`, action: ()=>{ closeGlobalSearch(); navigate('calibration'); } });
   });
 
+  pmcsTmpls.forEach(t => {
+    if ([t.title,t.description].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'PMCS', icon:'📋', title: t.title, sub: `${t.session_count||0} run${t.session_count!==1?'s':''}${t.item_count?' · '+t.item_count+' items':''}`, action: ()=>{ closeGlobalSearch(); navigate('pmcs'); } });
+  });
+
+  skos.forEach(s => {
+    if ([s.name,s.description,s.location].some(v=>v&&v.toLowerCase().includes(q)))
+      results.push({ type:'SKO', icon:'🎒', title: s.name, sub: `${s.description||''}${s.location?' · '+s.location:''}`, action: ()=>{ closeGlobalSearch(); navigate('skos'); } });
+  });
+
   if (!results.length) {
     el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#9ca3af;font-size:0.85rem;">No results found.</div>';
     return;
   }
 
-  const TYPE_COLORS = { Equipment:'#1d4ed8', Task:'#7c3aed', Inventory:'#b45309', Fault:'#dc2626', Calibration:'#0369a1' };
+  const TYPE_COLORS = { Equipment:'#1d4ed8', Task:'#7c3aed', Inventory:'#b45309', Fault:'#dc2626', Calibration:'#0369a1', PMCS:'#0f766e', SKO:'#be185d' };
   el.innerHTML = results.slice(0,30).map((r,i)=>`
     <div onclick="_gsearchGo(${i})" style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 1rem;cursor:pointer;border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
       <span style="font-size:1.1rem;flex-shrink:0;">${r.icon}</span>
@@ -573,7 +585,7 @@ async function dashboardPage() {
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
       ${statCard('My Tasks', data.my_tasks_count||0, (data.my_tasks_count||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', 'Assigned to me')}
-      ${statCard('Vehicles Out', c.rs_dispatched||0, (c.rs_dispatched||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', `of ${c.rs_total||0} rolling stock`)}
+      ${statCard('PMCS Stale', data.stale_pmcs||0, (data.stale_pmcs||0)?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700', 'Checklists >30d or never run')}
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -648,6 +660,38 @@ async function dashboardPage() {
             <td class="py-2 text-right ${i.quantity===0?'text-red-600 font-semibold':'text-yellow-600'}">${i.quantity} ${i.unit}</td>
             <td class="py-2 text-right text-gray-500">${i.min_stock} ${i.unit}</td>
           </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    <!-- PMCS compliance -->
+    ${data.pmcs_compliance && data.pmcs_compliance.length ? `
+    <div class="card mt-4" style="${data.stale_pmcs ? 'border-left:4px solid #ea580c;' : ''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <h2 class="font-semibold text-gray-700">PMCS Compliance</h2>
+        <button onclick="navigate('pmcs')" style="font-size:0.72rem;background:#fff7ed;color:#c2410c;border:none;border-radius:0.375rem;padding:0.2rem 0.6rem;cursor:pointer;">View All</button>
+      </div>
+      <table class="w-full text-sm">
+        <thead><tr class="text-xs text-gray-500 border-b">
+          <th class="pb-2 text-left">Checklist</th>
+          <th class="pb-2 text-left col-m-hide">Last Run</th>
+          <th class="pb-2 text-left">Status</th>
+          <th class="pb-2 text-right col-m-hide">Runs</th>
+        </tr></thead>
+        <tbody>${data.pmcs_compliance.map(p => {
+          const stale = p.days_since === null || p.days_since > 30;
+          const badge = p.days_since === null
+            ? `<span style="font-size:0.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;">Never run</span>`
+            : p.days_since > 30
+              ? `<span style="font-size:0.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;">${p.days_since}d ago</span>`
+              : `<span style="font-size:0.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;">${p.days_since}d ago</span>`;
+          return `<tr class="table-row border-b last:border-0">
+            <td class="py-2 pr-4 font-medium">${esc(p.title)}</td>
+            <td class="py-2 pr-4 text-gray-500 col-m-hide">${p.last_run ? p.last_run.slice(0,10) : '—'}</td>
+            <td class="py-2">${badge}</td>
+            <td class="py-2 text-right text-gray-400 col-m-hide">${p.total_runs}</td>
+          </tr>`;
+        }).join('')}
         </tbody>
       </table>
     </div>` : ''}
@@ -817,7 +861,10 @@ function equipmentRows(rows) {
           e.pending_tasks ? `<span class="badge-blue">${e.pending_tasks} pending</span>` :
           `<span class="badge-green">OK</span>`}
       </td>
-      <td class="px-4 py-3 col-m-hide">${dueBadge(e.cal_next_due)}</td>
+      <td class="px-4 py-3 col-m-hide">
+        ${dueBadge(e.cal_next_due)}
+        ${e.cal_next_due && e.cal_next_due < new Date().toISOString().slice(0,10) ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d97706;margin-left:4px;flex-shrink:0;" title="Calibration overdue"></span>` : ''}
+      </td>
       <td class="px-4 py-3 text-right" style="white-space:nowrap;">
         <button onclick="openQRModal(${e.id},'${esc(e.name)}')" class="text-gray-400 hover:text-gray-700 text-xs mr-3" title="QR Code">&#9641; QR</button>
         ${isTech() ? `<button onclick="openEquipmentModal(${e.id})" class="text-gray-800 hover:underline text-xs mr-3">Edit</button>` : ''}
@@ -867,6 +914,7 @@ async function openEqDetail(id) {
       <button onclick="eqTab('maintenance')" id="tab-maintenance" class="eq-tab">Maintenance <span id="mt-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dce8f5;color:#141414;border-radius:9999px;padding:1px 7px;">${tasks.filter(t=>t.status!=='completed').length||''}</span></button>
       <button onclick="eqTab('calibration')" id="tab-calibration" class="eq-tab">Calibration <span id="cal-count-badge" style="margin-left:4px;font-size:0.7rem;background:#dcfce7;color:#15803d;border-radius:9999px;padding:1px 7px;">${cals.length||''}</span></button>
       <button onclick="eqTab('attachments')" id="tab-attachments" class="eq-tab">Attachments <span id="att-count-badge" style="margin-left:4px;font-size:0.7rem;background:#f3f4f6;color:#4b5563;border-radius:9999px;padding:1px 7px;">${atts.length||''}</span></button>
+      <button onclick="eqTab('faults')" id="tab-faults" class="eq-tab">Faults</button>
       <button onclick="eqTab('pmcs-history')" id="tab-pmcs-history" class="eq-tab">PMCS History</button>
       <button onclick="eqTab('history')" id="tab-history" class="eq-tab">History</button>
     </div>
@@ -938,8 +986,9 @@ async function eqTab(tab) {
           ${lcDate(eq.end_of_life_date,'End of Life')}
         </div>
       </div>` : ''}
-      <div style="display:flex;gap:0.75rem;padding-top:0.5rem;border-top:1px solid #f3f4f6;">
+      <div style="display:flex;gap:0.75rem;padding-top:0.5rem;border-top:1px solid #f3f4f6;flex-wrap:wrap;">
         ${isTech() ? `<button onclick="openEquipmentModal(${id}); closeModal();" class="btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Edit Details</button>` : ''}
+        <button onclick="openFaultModalForEq(${id},'${esc(eq.name)}')" style="font-size:0.8rem;padding:0.4rem 0.9rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;cursor:pointer;font-weight:600;">⚠ Report Fault</button>
         ${isSuperAdmin() ? `<button onclick="deleteEquipment(${id})" class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.9rem;color:#dc2626;border-color:#fca5a5;">Delete Equipment</button>` : ''}
       </div>`;
   }
@@ -1068,6 +1117,40 @@ async function eqTab(tab) {
       </div>`;
 
     // input is inside the label — native label click triggers it; no JS needed
+  }
+
+  else if (tab === 'faults') {
+    body.innerHTML = '<div style="padding:1rem;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
+    const faults = await api('GET', `/api/faults?equipment_id=${id}`).catch(()=>[]);
+    const SCOL = { critical:'#dc2626', urgent:'#d97706', routine:'#6b7280' };
+    const SBADGE = { open:'#fef2f2|#dc2626', in_progress:'#fffbeb|#d97706', resolved:'#f0fdf4|#15803d', closed:'#f3f4f6|#6b7280' };
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div style="font-size:0.85rem;font-weight:700;color:#374151;">${faults.length} fault${faults.length!==1?'s':''} on record</div>
+        <button onclick="openFaultModalForEq(${id},'${esc(eq.name)}')" style="font-size:0.78rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.375rem;padding:0.3rem 0.7rem;cursor:pointer;font-weight:600;">⚠ Report Fault</button>
+      </div>
+      ${faults.length ? faults.map(f => {
+        const [bg,fg] = (SBADGE[f.status]||'#f3f4f6|#6b7280').split('|');
+        const taskPill = f.linked_task_id
+          ? `<span style="font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9999px;background:${f.linked_task_status==='completed'?'#f0fdf4':'#eff6ff'};color:${f.linked_task_status==='completed'?'#15803d':'#1d4ed8'};border:1px solid ${f.linked_task_status==='completed'?'#bbf7d0':'#bfdbfe'};">Task: ${f.linked_task_status||'pending'}</span>`
+          : (isTech() ? `<button onclick="eqFaultLinkTask(${f.id})" style="font-size:0.68rem;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:9999px;padding:1px 8px;cursor:pointer;">+ Create Task</button>` : '');
+        return `<div style="border:1px solid #e5e7eb;border-left:4px solid ${SCOL[f.severity]||'#6b7280'};border-radius:0.5rem;padding:0.8rem 1rem;margin-bottom:0.6rem;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem;">${esc(f.title)}</div>
+              ${f.description?`<div style="font-size:0.78rem;color:#64748b;margin-bottom:0.3rem;">${esc(f.description)}</div>`:''}
+              <div style="font-size:0.72rem;color:#9ca3af;">Reported by ${esc(f.reported_by)} · ${f.created_at.slice(0,10)}</div>
+              ${f.resolution?`<div style="font-size:0.75rem;color:#059669;margin-top:0.25rem;">✓ ${esc(f.resolution)}</div>`:''}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;flex-shrink:0;">
+              <span style="font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9999px;background:${SCOL[f.severity]}22;color:${SCOL[f.severity]};text-transform:uppercase;">${f.severity}</span>
+              <span style="font-size:0.68rem;padding:1px 7px;border-radius:9999px;background:${bg};color:${fg};text-transform:uppercase;">${f.status.replace('_',' ')}</span>
+              ${taskPill}
+              ${isTech()?`<button onclick="openFaultUpdate(${f.id},'${f.status}')" style="font-size:0.72rem;background:#f3f4f6;color:#374151;border:none;border-radius:0.375rem;padding:0.25rem 0.6rem;cursor:pointer;">Update</button>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('') : '<p style="font-size:0.875rem;color:#9ca3af;">No faults recorded for this equipment.</p>'}`;
   }
 
   else if (tab === 'pmcs-history') {
@@ -4900,6 +4983,9 @@ async function faultsPage() {
               <div class="fault-card-actions" style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;flex-shrink:0;">
                 <span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:9999px;text-transform:uppercase;background:${SEVERITY_COLOR[f.severity]}22;color:${SEVERITY_COLOR[f.severity]};">${f.severity}</span>
                 <span style="font-size:0.7rem;padding:2px 8px;border-radius:9999px;text-transform:uppercase;background:#e5e7eb;color:#374151;">${f.status.replace('_',' ')}</span>
+                ${f.linked_task_id
+                  ? `<span style="font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9999px;background:${f.linked_task_status==='completed'?'#f0fdf4':'#eff6ff'};color:${f.linked_task_status==='completed'?'#15803d':'#1d4ed8'};border:1px solid ${f.linked_task_status==='completed'?'#bbf7d0':'#bfdbfe'};">Task: ${f.linked_task_status||'pending'}</span>`
+                  : (isTech() ? `<button onclick="linkFaultTask(${f.id})" style="font-size:0.68rem;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:9999px;padding:2px 9px;cursor:pointer;">+ Create Task</button>` : '')}
                 ${isTech() ? `<button onclick="openFaultUpdate(${f.id},'${esc(f.status)}')" style="font-size:0.78rem;background:#dce8f5;color:#141414;border:none;border-radius:0.375rem;padding:0.4rem 0.75rem;cursor:pointer;min-height:36px;">Update</button>` : ''}
                 ${isSuperAdmin() ? `<button onclick="deleteFault(${f.id})" style="font-size:0.78rem;background:#fef2f2;color:#dc2626;border:none;border-radius:0.375rem;padding:0.4rem 0.75rem;cursor:pointer;min-height:36px;">Delete</button>` : ''}
               </div>
@@ -4910,6 +4996,57 @@ async function faultsPage() {
   }
   window.renderFaultTab = renderFaults;
   renderFaults('open');
+}
+
+function openFaultModalForEq(eqId, eqName) {
+  const equip = equipmentData || [];
+  modal(`<div class="modal" style="max-width:500px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold">Report Fault — ${esc(eqName)}</h2>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <form class="px-6 py-4 space-y-3" onsubmit="submitFaultForEq(event,${eqId})">
+      <div><label class="label">Title / Deficiency *</label><input class="input" name="title" required placeholder="Brief description of the fault"></div>
+      <div><label class="label">Severity</label>
+        <select class="input" name="severity">
+          <option value="routine">Routine</option>
+          <option value="urgent">Urgent</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+      <div><label class="label">Details</label><textarea class="input" name="description" rows="3" placeholder="Additional details, symptoms, when observed…"></textarea></div>
+      <div><label class="label">Reported By *</label><input class="input" name="reported_by" required value="${esc(cu())}"></div>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer;padding:0.4rem 0;">
+        <input type="checkbox" name="create_task" value="1"> Also create a corrective maintenance task
+      </label>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding-top:0.5rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Submit Fault</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function submitFaultForEq(e, eqId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = { equipment_id: eqId, title: fd.get('title'), severity: fd.get('severity'),
+    description: fd.get('description') || null, reported_by: fd.get('reported_by'),
+    create_task: fd.get('create_task') === '1' };
+  try {
+    await api('POST', '/api/faults', body);
+    closeModal();
+    toast('Fault submitted.' + (body.create_task ? ' Corrective task created.' : ''));
+    if (window._eqDetail?.id === eqId) eqTab('faults');
+  } catch(err) { toast(err.message, false); }
+}
+
+async function eqFaultLinkTask(faultId) {
+  try {
+    await api('POST', `/api/faults/${faultId}/link-task`);
+    toast('Corrective task created.');
+    if (window._eqDetail) eqTab('faults');
+  } catch(err) { toast(err.message, false); }
 }
 
 async function openFaultModal() {
@@ -4942,6 +5079,14 @@ async function openFaultModal() {
       </div>
     </form>
   </div>`);
+}
+
+async function linkFaultTask(faultId) {
+  try {
+    await api('POST', `/api/faults/${faultId}/link-task`);
+    toast('Corrective task created.');
+    window.renderFaultTab && window.renderFaultTab(window._currentFaultFilter || 'open');
+  } catch(err) { toast(err.message, false); }
 }
 
 async function submitFault(e) {

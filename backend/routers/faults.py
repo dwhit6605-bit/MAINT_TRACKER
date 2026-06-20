@@ -17,6 +17,7 @@ class FaultCreate(BaseModel):
     severity: str = "routine"
     title: str
     description: Optional[str] = None
+    create_task: bool = False
 
 
 class FaultUpdate(BaseModel):
@@ -31,9 +32,11 @@ class FaultUpdate(BaseModel):
 @router.get("")
 async def list_faults(status: Optional[str] = None, equipment_id: Optional[int] = None, db=Depends(get_db)):
     query = """
-        SELECT f.*, e.name as equipment_name, e.location
+        SELECT f.*, e.name as equipment_name, e.location,
+               m.status as linked_task_status, m.title as linked_task_title, m.id as linked_task_id
         FROM fault_reports f
         JOIN equipment e ON e.id = f.equipment_id
+        LEFT JOIN maintenance_tasks m ON m.id = f.linked_task_id
         WHERE 1=1
     """
     params = []
@@ -61,8 +64,19 @@ async def create_fault(data: FaultCreate, db=Depends(get_db)):
         VALUES (?, ?, ?, ?, ?)
     """, (data.equipment_id, data.reported_by, data.severity, data.title, data.description)) as cur:
         fault_id = cur.lastrowid
+
+    task_id = None
+    if data.create_task:
+        async with db.execute("""
+            INSERT INTO maintenance_tasks
+                (equipment_id, title, description, task_type, status, source_fault_id)
+            VALUES (?, ?, ?, 'corrective', 'pending', ?)
+        """, (data.equipment_id, f"Fault: {data.title}", data.description, fault_id)) as cur:
+            task_id = cur.lastrowid
+        await db.execute("UPDATE fault_reports SET linked_task_id=? WHERE id=?", (task_id, fault_id))
+
     await db.commit()
-    return {"id": fault_id}
+    return {"id": fault_id, "task_id": task_id}
 
 
 @router.patch("/{fault_id}")
@@ -95,6 +109,24 @@ async def update_fault(fault_id: int, data: FaultUpdate, request: Request, db=De
     await db.execute(f"UPDATE fault_reports SET {', '.join(sets)} WHERE id=?", params)
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/{fault_id}/link-task", status_code=201)
+async def link_task_to_fault(fault_id: int, request: Request, db=Depends(get_db)):
+    require_tech(request)
+    async with db.execute("SELECT * FROM fault_reports WHERE id=?", (fault_id,)) as cur:
+        fault = await cur.fetchone()
+    if not fault:
+        raise HTTPException(404, "Fault not found")
+    async with db.execute("""
+        INSERT INTO maintenance_tasks
+            (equipment_id, title, description, task_type, status, source_fault_id)
+        VALUES (?, ?, ?, 'corrective', 'pending', ?)
+    """, (fault["equipment_id"], f"Fault: {fault['title']}", fault["description"], fault_id)) as cur:
+        task_id = cur.lastrowid
+    await db.execute("UPDATE fault_reports SET linked_task_id=? WHERE id=?", (task_id, fault_id))
+    await db.commit()
+    return {"task_id": task_id}
 
 
 @router.delete("/{fault_id}")

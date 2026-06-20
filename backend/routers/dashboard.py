@@ -118,6 +118,21 @@ async def dashboard_summary(db=Depends(get_db), me: Optional[str] = Query(None))
     """) as cur:
         lifecycle_alerts = [dict(r) for r in await cur.fetchall()]
 
+    async with db.execute("""
+        SELECT t.id, t.title,
+               MAX(s.completed_at) as last_run,
+               CAST(julianday('now') - julianday(MAX(s.completed_at)) AS INTEGER) as days_since,
+               COUNT(s.id) as total_runs
+        FROM pmcs_templates t
+        LEFT JOIN pmcs_sessions s ON s.template_id = t.id AND s.status = 'completed'
+        GROUP BY t.id, t.title
+        ORDER BY last_run ASC NULLS FIRST
+        LIMIT 15
+    """) as cur:
+        pmcs_compliance = [dict(r) for r in await cur.fetchall()]
+
+    stale_pmcs = sum(1 for p in pmcs_compliance if p["days_since"] is None or p["days_since"] > 30)
+
     return {
         "counts": {
             "total_equipment": total_equipment,
@@ -133,6 +148,8 @@ async def dashboard_summary(db=Depends(get_db), me: Optional[str] = Query(None))
             "rs_dispatched": rs_dispatched,
             "rs_maint": rs_maint,
         },
+        "stale_pmcs": stale_pmcs,
+        "pmcs_compliance": pmcs_compliance,
         "my_tasks_count": my_tasks_count,
         "my_upcoming": my_upcoming,
         "upcoming_tasks": upcoming_tasks,

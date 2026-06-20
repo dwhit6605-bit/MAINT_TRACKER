@@ -348,4 +348,12 @@ async def init_db():
         if "creates_task" not in pmcs_item_cols:
             await db.execute("ALTER TABLE pmcs_items ADD COLUMN creates_task INTEGER NOT NULL DEFAULT 0")
 
+        fault_cols = {row[1] async for row in await db.execute("PRAGMA table_info(fault_reports)")}
+        if "linked_task_id" not in fault_cols:
+            await db.execute("ALTER TABLE fault_reports ADD COLUMN linked_task_id INTEGER REFERENCES maintenance_tasks(id) ON DELETE SET NULL")
+
+        task_cols = {row[1] async for row in await db.execute("PRAGMA table_info(maintenance_tasks)")}
+        if "source_fault_id" not in task_cols:
+            await db.execute("ALTER TABLE maintenance_tasks ADD COLUMN source_fault_id INTEGER REFERENCES fault_reports(id) ON DELETE SET NULL")
+
         await db.commit()
