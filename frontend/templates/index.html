@@ -853,7 +853,7 @@ async function equipmentPage() {
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/equipment/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <a href="/labels?token=${getToken()}" target="_blank" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">&#9641; QR Labels</a>
     ${isTech() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
-  if (!_userList.length) api('GET', '/api/users').then(u => { _userList = u || []; }).catch(()=>{});
+  if (!_userList.length) api('GET', '/api/auth/users').then(u => { _userList = u || []; }).catch(()=>{});
   await refreshEquipment();
 }
 
@@ -2211,7 +2211,7 @@ async function maintenancePage() {
   [maintenanceData, equipList, _userList] = await Promise.all([
     api('GET', '/api/maintenance'),
     api('GET', '/api/equipment'),
-    api('GET', '/api/users').catch(() => []),
+    api('GET', '/api/auth/users').catch(() => []),
   ]);
   renderMaintenanceTable(maintenanceData);
   restoreMaintenanceFilters();
