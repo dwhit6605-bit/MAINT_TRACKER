@@ -512,7 +512,7 @@ function renderCard(item, isGrouped, groupEqs) {
           </button>`).join('')}
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-        <button class="fault-confirm-btn" onclick="confirmFaultUnits(${item.id})">Confirm Selection</button>
+        <button class="fault-confirm-btn" onclick="confirmFaultUnits(${item.id})">✓ Done</button>
         <button onclick="cancelFault(${item.id})" style="background:none;border:none;color:#6b7280;font-size:0.78rem;cursor:pointer;padding:0.35rem 0.5rem;">Cancel</button>
       </div>
     </div>` : '';
@@ -547,7 +547,22 @@ function setStatus(itemId, status, fromRestore) {
   const fp  = document.getElementById('fp-' + itemId);
 
   if (status === 'fault' && isGrouped && !fromRestore) {
-    // Show unit picker; don't commit status yet
+    const sg = STEP_GROUPS[itemId];
+    if (sg && sg.groupEqs.length === 1) {
+      // Only one unit — auto-confirm without showing picker
+      statuses[itemId] = { status: 'fault', faultEqIds: [sg.groupEqs[0].id] };
+      const summaryEl = document.getElementById('fault-summary-' + itemId);
+      if (summaryEl) {
+        summaryEl.style.display = 'block';
+        summaryEl.textContent = `Faulted: ${sg.groupEqs[0].serial_num || sg.groupEqs[0].name}`;
+      }
+      _applyGroupedFaultVisuals(itemId);
+      updateCounts();
+      saveDraft();
+      scrollToNext(itemId);
+      return;
+    }
+    // Multiple units — show picker
     ['ok','fault','na'].forEach(s => {
       const b = document.getElementById('btn-' + s + '-' + itemId);
       if (b) b.className = 'status-btn' + (s === 'fault' ? ' active-fault' : '');
@@ -584,7 +599,10 @@ function setStatus(itemId, status, fromRestore) {
   }
 
   updateCounts();
-  if (!fromRestore) saveDraft();
+  if (!fromRestore) {
+    saveDraft();
+    if (status !== 'fault') scrollToNext(itemId);
+  }
 }
 
 function toggleNote(itemId) {
@@ -593,55 +611,66 @@ function toggleNote(itemId) {
   document.getElementById('note-' + itemId)?.focus();
 }
 
+// ── Scroll to next unanswered ─────────────────────────────────────────────────
+function scrollToNext(currentItemId) {
+  const idx = DISPLAY_ITEMS.findIndex(i => i.id === currentItemId);
+  for (let i = idx + 1; i < DISPLAY_ITEMS.length; i++) {
+    if (!statuses[DISPLAY_ITEMS[i].id]?.status) {
+      const el = document.getElementById('card-' + DISPLAY_ITEMS[i].id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); break; }
+    }
+  }
+}
+
 // ── Fault unit picker ─────────────────────────────────────────────────────────
 function toggleFaultUnit(itemId, eqId, btn) {
   btn.classList.toggle('selected');
-}
-
-function confirmFaultUnits(itemId) {
+  // Live-commit fault state on every chip tap
   const chips = document.querySelectorAll(`#fpc-${itemId} .sn-chip.selected`);
   const faultEqIds = [...chips].map(c => parseInt(c.dataset.eqId));
-  if (!faultEqIds.length) {
-    // No units selected — treat as OK
-    cancelFault(itemId);
-    return;
-  }
   statuses[itemId] = statuses[itemId] || {};
   statuses[itemId].status     = 'fault';
   statuses[itemId].faultEqIds = faultEqIds;
+  // Update inline summary live
+  const sg = STEP_GROUPS[itemId];
+  const summaryEl = document.getElementById('fault-summary-' + itemId);
+  if (summaryEl && sg) {
+    if (faultEqIds.length) {
+      const names = faultEqIds.map(id => { const eq = sg.groupEqs.find(e => e.id === id); return eq?.serial_num || eq?.name || id; });
+      summaryEl.style.display = 'block';
+      summaryEl.textContent = `Faulted: ${names.join(', ')} (${faultEqIds.length} of ${sg.groupEqs.length})`;
+    } else {
+      summaryEl.style.display = 'none';
+    }
+  }
+  updateCounts();
+  saveDraft();
+}
 
-  const fp = document.getElementById('fp-' + itemId);
-  if (fp) fp.classList.remove('show');
-
+function _applyGroupedFaultVisuals(itemId) {
   const card = document.getElementById('card-' + itemId);
   if (card) card.className = 'check-card status-fault';
   ['ok','fault','na'].forEach(s => {
     const b = document.getElementById('btn-' + s + '-' + itemId);
     if (b) b.className = 'status-btn' + (s === 'fault' ? ' active-fault' : '');
   });
-
-  // Show fault summary
-  const sg = STEP_GROUPS[itemId];
-  const summaryEl = document.getElementById('fault-summary-' + itemId);
-  if (summaryEl && sg) {
-    const names = faultEqIds.map(id => {
-      const eq = sg.groupEqs.find(e => e.id === id);
-      return eq?.serial_num || eq?.name || id;
-    });
-    summaryEl.style.display = 'block';
-    summaryEl.textContent = `Faulted: ${names.join(', ')} (${faultEqIds.length} of ${sg.groupEqs.length})`;
-  }
-
-  // Show notes
   const notesEl  = document.getElementById('notes-' + itemId);
   const toggleEl = document.getElementById('note-toggle-' + itemId);
   const noteEl   = document.getElementById('note-' + itemId);
   if (notesEl) notesEl.className = 'item-notes show';
   if (noteEl)  { noteEl.placeholder = 'Describe the fault…'; noteEl.required = true; }
   if (toggleEl) toggleEl.style.display = 'none';
+}
 
-  updateCounts();
-  saveDraft();
+function confirmFaultUnits(itemId) {
+  const chips = document.querySelectorAll(`#fpc-${itemId} .sn-chip.selected`);
+  const faultEqIds = [...chips].map(c => parseInt(c.dataset.eqId));
+  if (!faultEqIds.length) { cancelFault(itemId); return; }
+  // State already committed by toggleFaultUnit — just close picker and apply visuals
+  const fp = document.getElementById('fp-' + itemId);
+  if (fp) fp.classList.remove('show');
+  _applyGroupedFaultVisuals(itemId);
+  scrollToNext(itemId);
 }
 
 function cancelFault(itemId) {
@@ -811,6 +840,11 @@ function dismissDraft() {
 async function submitChecklist() {
   const name = document.getElementById('op-name').value.trim();
   if (!name) { document.getElementById('op-name').focus(); document.getElementById('op-name').style.borderColor='#ef4444'; return; }
+  // Persist operator identity for next run
+  try {
+    localStorage.setItem('pmcs_op_rank', document.getElementById('op-rank').value.trim());
+    localStorage.setItem('pmcs_op_name', name);
+  } catch(e) {}
 
   // Fault notes required
   const missingFault = DISPLAY_ITEMS.find(item => {
@@ -1036,6 +1070,13 @@ function toggleAdv() {
   renderChecklist();
   updateCounts();
   checkDraft();
+  // Prefill operator from last session (only if draft didn't already fill it)
+  try {
+    if (!document.getElementById('op-name').value)
+      document.getElementById('op-name').value = localStorage.getItem('pmcs_op_name') || '';
+    if (!document.getElementById('op-rank').value)
+      document.getElementById('op-rank').value = localStorage.getItem('pmcs_op_rank') || '';
+  } catch(e) {}
 })();
 </script>
 </body>
