@@ -240,7 +240,7 @@
     </div>
     <div class="px-5 py-3 flex items-center justify-between text-xs" style="border-top:1px solid rgba(241,228,208,0.15);color:rgba(241,228,208,0.45);">
       <span>WHITWERX &copy; 2025</span>
-      <button id="nav-bell" onclick="navigate('dashboard')" title="Alerts" style="background:none;border:none;cursor:pointer;position:relative;padding:0;line-height:1;">
+      <button id="nav-bell" onclick="openBellPanel()" title="Alerts" style="background:none;border:none;cursor:pointer;position:relative;padding:0;line-height:1;">
         <svg style="width:1.1rem;height:1.1rem;color:rgba(255,255,255,0.6);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
         </svg>
@@ -276,6 +276,16 @@
 
     <!-- Global search overlay -->
     <div id="gsearch-overlay" onclick="closeGlobalSearch()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;"></div>
+    <div id="bell-overlay" onclick="closeBellPanel()" style="display:none;position:fixed;inset:0;z-index:198;"></div>
+    <div id="bell-panel" style="display:none;position:fixed;bottom:4rem;left:1rem;width:min(340px,calc(100vw-2rem));background:#fff;border-radius:0.75rem;box-shadow:0 20px 60px rgba(0,0,0,0.25);z-index:199;overflow:hidden;max-height:70vh;overflow-y:auto;">
+      <div style="padding:0.75rem 1rem;background:#1e3a5f;color:#fff;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;">
+        <span>Alerts</span>
+        <button onclick="closeBellPanel()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:1.1rem;line-height:1;">&times;</button>
+      </div>
+      <div id="bell-content" style="padding:0.5rem 0;">
+        <div style="padding:1rem;text-align:center;color:#9ca3af;font-size:0.85rem;">Loading…</div>
+      </div>
+    </div>
     <div id="gsearch-panel" style="display:none;position:fixed;top:5rem;left:50%;transform:translateX(-50%);width:min(640px,96vw);background:#fff;border-radius:0.75rem;box-shadow:0 20px 60px rgba(0,0,0,0.25);z-index:201;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e5e7eb;">
         <svg width="18" height="18" fill="none" stroke="#9ca3af" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -495,8 +505,8 @@ function closeSidebar() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -524,13 +534,75 @@ document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => { e.preventDefault(); closeSidebar(); navigate(a.dataset.page); });
 });
 window.addEventListener('popstate', e => renderPage(e.state?.page || 'dashboard'));
-initAuth().then(ok => { if (ok) renderPage('{{ page }}'); });
+initAuth().then(ok => {
+  if (!ok) return;
+  const requestedPage = '{{ page }}';
+  const isDefaultLanding = requestedPage === 'dashboard';
+  const rolePage = currentUser?.role === 'operator' ? 'mywork'
+    : currentUser?.role === 'tech' ? 'maintenance'
+    : 'dashboard';
+  renderPage(isDefaultLanding ? rolePage : requestedPage);
+});
 
-// Bell: load overdue count
+// ─── Bell notification panel ────────────────────────────────────────────────
+function closeBellPanel() {
+  document.getElementById('bell-panel').style.display = 'none';
+  document.getElementById('bell-overlay').style.display = 'none';
+}
+
+async function openBellPanel() {
+  const panel = document.getElementById('bell-panel');
+  const overlay = document.getElementById('bell-overlay');
+  if (panel.style.display !== 'none') { closeBellPanel(); return; }
+  panel.style.display = 'block';
+  overlay.style.display = 'block';
+  const bc = document.getElementById('bell-content');
+  bc.innerHTML = '<div style="padding:1rem;text-align:center;color:#9ca3af;font-size:0.85rem;">Loading…</div>';
+  try {
+    const data = await api('GET', '/api/dashboard');
+    const c = data.counts;
+    let html = '';
+    const section = (label, color, items) => {
+      if (!items.length) return '';
+      return `<div style="padding:0.4rem 1rem 0.2rem;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${color};">${label}</div>`
+        + items.map(i => `<div onclick="${i.nav}" style="padding:0.55rem 1rem;font-size:0.8rem;cursor:pointer;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:0.5rem;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+          <span style="flex:1;">${i.label}</span>
+          ${i.badge ? `<span style="font-size:0.7rem;background:${color};color:#fff;border-radius:9999px;padding:1px 6px;">${i.badge}</span>` : ''}
+        </div>`).join('');
+    };
+
+    const overdueItems = (data.upcoming_tasks || []).filter(t => t.status === 'overdue')
+      .map(t => ({ label: `${t.title} — ${t.equipment_name}`, badge: 'OVERDUE', nav: `navigate('maintenance');closeBellPanel()` }));
+    const calItems = (data.upcoming_cals || []).filter(c => { const d = daysUntil(c.next_due); return d !== null && d < 0; })
+      .map(c => ({ label: `${c.equipment_name} cal overdue`, badge: fmtDate(c.next_due), nav: `navigate('calibration');closeBellPanel()` }));
+    const lowItems = (data.low_items || []).slice(0,5)
+      .map(i => ({ label: `${i.name} — ${i.quantity} ${i.unit} (min ${i.min_stock})`, badge: 'LOW', nav: `navigate('inventory');closeBellPanel()` }));
+    const pmcsItems = (data.pmcs_compliance || []).filter(p => p.days_since === null || p.days_since > 30).slice(0,5)
+      .map(p => ({ label: p.title, badge: p.days_since === null ? 'NEVER RUN' : `${p.days_since}d ago`, nav: `navigate('pmcs');closeBellPanel()` }));
+
+    html += section('Overdue Tasks', '#dc2626', overdueItems);
+    html += section('Calibration Overdue', '#d97706', calItems);
+    html += section('Low Stock', '#7c3aed', lowItems);
+    html += section('Stale PMCS', '#0f766e', pmcsItems);
+
+    const total = overdueItems.length + calItems.length + lowItems.length + pmcsItems.length;
+    if (!total) html = '<div style="padding:1.5rem 1rem;text-align:center;color:#9ca3af;font-size:0.85rem;">✓ No active alerts</div>';
+    bc.innerHTML = html;
+
+    // update badge
+    const count = c.overdue_tasks + c.cal_overdue + c.low_stock + (data.stale_pmcs || 0);
+    const badge = document.getElementById('nav-bell-badge');
+    if (badge) { badge.textContent = count || ''; badge.style.display = count ? 'block' : 'none'; }
+  } catch(e) {
+    bc.innerHTML = '<div style="padding:1rem;text-align:center;color:#ef4444;font-size:0.85rem;">Failed to load alerts</div>';
+  }
+}
+
+// Bell: load overdue count on startup
 (async () => {
   try {
     const data = await api('GET', '/api/dashboard');
-    const count = (data.counts.overdue_tasks || 0) + (data.counts.cal_overdue || 0);
+    const count = (data.counts.overdue_tasks || 0) + (data.counts.cal_overdue || 0) + (data.counts.low_stock || 0) + (data.stale_pmcs || 0);
     const badge = document.getElementById('nav-bell-badge');
     if (count > 0 && badge) {
       badge.textContent = count;
@@ -574,6 +646,36 @@ async function dashboardPage() {
   }
   const c = data.counts;
   showOverdueBanner(c.overdue_tasks, c.cal_overdue);
+
+  // Empty-state onboarding guide for fresh installs
+  if (c.total_equipment === 0 && isAdmin()) {
+    $('page-content').innerHTML = `
+      <div style="max-width:560px;margin:2rem auto;">
+        <div class="card" style="border:2px dashed #cbd5e1;background:#f8fafc;padding:2rem;text-align:center;">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;">🪖</div>
+          <div style="font-weight:700;font-size:1.1rem;margin-bottom:0.4rem;">Welcome to GEAR GUARD</div>
+          <div style="color:#64748b;font-size:0.875rem;margin-bottom:1.75rem;">No data yet. Follow these steps to get your unit set up.</div>
+          <div style="display:flex;flex-direction:column;gap:0.6rem;text-align:left;">
+            ${[
+              ['1', 'Add Equipment', 'Start with your sensitive items and MTOE equipment.', "navigate('equipment')"],
+              ['2', 'Create PMCS Templates', 'Build checklists for each equipment type.', "navigate('pmcs')"],
+              ['3', 'Add Inventory', 'Track your parts and consumables.', "navigate('inventory')"],
+              ['4', 'Add Users', 'Create accounts for your techs and operators.', "navigate('users')"],
+              ['5', 'Run Your First PMCS', 'Assign an operator and conduct the first inspection.', "navigate('pmcs')"],
+            ].map(([n, title, desc, nav]) => `
+              <button onclick="${nav}" style="display:flex;align-items:center;gap:1rem;padding:0.85rem 1rem;background:#fff;border:1px solid #e2e8f0;border-radius:0.5rem;cursor:pointer;text-align:left;width:100%;" onmouseover="this.style.borderColor='#1e3a5f'" onmouseout="this.style.borderColor='#e2e8f0'">
+                <span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;">${n}</span>
+                <div>
+                  <div style="font-weight:700;font-size:0.875rem;">${title}</div>
+                  <div style="font-size:0.75rem;color:#64748b;">${desc}</div>
+                </div>
+                <span style="margin-left:auto;color:#94a3b8;">→</span>
+              </button>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
 
   $('page-content').innerHTML = `
     <!-- Stat cards -->
@@ -6156,6 +6258,92 @@ function printRequisition(id) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── My Work (operator landing page) ────────────────────────────────────────
+async function myWorkPage() {
+  $('page-title').textContent = 'My Work';
+  $('page-actions').innerHTML = `<button onclick="openFaultModal()" class="btn-primary" style="font-size:0.85rem;">⚠ Report Fault</button>`;
+
+  $('page-content').innerHTML = '<div class="flex items-center justify-center h-32"><div class="text-gray-400">Loading…</div></div>';
+
+  const me = cu();
+  const [tasks, pmcsTmpls, myFaults] = await Promise.all([
+    api('GET', '/api/maintenance').catch(() => []),
+    api('GET', '/api/pmcs/templates').catch(() => []),
+    api('GET', '/api/faults').catch(() => []),
+  ]);
+
+  const myTasks = tasks.filter(t => t.assigned_to === me && t.status !== 'completed');
+  const overdue = myTasks.filter(t => t.status === 'overdue');
+  const pending = myTasks.filter(t => t.status === 'pending');
+  const myOpenFaults = myFaults.filter(f => f.reported_by === me && f.status === 'open');
+
+  const taskCard = (t) => `
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;border-radius:0.5rem;background:${t.status==='overdue'?'#fef2f2':'#f9fafb'};border:1px solid ${t.status==='overdue'?'#fca5a5':'#e5e7eb'};">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
+        <div style="font-size:0.75rem;color:#6b7280;">${esc(t.equipment_name)}${t.next_due ? ' · Due ' + fmtDate(t.next_due) : ''}</div>
+      </div>
+      ${dueBadge(t.next_due, t.status)}
+    </div>`;
+
+  $('page-content').innerHTML = `
+    <div style="max-width:680px;margin:0 auto;padding:1rem;display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Quick actions -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <button onclick="openFaultModal()" style="padding:1rem;background:#1e3a5f;color:#fff;border:none;border-radius:0.75rem;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:0.4rem;">
+          <span style="font-size:1.5rem;">⚠</span>Report a Fault
+        </button>
+        <button onclick="navigate('pmcs')" style="padding:1rem;background:#0f766e;color:#fff;border:none;border-radius:0.75rem;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:0.4rem;">
+          <span style="font-size:1.5rem;">📋</span>Run PMCS
+        </button>
+      </div>
+
+      <!-- Assigned tasks -->
+      <div class="card" style="padding:1rem;">
+        <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;">
+          My Tasks
+          <span style="font-size:0.75rem;font-weight:400;color:#6b7280;">${myTasks.length} open</span>
+        </div>
+        ${overdue.length ? `<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#dc2626;margin-bottom:0.4rem;">Overdue</div>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:0.75rem;">${overdue.map(taskCard).join('')}</div>` : ''}
+        ${pending.length ? `<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:0.4rem;">Pending</div>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">${pending.map(taskCard).join('')}</div>` : ''}
+        ${!myTasks.length ? `<div style="text-align:center;color:#22c55e;font-size:0.85rem;font-weight:600;padding:0.75rem 0;">✓ No tasks assigned to you</div>` : ''}
+      </div>
+
+      <!-- My open faults -->
+      ${myOpenFaults.length ? `
+      <div class="card" style="padding:1rem;">
+        <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">My Open Faults <span style="font-size:0.75rem;font-weight:400;color:#6b7280;">${myOpenFaults.length}</span></div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          ${myOpenFaults.map(f => `
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.75rem;border-radius:0.5rem;background:#fef9f0;border:1px solid #fed7aa;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.83rem;">${esc(f.title)}</div>
+              <div style="font-size:0.73rem;color:#6b7280;">${esc(f.equipment_name)} · ${f.created_at.slice(0,10)}</div>
+            </div>
+            <span style="font-size:0.7rem;padding:2px 6px;border-radius:9999px;background:${f.severity==='critical'?'#dc2626':f.severity==='urgent'?'#d97706':'#6b7280'};color:#fff;font-weight:700;text-transform:uppercase;">${f.severity}</span>
+          </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- PMCS checklist links -->
+      ${pmcsTmpls.length ? `
+      <div class="card" style="padding:1rem;">
+        <div style="font-weight:700;font-size:0.875rem;margin-bottom:0.75rem;">PMCS Checklists</div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          ${pmcsTmpls.slice(0,8).map(t => `
+          <a href="/pmcs/${t.id}/checklist?token=${getToken()}" style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.5rem;text-decoration:none;color:inherit;">
+            <span style="font-size:0.85rem;font-weight:600;">📋 ${esc(t.title)}</span>
+            <span style="font-size:0.75rem;color:#059669;font-weight:600;">Start →</span>
+          </a>`).join('')}
+        </div>
+      </div>` : ''}
+
+    </div>`;
 }
 </script>
 <script>
