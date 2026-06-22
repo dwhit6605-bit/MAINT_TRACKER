@@ -176,6 +176,11 @@
 </head>
 <body class="h-full font-sans text-gray-800" style="background-color:#1e3a5f;">
 
+<!-- Offline banner -->
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;text-align:center;font-size:0.8rem;font-weight:600;padding:0.4rem 1rem;letter-spacing:.03em;">
+  ⚠ No connection — showing cached data. Changes will sync when back online.
+</div>
+
 <div class="flex h-screen overflow-hidden">
 
   <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
@@ -6671,8 +6676,39 @@ function pwaInstall() {
 // ── Service Worker ─────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'FLUSH_DRAFTS') flushOfflineQueue();
+    });
   });
+}
+
+// ── Offline detection ─────────────────────────────────────────────────────────
+function setOfflineBanner(offline) {
+  const b = document.getElementById('offline-banner');
+  if (!b) return;
+  b.style.display = offline ? '' : 'none';
+  // push content down so banner doesn't overlap nav
+  document.body.style.paddingTop = offline ? '2rem' : '';
+}
+window.addEventListener('online',  () => { setOfflineBanner(false); flushOfflineQueue(); });
+window.addEventListener('offline', () => setOfflineBanner(true));
+if (!navigator.onLine) setOfflineBanner(true);
+
+// Flush any queued offline API calls (stored in localStorage as fallback)
+async function flushOfflineQueue() {
+  const queue = JSON.parse(localStorage.getItem('gg-offline-queue') || '[]');
+  if (!queue.length) return;
+  const remaining = [];
+  for (const req of queue) {
+    try {
+      await fetch(req.url, { method: req.method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }, body: req.body });
+    } catch {
+      remaining.push(req);
+    }
+  }
+  localStorage.setItem('gg-offline-queue', JSON.stringify(remaining));
+  if (!remaining.length) showToast('Offline changes synced ✓');
 }
 
 // Show install bar on iOS (beforeinstallprompt never fires there)

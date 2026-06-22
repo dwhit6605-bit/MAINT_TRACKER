@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.database import init_db
@@ -27,7 +27,7 @@ scheduler = AsyncIOScheduler()
 
 # Paths that don't require authentication
 _PUBLIC_PATHS = {"/login", "/api/auth/login"}
-_PUBLIC_PREFIXES = ("/static", "/uploads")
+_PUBLIC_PREFIXES = ("/static", "/uploads", "/sw.js")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
 _PUBLIC_API_RE = re.compile(
@@ -103,6 +103,15 @@ app.include_router(rolling_stock_router.router)
 app.include_router(task_attachments_router.router)
 app.include_router(faults_router.router)
 app.include_router(eq_checklists_router.router)
+
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(
+        "frontend/static/sw.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
