@@ -852,6 +852,7 @@ async function equipmentPage() {
     ${isTech() ? `<button onclick="openCsvImport('equipment')" class="btn-secondary" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/equipment/export?token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <a href="/labels?token=${getToken()}" target="_blank" class="btn-secondary" style="font-size:0.8rem;text-decoration:none;">&#9641; QR Labels</a>
+    <button onclick="openHandReceiptModal()" class="btn-secondary" style="font-size:0.8rem;">📄 Hand Receipt</button>
     ${isTech() ? `<button onclick="openEquipmentModal()" class="btn-primary">+ Add Equipment</button>` : ''}`;
   if (!_userList.length) api('GET', '/api/auth/users').then(u => { _userList = u || []; }).catch(()=>{});
   await refreshEquipment();
@@ -3328,7 +3329,7 @@ function pmcsCard(t) {
       <button onclick="openPmcsTemplateModal(pmcsTemplateCache.find(x=>x.id===${t.id}))" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Rename</button>
       <button onclick="openPmcsItems(${t.id})" class="btn-primary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">✎ Edit Items</button>
       <button onclick="openPmcsQR(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">&#9641; QR Code</button>
-      <a href="/pmcs/${t.id}" target="_blank" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;text-decoration:none;">▶ Run</a>
+      <a href="/pmcs/${t.id}" target="_blank" style="font-size:0.95rem;font-weight:700;padding:0.5rem 1.4rem;background:#1e3a5f;color:#fff;border:none;border-radius:0.5rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;">▶ Run Checklist</a>
       <button onclick="openPmcsRuns(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">📋 Past Runs</button>
       <button onclick="openPmcsArchive(${t.id},'${esc(t.title)}')" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">🗂 Archive</button>
       <button onclick="openCsvImport('pmcs-items',${t.id})" class="btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.8rem;">⬆ Import Items</button>
@@ -6272,6 +6273,198 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ─── DA 2062 Hand Receipt ────────────────────────────────────────────────────
+function openHandReceiptModal() {
+  const modal = document.getElementById('hr-modal-backdrop');
+  modal.style.display = 'flex';
+
+  // Set today's date
+  document.getElementById('hr-date').value = new Date().toISOString().slice(0, 10);
+
+  // Auto-number
+  const yr = new Date().getFullYear();
+  document.getElementById('hr-number').value = `HR-${yr}-${String(Math.floor(Math.random()*900)+100)}`;
+
+  // Populate "To" dropdown from assigned_to values in equipment
+  const eq = equipmentData.filter(e => e.status !== 'retired');
+  const people = [...new Set(eq.map(e => e.assigned_to).filter(Boolean))].sort();
+  const cats   = [...new Set(eq.map(e => e.category).filter(Boolean))].sort();
+
+  const toSel = document.getElementById('hr-to');
+  // keep first two options (blank + all), replace rest
+  while (toSel.options.length > 2) toSel.remove(2);
+  people.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; toSel.appendChild(o); });
+
+  const catSel = document.getElementById('hr-category');
+  while (catSel.options.length > 1) catSel.remove(1);
+  cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+
+  previewHandReceiptCount();
+}
+
+function closeHandReceiptModal() {
+  document.getElementById('hr-modal-backdrop').style.display = 'none';
+}
+
+function previewHandReceiptCount() {
+  const to  = document.getElementById('hr-to').value;
+  const cat = document.getElementById('hr-category').value;
+  const eq  = equipmentData.filter(e => e.status !== 'retired');
+  const items = eq.filter(e =>
+    (to === '__all__' || e.assigned_to === to) &&
+    (!cat || e.category === cat)
+  );
+  const el = document.getElementById('hr-count');
+  if (!to) { el.textContent = ''; return; }
+  el.textContent = `${items.length} item${items.length !== 1 ? 's' : ''} will appear on this hand receipt`;
+}
+
+function generateHandReceipt() {
+  const to   = document.getElementById('hr-to').value;
+  const from = document.getElementById('hr-from').value || '9th CST (WMD)';
+  const org  = document.getElementById('hr-org').value  || '9th CST (WMD)';
+  const hrNo = document.getElementById('hr-number').value;
+  const date = document.getElementById('hr-date').value;
+  const cat  = document.getElementById('hr-category').value;
+
+  if (!to) { toast('Select a hand receipt holder', false); return; }
+
+  const eq    = equipmentData.filter(e => e.status !== 'retired');
+  const items = eq.filter(e =>
+    (to === '__all__' || e.assigned_to === to) &&
+    (!cat || e.category === cat)
+  ).sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
+
+  if (!items.length) { toast('No equipment found for this selection', false); return; }
+
+  // Group by category for display
+  const grouped = {};
+  items.forEach(e => {
+    const c = e.category || 'Uncategorized';
+    if (!grouped[c]) grouped[c] = [];
+    grouped[c].push(e);
+  });
+
+  let lineNo = 1;
+  let rows = '';
+  Object.entries(grouped).forEach(([grp, grpItems]) => {
+    rows += `<tr><td colspan="7" style="background:#e8edf2;font-weight:700;font-size:9pt;padding:3px 6px;border:1px solid #999;">${grp}</td></tr>`;
+    grpItems.forEach(e => {
+      rows += `<tr>
+        <td style="border:1px solid #999;padding:3px 5px;text-align:center;">${lineNo++}</td>
+        <td style="border:1px solid #999;padding:3px 5px;font-size:8.5pt;">${e.model || '—'}</td>
+        <td style="border:1px solid #999;padding:3px 5px;font-weight:600;">${e.name}${e.manufacturer ? ' / ' + e.manufacturer : ''}</td>
+        <td style="border:1px solid #999;padding:3px 5px;text-align:center;">EA</td>
+        <td style="border:1px solid #999;padding:3px 5px;text-align:center;">1</td>
+        <td style="border:1px solid #999;padding:3px 5px;font-size:8.5pt;font-family:monospace;">${e.serial_num || '—'}</td>
+        <td style="border:1px solid #999;padding:3px 5px;font-size:8.5pt;">${e.location || ''}</td>
+      </tr>`;
+    });
+  });
+
+  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }) : '';
+
+  const html = `<!DOCTYPE html><html><head><title>DA Form 2062 — Hand Receipt</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 0.5in; }
+  h1 { font-size: 13pt; text-align: center; letter-spacing: .04em; margin-bottom: 2px; }
+  .subtitle { text-align: center; font-size: 9pt; margin-bottom: 12px; color: #444; }
+  .header-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border: 1px solid #999; margin-bottom: 10px; }
+  .hcell { padding: 4px 7px; border-right: 1px solid #999; }
+  .hcell:last-child { border-right: none; }
+  .hlabel { font-size: 7.5pt; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+  .hval { font-size: 10pt; font-weight: 700; margin-top: 1px; }
+  .hval.lg { font-size: 12pt; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9.5pt; }
+  thead th { background: #1e3a5f; color: #fff; padding: 4px 5px; text-align: left; font-size: 8.5pt; letter-spacing:.03em; border: 1px solid #999; }
+  tbody tr:nth-child(even) td { background: #f7f9fc; }
+  .sig-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+  .sig-block { border-top: 1.5px solid #000; padding-top: 4px; }
+  .sig-label { font-size: 8pt; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+  .sig-name  { font-size: 9pt; font-weight: 700; margin-top: 2px; }
+  .sig-title { font-size: 8pt; color: #444; }
+  .sig-date  { font-size: 8pt; color: #444; margin-top: 14px; }
+  .footer { margin-top: 14px; font-size: 7.5pt; color: #888; text-align: center; border-top: 1px solid #ccc; padding-top: 4px; }
+  @media print { body { padding: 0.35in; } button { display: none !important; } }
+</style></head><body>
+  <div style="text-align:center;margin-bottom:12px;">
+    <div style="font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#555;margin-bottom:2px;">Department of the Army</div>
+    <h1>HAND RECEIPT / ANNEX NUMBER</h1>
+    <div class="subtitle">DA FORM 2062 &nbsp;·&nbsp; For use of this form, see DA PAM 710-2-1</div>
+  </div>
+
+  <div class="header-grid">
+    <div class="hcell">
+      <div class="hlabel">Hand Receipt No.</div>
+      <div class="hval lg">${hrNo || '—'}</div>
+    </div>
+    <div class="hcell">
+      <div class="hlabel">Date</div>
+      <div class="hval">${fmtDate(date)}</div>
+    </div>
+    <div class="hcell">
+      <div class="hlabel">Organization / Unit</div>
+      <div class="hval">${org}</div>
+    </div>
+    <div class="hcell" style="border-top:1px solid #999;">
+      <div class="hlabel">From (Primary Hand Receipt Officer)</div>
+      <div class="hval">${from}</div>
+    </div>
+    <div class="hcell" style="border-top:1px solid #999;grid-column:span 2;">
+      <div class="hlabel">To (Sub-Hand Receipt Holder)</div>
+      <div class="hval">${to === '__all__' ? 'All Personnel — Full Property Book' : to}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;">Line No.</th>
+        <th style="width:90px;">Stock No. / Model</th>
+        <th>Item Description / Nomenclature</th>
+        <th style="width:28px;">UI</th>
+        <th style="width:36px;">Qty Auth</th>
+        <th style="width:110px;">Serial / ID Number</th>
+        <th style="width:80px;">Location</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div style="font-size:8.5pt;margin-bottom:16px;">
+    <strong>Total Line Items:</strong> ${lineNo - 1} &nbsp;&nbsp;
+    <strong>Total Equipment Items:</strong> ${items.length}
+  </div>
+
+  <div class="sig-section">
+    <div class="sig-block">
+      <div class="sig-label">Issued by (signature)</div>
+      <div class="sig-name">${from}</div>
+      <div class="sig-title">Primary Hand Receipt Officer</div>
+      <div class="sig-date">Date: ___________________________</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Received by (signature)</div>
+      <div class="sig-name">${to === '__all__' ? '________________________________' : to}</div>
+      <div class="sig-title">Sub-Hand Receipt Holder</div>
+      <div class="sig-date">Date: ___________________________</div>
+    </div>
+  </div>
+
+  <div class="footer">Generated by GEAR GUARD · ${new Date().toLocaleString()} · This document is for administrative use.</div>
+
+  <div style="text-align:center;margin-top:20px;">
+    <button onclick="window.print()" style="padding:8px 24px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;font-size:11pt;cursor:pointer;">🖨 Print / Save as PDF</button>
+  </div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  closeHandReceiptModal();
+}
+
 // ─── QR Scanner ──────────────────────────────────────────────────────────────
 let _qrScanner = null;
 
@@ -6495,6 +6688,56 @@ window.addEventListener('load', () => {
   }
 });
 </script>
+
+<!-- Hand Receipt Modal -->
+<div id="hr-modal-backdrop" style="display:none;position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:0.75rem;width:min(95vw,520px);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb;">
+      <div style="font-weight:700;font-size:1rem;">Generate DA Form 2062 — Hand Receipt</div>
+      <button onclick="closeHandReceiptModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">From (Hand Receipt Officer)</label>
+          <input id="hr-from" class="form-input" style="width:100%;" placeholder="Rank Last, First MI" value="9th CST (WMD)">
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">Organization</label>
+          <input id="hr-org" class="form-input" style="width:100%;" placeholder="Unit / Organization" value="9th CST (WMD)">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">To (Primary Hand Receipt Holder)</label>
+        <select id="hr-to" class="form-input" style="width:100%;" onchange="previewHandReceiptCount()">
+          <option value="">— Select a person —</option>
+          <option value="__all__">All equipment (full property book)</option>
+        </select>
+        <div id="hr-count" style="font-size:0.72rem;color:#6b7280;margin-top:0.3rem;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">Hand Receipt No.</label>
+          <input id="hr-number" class="form-input" style="width:100%;" placeholder="e.g. HR-2026-001">
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">Date</label>
+          <input id="hr-date" type="date" class="form-input" style="width:100%;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">Filter by Category <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <select id="hr-category" class="form-input" style="width:100%;" onchange="previewHandReceiptCount()">
+          <option value="">All categories</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding:1rem 1.25rem;border-top:1px solid #e5e7eb;">
+      <button onclick="closeHandReceiptModal()" class="btn-secondary">Cancel</button>
+      <button onclick="generateHandReceipt()" class="btn-primary">📄 Generate & Print</button>
+    </div>
+  </div>
+</div>
 
 <!-- QR Scanner Modal -->
 <div id="qr-scanner-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);flex-direction:column;align-items:center;justify-content:center;">
