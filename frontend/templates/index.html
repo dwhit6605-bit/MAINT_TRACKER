@@ -6272,6 +6272,72 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ─── QR Scanner ──────────────────────────────────────────────────────────────
+let _qrScanner = null;
+
+function openQrScanner() {
+  const modal = document.getElementById('qr-scanner-modal');
+  modal.style.display = 'flex';
+  document.getElementById('qr-status-text').textContent = 'Starting camera…';
+
+  if (!window.Html5Qrcode) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    s.onload = _startQrCamera;
+    document.head.appendChild(s);
+  } else {
+    _startQrCamera();
+  }
+}
+
+function _startQrCamera() {
+  _qrScanner = new Html5Qrcode('qr-reader');
+  const config = { fps: 10, qrbox: { width: 200, height: 200 }, aspectRatio: 1.0 };
+  _qrScanner.start(
+    { facingMode: 'environment' },
+    config,
+    _onQrSuccess,
+    () => {}
+  ).then(() => {
+    document.getElementById('qr-status-text').textContent = 'Ready — align QR code in frame';
+  }).catch(err => {
+    document.getElementById('qr-status-text').textContent = 'Camera unavailable: ' + (err.message || err);
+  });
+}
+
+function _onQrSuccess(decodedText) {
+  closeQrScanner();
+  try {
+    const url = new URL(decodedText);
+    const path = url.pathname;
+    const params = url.searchParams;
+
+    if (params.get('open')) {
+      const eqId = parseInt(params.get('open'));
+      navigate('equipment');
+      setTimeout(() => openEqDetail(eqId), 400);
+      toast('Opening equipment #' + eqId);
+      return;
+    }
+    const pmcsMatch = path.match(/\/pmcs\/(\d+)/);
+    if (pmcsMatch) {
+      window.location.href = decodedText + (decodedText.includes('?') ? '&' : '?') + 'token=' + getToken();
+      return;
+    }
+    toast('Unrecognized QR code', false);
+  } catch {
+    toast('Invalid QR code', false);
+  }
+}
+
+function closeQrScanner() {
+  document.getElementById('qr-scanner-modal').style.display = 'none';
+  if (_qrScanner) {
+    _qrScanner.stop().catch(() => {});
+    _qrScanner = null;
+  }
+}
+
 function filterPmcsCompliance() {
   const cat = document.getElementById('pmcs-cat-filter')?.value || '';
   document.querySelectorAll('#pmcs-compliance-tbody tr').forEach(row => {
@@ -6430,6 +6496,33 @@ window.addEventListener('load', () => {
 });
 </script>
 
+<!-- QR Scanner Modal -->
+<div id="qr-scanner-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);flex-direction:column;align-items:center;justify-content:center;">
+  <div style="width:min(92vw,380px);background:#111827;border-radius:1rem;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.6);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem;border-bottom:1px solid #1f2937;">
+      <div>
+        <div style="font-weight:600;font-size:0.95rem;color:#f9fafb;">Scan Equipment QR</div>
+        <div style="font-size:0.72rem;color:#6b7280;margin-top:1px;">Point camera at any GEAR GUARD QR code</div>
+      </div>
+      <button onclick="closeQrScanner()" style="background:none;border:none;color:#9ca3af;font-size:1.4rem;cursor:pointer;line-height:1;padding:0 0.25rem;">✕</button>
+    </div>
+    <div style="position:relative;background:#000;">
+      <div id="qr-reader" style="width:100%;"></div>
+      <div id="qr-viewfinder" style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;">
+        <div style="width:200px;height:200px;position:relative;">
+          <div style="position:absolute;top:0;left:0;width:28px;height:28px;border-top:3px solid #3b82f6;border-left:3px solid #3b82f6;border-radius:3px 0 0 0;"></div>
+          <div style="position:absolute;top:0;right:0;width:28px;height:28px;border-top:3px solid #3b82f6;border-right:3px solid #3b82f6;border-radius:0 3px 0 0;"></div>
+          <div style="position:absolute;bottom:0;left:0;width:28px;height:28px;border-bottom:3px solid #3b82f6;border-left:3px solid #3b82f6;border-radius:0 0 0 3px;"></div>
+          <div style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-bottom:3px solid #3b82f6;border-right:3px solid #3b82f6;border-radius:0 0 3px 0;"></div>
+        </div>
+      </div>
+    </div>
+    <div id="qr-status" style="padding:0.75rem 1rem;font-size:0.8rem;color:#6b7280;text-align:center;min-height:2.5rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+      <span id="qr-status-text">Starting camera…</span>
+    </div>
+  </div>
+</div>
+
 <!-- Mobile bottom navigation bar -->
 <nav id="bottom-nav" role="navigation" aria-label="Main navigation">
   <button class="bnav-btn" id="bnav-dashboard" onclick="navigate('dashboard');bnavActive('dashboard')">
@@ -6444,9 +6537,9 @@ window.addEventListener('load', () => {
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Equipment
   </button>
-  <button class="bnav-btn" id="bnav-faults" onclick="navigate('faults');bnavActive('faults')">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-    Faults
+  <button class="bnav-btn" id="bnav-scan" onclick="openQrScanner()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+    Scan
   </button>
   <button class="bnav-btn" id="bnav-more" onclick="toggleSidebar()">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
