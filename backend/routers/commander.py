@@ -104,7 +104,7 @@ async def commander_summary(request: Request, db=Depends(get_db)):
         FROM pmcs_templates t
         LEFT JOIN pmcs_sessions s ON s.template_id = t.id AND s.status='completed'
         GROUP BY t.id, t.title
-        ORDER BY last_run ASC NULLS FIRST
+        ORDER BY CASE WHEN MAX(s.completed_at) IS NULL THEN 0 ELSE 1 END ASC, last_run ASC
         LIMIT 5
     """) as cur:
         pmcs_status = [dict(r) for r in await cur.fetchall()]
