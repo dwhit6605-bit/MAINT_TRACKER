@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 from backend.database import get_db
-from backend.auth import require_command
 
 router = APIRouter(prefix="/api/commander", tags=["commander"])
 
 
 @router.get("")
 async def commander_summary(request: Request, db=Depends(get_db)):
-    require_command(request)
 
     async def scalar(sql, params=()):
         async with db.execute(sql, params) as cur:
