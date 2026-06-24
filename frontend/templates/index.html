@@ -6677,50 +6677,6 @@ async function myWorkPage() {
 
     </div>`;
 }
-</script>
-<script>
-// ── PWA install ───────────────────────────────────────────────────────────────
-let _pwaPrompt = null;
-
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _pwaPrompt = e;
-  const bar = document.getElementById('pwa-install-bar');
-  if (bar) bar.style.display = '';
-});
-
-window.addEventListener('appinstalled', () => {
-  _pwaPrompt = null;
-  const bar = document.getElementById('pwa-install-bar');
-  if (bar) bar.style.display = 'none';
-});
-
-function pwaInstall() {
-  if (_pwaPrompt) {
-    _pwaPrompt.prompt();
-    _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; });
-  } else {
-    // iOS / browsers that don't support beforeinstallprompt
-    modal(`<div class="modal" style="max-width:22rem;">
-      <div class="px-6 py-4 border-b flex items-center justify-between">
-        <h2 class="font-semibold">Install GEAR GUARD</h2>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-      </div>
-      <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
-        <p><strong>iPhone / iPad (Safari):</strong></p>
-        <ol style="padding-left:1.25rem;line-height:1.8;">
-          <li>Tap the <strong>Share</strong> button <span style="font-size:1rem;">⬆</span> at the bottom of Safari</li>
-          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-          <li>Tap <strong>Add</strong></li>
-        </ol>
-        <p style="color:#6b7280;font-size:0.78rem;">The app will appear on your home screen and open full-screen without the browser bar.</p>
-      </div>
-      <div class="px-6 pb-5 flex justify-end">
-        <button onclick="closeModal()" class="btn-primary">Got it</button>
-      </div>
-    </div>`);
-  }
-}
 
 // ── Commander Dashboard ────────────────────────────────────────────────────────
 async function commanderPage() {
@@ -6887,6 +6843,53 @@ async function commanderPage() {
       <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">Master Sergeant / Date</div></div>
     </div>
   </div>`;
+}
+
+
+// Moved here so PAGES const can reference it during initialization
+</script>
+<script>
+// ── PWA install ───────────────────────────────────────────────────────────────
+let _pwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  const bar = document.getElementById('pwa-install-bar');
+  if (bar) bar.style.display = '';
+});
+
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  const bar = document.getElementById('pwa-install-bar');
+  if (bar) bar.style.display = 'none';
+});
+
+function pwaInstall() {
+  if (_pwaPrompt) {
+    _pwaPrompt.prompt();
+    _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; });
+  } else {
+    // iOS / browsers that don't support beforeinstallprompt
+    modal(`<div class="modal" style="max-width:22rem;">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h2 class="font-semibold">Install GEAR GUARD</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
+        <p><strong>iPhone / iPad (Safari):</strong></p>
+        <ol style="padding-left:1.25rem;line-height:1.8;">
+          <li>Tap the <strong>Share</strong> button <span style="font-size:1rem;">⬆</span> at the bottom of Safari</li>
+          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+          <li>Tap <strong>Add</strong></li>
+        </ol>
+        <p style="color:#6b7280;font-size:0.78rem;">The app will appear on your home screen and open full-screen without the browser bar.</p>
+      </div>
+      <div class="px-6 pb-5 flex justify-end">
+        <button onclick="closeModal()" class="btn-primary">Got it</button>
+      </div>
+    </div>`);
+  }
 }
 
 // ── Service Worker ─────────────────────────────────────────────────────────────
