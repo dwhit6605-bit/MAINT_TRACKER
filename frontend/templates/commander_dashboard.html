@@ -176,19 +176,12 @@
       {% if top_faults %}
         {% for f in top_faults %}
           {% set age = f.age_days or 0 %}
-          {% if age > 3 %}
-            {% set bc, tc = '#fef2f2', '#dc2626' %}
-          {% elif age > 1 %}
-            {% set bc, tc = '#fffbeb', '#b45309' %}
-          {% else %}
-            {% set bc, tc = '#f8fafc', '#64748b' %}
-          {% endif %}
           <div class="item-row">
             <div class="item-name">
               {{ f.title or 'Untitled' }}
               <span class="item-sub"> · {{ f.equipment_name or '—' }}</span>
             </div>
-            <span class="badge" style="background:{{ bc }};color:{{ tc }};">Day {{ age }}</span>
+            <span class="badge {% if age > 3 %}badge-red{% elif age > 1 %}badge-amber{% else %}badge-gray{% endif %}">Day {{ age }}</span>
           </div>
         {% endfor %}
       {% else %}
@@ -225,20 +218,15 @@
     <div class="card">
       <div class="card-title">Vehicle status</div>
       {% for v in vehicles %}
-        {% if v.status == 'available' %}
-          {% set bc, tc = '#f0fdf4', '#15803d' %}{% set lbl = 'Available' %}
-        {% elif v.status == 'dispatched' %}
-          {% set bc, tc = '#eff6ff', '#1d4ed8' %}{% set lbl = 'Dispatched' %}
-        {% elif v.status == 'maintenance' %}
-          {% set bc, tc = '#fffbeb', '#b45309' %}{% set lbl = 'Maintenance' %}
-        {% elif v.status == 'deadline' %}
-          {% set bc, tc = '#fef2f2', '#dc2626' %}{% set lbl = 'Deadline' %}
-        {% else %}
-          {% set bc, tc = '#f8fafc', '#64748b' %}{% set lbl = v.status | title %}
-        {% endif %}
         <div class="item-row">
           <div class="item-name">{{ v.name }}</div>
-          <span class="badge" style="background:{{ bc }};color:{{ tc }};">{{ lbl }}</span>
+          <span class="badge {% if v.status == 'available' %}badge-green{% elif v.status == 'dispatched' %}badge-blue{% elif v.status == 'maintenance' %}badge-amber{% elif v.status == 'deadline' %}badge-red{% else %}badge-gray{% endif %}">
+            {% if v.status == 'available' %}Available
+            {% elif v.status == 'dispatched' %}Dispatched
+            {% elif v.status == 'maintenance' %}Maintenance
+            {% elif v.status == 'deadline' %}Deadline
+            {% else %}{{ v.status | title }}{% endif %}
+          </span>
         </div>
       {% else %}
         <div class="empty">No vehicles on record.</div>
