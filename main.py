@@ -27,7 +27,7 @@ from backend.notifications import run_daily_check
 scheduler = AsyncIOScheduler()
 
 # Paths that don't require authentication
-_PUBLIC_PATHS = {"/login", "/api/auth/login"}
+_PUBLIC_PATHS = {"/login", "/api/auth/login", "/api/commander"}
 _PUBLIC_PREFIXES = ("/static", "/uploads", "/sw.js")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
