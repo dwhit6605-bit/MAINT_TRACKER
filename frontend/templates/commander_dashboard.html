@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="300">
+  <title>9th CST (WMD) — Commander's Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      color: #111827;
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+
+    /* Header */
+    .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+    .header-unit { font-size: 0.65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
+    .header-title { font-size: 1.35rem; font-weight: 700; color: #0f172a; }
+    .header-meta { font-size: 0.72rem; color: #94a3b8; margin-top: 0.2rem; }
+    .header-right { display: flex; gap: 0.6rem; align-items: center; }
+    .print-btn { font-size: 0.75rem; font-weight: 600; padding: 0.45rem 1rem; border-radius: 0.375rem; border: 1px solid #cbd5e1; background: #fff; color: #374151; cursor: pointer; }
+    .print-btn:hover { background: #f8fafc; }
+
+    /* Stat cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+    .stat-card { background: #fff; border-radius: 0.75rem; border: 1px solid #e2e8f0; padding: 1.1rem 1.25rem; }
+    .stat-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.5rem; }
+    .stat-val { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .stat-sub { font-size: 0.72rem; margin-top: 0.35rem; font-weight: 500; }
+    .c-green { color: #15803d; } .c-amber { color: #b45309; } .c-red { color: #dc2626; } .c-gray { color: #6b7280; }
+
+    /* Layout rows */
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
+
+    /* Cards */
+    .card { background: #fff; border-radius: 0.75rem; border: 1px solid #e2e8f0; padding: 1rem 1.25rem; }
+    .card-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.85rem; }
+
+    /* Bar chart */
+    .bar-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.55rem; }
+    .bar-label { width: 130px; font-size: 0.78rem; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { flex: 1; height: 8px; background: #f1f5f9; border-radius: 9999px; overflow: hidden; }
+    .bar-fill { height: 8px; border-radius: 9999px; }
+    .bar-pct { width: 36px; text-align: right; font-size: 0.72rem; font-weight: 600; }
+
+    /* List rows */
+    .item-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+                padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.82rem; }
+    .item-row:last-child { border-bottom: none; }
+    .item-name { flex: 1; color: #1e293b; }
+    .item-sub { font-size: 0.7rem; color: #94a3b8; }
+
+    /* Badges */
+    .badge { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.2rem 0.6rem;
+             border-radius: 9999px; white-space: nowrap; }
+    .badge-red    { background: #fef2f2; color: #dc2626; }
+    .badge-amber  { background: #fffbeb; color: #b45309; }
+    .badge-green  { background: #f0fdf4; color: #15803d; }
+    .badge-blue   { background: #eff6ff; color: #1d4ed8; }
+    .badge-gray   { background: #f8fafc; color: #64748b; }
+
+    /* Signature block */
+    .sig-section { background: #fff; border-radius: 0.75rem; border: 1px solid #e2e8f0; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+    .sig-row { display: flex; justify-content: space-around; margin-top: 1rem; }
+    .sig-col { text-align: center; }
+    .sig-line { width: 200px; height: 1px; background: #94a3b8; margin: 2rem auto 0.4rem; }
+    .sig-lbl { font-size: 0.68rem; color: #94a3b8; }
+
+    /* Footer */
+    .footer { text-align: center; font-size: 0.68rem; color: #94a3b8; margin-top: 1rem; }
+
+    /* Empty state */
+    .empty { font-size: 0.82rem; color: #15803d; padding: 0.5rem 0; }
+
+    @media (max-width: 700px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .row2, .row3 { grid-template-columns: 1fr; }
+      .sig-row { flex-direction: column; gap: 1.5rem; align-items: center; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .print-btn { display: none; }
+      .page { max-width: 100%; padding: 0.5rem; }
+      .stat-grid { grid-template-columns: repeat(4, 1fr); }
+      .row2 { grid-template-columns: 1fr 1fr; }
+      .row3 { grid-template-columns: 1fr 1fr 1fr; }
+      .card, .stat-card, .sig-section { break-inside: avoid; border: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div>
+      <div class="header-unit">9th Civil Support Team (WMD) · GEAR GUARD</div>
+      <div class="header-title">Commander's Readiness Summary</div>
+      <div class="header-meta">As of {{ generated }} · Auto-refreshes every 5 min · Read-only public view</div>
+    </div>
+    <div class="header-right">
+      <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+    </div>
+  </div>
+
+  <!-- Top stats -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Equipment MC%</div>
+      {% if mc_pct >= 90 %}
+        <div class="stat-val c-green">{{ mc_pct }}%</div>
+        <div class="stat-sub c-green">{{ mc_count }} of {{ total_eq }} mission capable</div>
+      {% elif mc_pct >= 75 %}
+        <div class="stat-val c-amber">{{ mc_pct }}%</div>
+        <div class="stat-sub c-amber">{{ mc_count }} of {{ total_eq }} mission capable</div>
+      {% else %}
+        <div class="stat-val c-red">{{ mc_pct }}%</div>
+        <div class="stat-sub c-red">{{ mc_count }} of {{ total_eq }} mission capable</div>
+      {% endif %}
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Open Faults</div>
+      {% if open_faults == 0 %}
+        <div class="stat-val c-green">0</div>
+        <div class="stat-sub c-green">No open faults</div>
+      {% elif urgent_faults > 0 %}
+        <div class="stat-val c-red">{{ open_faults }}</div>
+        <div class="stat-sub c-red">{{ urgent_faults }} exceed 48 hours</div>
+      {% else %}
+        <div class="stat-val c-amber">{{ open_faults }}</div>
+        <div class="stat-sub c-amber">None exceed 48 hours</div>
+      {% endif %}
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Calibration Overdue</div>
+      {% if cal_overdue == 0 %}
+        <div class="stat-val c-green">0</div>
+        <div class="stat-sub c-green">{{ cal_due_14d }} due within 14 days</div>
+      {% else %}
+        <div class="stat-val c-red">{{ cal_overdue }}</div>
+        <div class="stat-sub c-amber">{{ cal_due_14d }} more due within 14 days</div>
+      {% endif %}
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Vehicles Available</div>
+      <div class="stat-val">{{ rs_available }} <span style="font-size:1.1rem;font-weight:400;color:#94a3b8;">/ {{ rs_total }}</span></div>
+      <div class="stat-sub c-gray">{{ rs_dispatched }} dispatched · {{ rs_down }} down</div>
+    </div>
+  </div>
+
+  <!-- Readiness by category + Open faults -->
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Readiness by category</div>
+      {% for cat in by_category %}
+        {% set pct = ((cat.active / cat.total) * 100) | round | int if cat.total else 0 %}
+        {% set color = '#15803d' if pct >= 90 else ('#b45309' if pct >= 75 else '#dc2626') %}
+        <div class="bar-row">
+          <div class="bar-label">{{ cat.category }}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:{{ pct }}%;background:{{ color }};"></div></div>
+          <div class="bar-pct" style="color:{{ color }};">{{ pct }}%</div>
+        </div>
+      {% else %}
+        <div class="empty">No equipment data.</div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Open faults — by age</div>
+      {% if top_faults %}
+        {% for f in top_faults %}
+          {% set age = f.age_days or 0 %}
+          {% if age > 3 %}
+            {% set bc, tc = '#fef2f2', '#dc2626' %}
+          {% elif age > 1 %}
+            {% set bc, tc = '#fffbeb', '#b45309' %}
+          {% else %}
+            {% set bc, tc = '#f8fafc', '#64748b' %}
+          {% endif %}
+          <div class="item-row">
+            <div class="item-name">
+              {{ f.title or 'Untitled' }}
+              <span class="item-sub"> · {{ f.equipment_name or '—' }}</span>
+            </div>
+            <span class="badge" style="background:{{ bc }};color:{{ tc }};">Day {{ age }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No open faults ✓</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Cal status + Vehicles + PMCS -->
+  <div class="row3">
+    <div class="card">
+      <div class="card-title">Calibration status</div>
+      {% if cal_items %}
+        {% for c in cal_items %}
+          {% set over = c.days_over or 0 %}
+          {% if over > 0 %}
+            <div class="item-row">
+              <div class="item-name">{{ c.equipment_name }}</div>
+              <span class="badge badge-red">{{ over }}d overdue</span>
+            </div>
+          {% else %}
+            {% set remaining = (over * -1) %}
+            <div class="item-row">
+              <div class="item-name">{{ c.equipment_name }}</div>
+              <span class="badge {% if remaining <= 3 %}badge-red{% else %}badge-amber{% endif %}">Due in {{ remaining }}d</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="empty">All calibrations current ✓</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Vehicle status</div>
+      {% for v in vehicles %}
+        {% if v.status == 'available' %}
+          {% set bc, tc = '#f0fdf4', '#15803d' %}{% set lbl = 'Available' %}
+        {% elif v.status == 'dispatched' %}
+          {% set bc, tc = '#eff6ff', '#1d4ed8' %}{% set lbl = 'Dispatched' %}
+        {% elif v.status == 'maintenance' %}
+          {% set bc, tc = '#fffbeb', '#b45309' %}{% set lbl = 'Maintenance' %}
+        {% elif v.status == 'deadline' %}
+          {% set bc, tc = '#fef2f2', '#dc2626' %}{% set lbl = 'Deadline' %}
+        {% else %}
+          {% set bc, tc = '#f8fafc', '#64748b' %}{% set lbl = v.status | title %}
+        {% endif %}
+        <div class="item-row">
+          <div class="item-name">{{ v.name }}</div>
+          <span class="badge" style="background:{{ bc }};color:{{ tc }};">{{ lbl }}</span>
+        </div>
+      {% else %}
+        <div class="empty">No vehicles on record.</div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-title">PMCS compliance</div>
+      {% for p in pmcs_status %}
+        {% if not p.last_run %}
+          <div class="item-row">
+            <div class="item-name">{{ p.title }}</div>
+            <span class="badge badge-red">Never run</span>
+          </div>
+        {% elif p.days_since > 30 %}
+          <div class="item-row">
+            <div class="item-name">{{ p.title }}</div>
+            <span class="badge badge-red">{{ p.days_since }}d ago</span>
+          </div>
+        {% elif p.days_since > 14 %}
+          <div class="item-row">
+            <div class="item-name">{{ p.title }}</div>
+            <span class="badge badge-amber">{{ p.days_since }}d ago</span>
+          </div>
+        {% else %}
+          <div class="item-row">
+            <div class="item-name">{{ p.title }}</div>
+            <span class="badge badge-green">Current</span>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="empty">No PMCS templates configured.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Signature block -->
+  <div class="sig-section">
+    <div class="card-title">Commander's certification</div>
+    <p style="font-size:0.78rem;color:#64748b;">
+      I certify that the above readiness data is accurate as of the date shown and reflects
+      the current operational status of all assigned equipment and personnel.
+    </p>
+    <div class="sig-row">
+      <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">Commanding Officer / Date</div></div>
+      <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">Unit Maintenance Officer / Date</div></div>
+      <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">Master Sergeant / Date</div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    GEAR GUARD · 9th CST (WMD) · Generated {{ generated }} ·
+    <a href="/login" style="color:#94a3b8;text-decoration:underline;">Staff login</a>
+  </div>
+
+</div>
+</body>
+</html>
