@@ -27,7 +27,7 @@ from backend.notifications import run_daily_check
 scheduler = AsyncIOScheduler()
 
 # Paths that don't require authentication
-_PUBLIC_PATHS = {"/login", "/api/auth/login", "/commander", "/Commander"}
+_PUBLIC_PATHS = {"/login", "/api/auth/login", "/cub"}
 _PUBLIC_PREFIXES = ("/static", "/uploads", "/sw.js")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
@@ -116,12 +116,7 @@ async def service_worker():
     )
 
 
-@app.get("/Commander", response_class=HTMLResponse)
-async def commander_redirect():
-    return RedirectResponse("/commander", status_code=301)
-
-
-@app.get("/commander", response_class=HTMLResponse)
+@app.get("/cub", response_class=HTMLResponse)
 async def commander_public(request: Request):
     import aiosqlite
     from datetime import date
