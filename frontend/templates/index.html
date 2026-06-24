@@ -381,7 +381,13 @@ function toast(msg, ok=true) {
   setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-function fmtDate(d) { if (!d) return '—'; const s = String(d).slice(0,10); return new Date(s+'T00:00:00').toLocaleDateString(); }
+function fmtDate(d) {
+  if (!d) return '—';
+  const s = String(d).slice(0,10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '—';
+  return new Date(+m[1], +m[2]-1, +m[3]).toLocaleDateString();
+}
 function daysUntil(d) {
   if (!d) return null;
   return Math.round((new Date(String(d).slice(0,10)+'T00:00:00') - new Date()) / 86400000);
@@ -1866,8 +1872,8 @@ function eqUpdateCalDue(calId) {
       <button onclick="document.getElementById('subtask-backdrop').remove()" style="color:#9ca3af;font-size:1.5rem;background:none;border:none;cursor:pointer;">&times;</button>
     </div>
     <form class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" onsubmit="eqPatchCalDue(event,${calId},${eqId})">
-      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eq" name="calibrated_at" required value="${cal.calibrated_at||''}" onchange="applyCalInterval('cal-date-eq','next_due',document.getElementById('next_due-interval')?.value)"></div>
-      <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-eq','next_due',cal.next_due||'')}</div>
+      <div><label class="label">Calibrated At *</label><input class="input" type="date" id="cal-date-eq" name="calibrated_at" required value="${(cal.calibrated_at||'').slice(0,10)}" onchange="applyCalInterval('cal-date-eq','next_due',document.getElementById('next_due-interval')?.value)"></div>
+      <div><label class="label">Next Due</label>${calIntervalPicker('cal-date-eq','next_due',(cal.next_due||'').slice(0,10))}</div>
       <div><label class="label">Calibrated By</label><input class="input" name="calibrated_by" value="${esc(cal.calibrated_by||'')}"></div>
       <div><label class="label">Certificate #</label><input class="input" name="certificate_num" value="${esc(cal.certificate_num||'')}"></div>
       <div><label class="label">Result</label>
