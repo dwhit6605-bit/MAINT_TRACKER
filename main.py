@@ -21,6 +21,7 @@ from backend.routers import rolling_stock as rolling_stock_router
 from backend.routers import task_attachments as task_attachments_router
 from backend.routers import faults as faults_router
 from backend.routers import eq_checklists as eq_checklists_router
+from backend.routers import commander as commander_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -103,6 +104,7 @@ app.include_router(rolling_stock_router.router)
 app.include_router(task_attachments_router.router)
 app.include_router(faults_router.router)
 app.include_router(eq_checklists_router.router)
+app.include_router(commander_router.router)
 
 
 @app.get("/sw.js")

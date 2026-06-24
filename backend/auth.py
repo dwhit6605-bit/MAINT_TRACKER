@@ -31,12 +31,14 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
-VALID_ROLES = {"admin", "team_chief", "tech", "operator"}
+VALID_ROLES = {"admin", "team_chief", "tech", "operator", "command-user"}
 
 # Roles with elevated (admin-equivalent) access — user management, etc.
 _ADMIN_ROLES = {"admin", "team_chief"}
 # Roles that can create/edit records
 _TECH_ROLES  = {"admin", "team_chief", "tech"}
+# Roles with read-only commander view
+_COMMAND_ROLES = {"admin", "team_chief", "command-user"}
 
 
 def require_admin(request: Request):
@@ -60,4 +62,12 @@ def require_tech(request: Request):
     user = getattr(request.state, "user", None)
     if not user or user.get("role") not in _TECH_ROLES:
         raise HTTPException(403, "Technician access required")
+    return user
+
+
+def require_command(request: Request):
+    """Admin, Team Chief, or Command-User — read-only commander view."""
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") not in _COMMAND_ROLES:
+        raise HTTPException(403, "Command access required")
     return user
