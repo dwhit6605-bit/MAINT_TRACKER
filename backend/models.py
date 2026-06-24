@@ -18,6 +18,7 @@ class EquipmentCreate(BaseModel):
     out_for: Optional[str] = None          # "service" | "calibration" | null
     out_since: Optional[str] = None
     expected_return: Optional[str] = None
+    reference_url: Optional[str] = None
 
 
 class EquipmentUpdate(EquipmentCreate):

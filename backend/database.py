@@ -341,6 +341,8 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN out_since TEXT")
         if "expected_return" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN expected_return TEXT")
+        if "reference_url" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN reference_url TEXT")
 
         pmcs_item_cols = {row[1] async for row in await db.execute("PRAGMA table_info(pmcs_items)")}
         if "equipment_id" not in pmcs_item_cols:

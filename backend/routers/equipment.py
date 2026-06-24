@@ -62,11 +62,11 @@ async def create_equipment(data: EquipmentCreate, request: Request, db=Depends(g
     require_tech(request)
     async with db.execute("""
         INSERT INTO equipment (name, category, serial_num, model, manufacturer,
-            location, assigned_to, status, notes, purchase_date, warranty_expiry, end_of_life_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            location, assigned_to, status, notes, purchase_date, warranty_expiry, end_of_life_date, reference_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data.name, data.category, data.serial_num, data.model,
           data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
-          data.purchase_date, data.warranty_expiry, data.end_of_life_date)) as cur:
+          data.purchase_date, data.warranty_expiry, data.end_of_life_date, data.reference_url)) as cur:
         eq_id = cur.lastrowid
     await audit.log(db, "equipment", eq_id, "created", equipment_id=eq_id,
                     detail={"name": data.name, "category": data.category})
@@ -81,13 +81,13 @@ async def update_equipment(eq_id: int, data: EquipmentUpdate, request: Request, 
         UPDATE equipment SET name=?, category=?, serial_num=?, model=?, manufacturer=?,
             location=?, assigned_to=?, status=?, notes=?,
             purchase_date=?, warranty_expiry=?, end_of_life_date=?,
-            out_for=?, out_since=?, expected_return=?,
+            out_for=?, out_since=?, expected_return=?, reference_url=?,
             updated_at=datetime('now')
         WHERE id=?
     """, (data.name, data.category, data.serial_num, data.model,
           data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
           data.purchase_date, data.warranty_expiry, data.end_of_life_date,
-          data.out_for, data.out_since, data.expected_return, eq_id))
+          data.out_for, data.out_since, data.expected_return, data.reference_url, eq_id))
     await audit.log(db, "equipment", eq_id, "updated", equipment_id=eq_id,
                     detail={"name": data.name, "status": data.status})
     await db.commit()
