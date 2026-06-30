@@ -100,7 +100,17 @@
       .modal .grid-cols-2, .modal .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
       .modal .col-span-2 { grid-column: span 1 !important; }
       /* Bigger tap targets for table action links */
-      .table-row td a, .table-row td button { min-height: 36px; display:inline-flex; align-items:center; }
+      .table-row td a, .table-row td button { min-height: 44px; display:inline-flex; align-items:center; justify-content:center; }
+      /* Inputs: prevent iOS auto-zoom (requires 16px) + proper height */
+      .input, input[type="text"], input[type="date"], input[type="number"], input[type="password"], input[type="email"], textarea, select { font-size: 16px !important; min-height: 44px; }
+      /* All buttons should be easy to tap */
+      button, .btn-primary, .btn-secondary, .btn-danger { min-height: 44px; }
+      #page-actions button, #page-actions a { min-height: 40px; }
+      /* Checkbox hit areas */
+      input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
+      /* Bulk bar: wrap on mobile */
+      #eq-bulk-bar { flex-wrap: wrap; gap: 0.4rem !important; padding: 0.75rem !important; }
+      #eq-bulk-bar button { min-height: 40px; font-size: 0.8rem !important; padding: 0.4rem 0.8rem !important; }
       /* Bottom nav bar */
       #bottom-nav { display:flex; }
       /* Cards stack full-width */
@@ -663,6 +673,7 @@ function showOverdueBanner(overdueTasks, overdueCals) {}
 let _dashMyTasks = false;
 
 async function dashboardPage() {
+  $('page-actions').innerHTML = `<button onclick="openDashCustomize()" class="btn-secondary" style="font-size:0.8rem;">⚙ Customize</button>`;
   let data;
   const meParam = currentUser?.username ? `?me=${encodeURIComponent(currentUser.username)}` : '';
   try {
@@ -709,6 +720,7 @@ async function dashboardPage() {
 
   $('page-content').innerHTML = `
     <!-- Stat cards -->
+    ${widgetOn('stat-cards') ? `
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
       ${statCard('Equipment', c.total_equipment, 'bg-stone-100 text-stone-800', 'Active')}
       ${statCard('Overdue Tasks', c.overdue_tasks, c.overdue_tasks?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Maintenance')}
@@ -718,11 +730,11 @@ async function dashboardPage() {
       ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
       ${statCard('My Tasks', data.my_tasks_count||0, (data.my_tasks_count||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', 'Assigned to me')}
       ${statCard('PMCS Stale', data.stale_pmcs||0, (data.stale_pmcs||0)?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700', 'Checklists >30d or never run')}
-    </div>
+    </div>` : ''}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <!-- Upcoming maintenance -->
-      <div class="card">
+      ${widgetOn('upcoming-maintenance') ? `<div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
           <h2 class="font-semibold text-gray-700">Upcoming Maintenance</h2>
           <button id="dash-my-tasks-btn" onclick="dashToggleMyTasks()" style="font-size:0.72rem;padding:0.2rem 0.7rem;border-radius:9999px;border:1px solid #d1d5db;background:${_dashMyTasks?'#1d4ed8':'#f9fafb'};color:${_dashMyTasks?'#fff':'#374151'};cursor:pointer;">My Tasks${data.my_tasks_count?' ('+data.my_tasks_count+')':''}</button>
@@ -746,10 +758,10 @@ async function dashboardPage() {
           </table></div>`;
         })()}
         </div>
-      </div>
+      </div>` : ''}
 
       <!-- Calibration due -->
-      <div class="card">
+      ${widgetOn('calibration-due') ? `<div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
           <h2 class="font-semibold text-gray-700">Calibration Due</h2>
           ${isTech() ? `<button onclick="navigate('calibration')" style="font-size:0.72rem;background:#eff6ff;color:#1d4ed8;border:none;border-radius:0.375rem;padding:0.2rem 0.6rem;cursor:pointer;">+ Log Cal</button>` : ''}
@@ -774,11 +786,11 @@ async function dashboardPage() {
             </tbody>
           </table>`;
         })() : '<p class="text-sm text-gray-400">No calibrations due in the next 30 days.</p>'}
-      </div>
+      </div>` : ''}
     </div>
 
     <!-- Low stock -->
-    ${c.low_stock ? `
+    ${widgetOn('low-stock') && c.low_stock ? `
     <div class="card mt-4">
       <h2 class="font-semibold text-gray-700 mb-3">Low Stock Items</h2>
       <table class="w-full text-sm">
@@ -797,7 +809,7 @@ async function dashboardPage() {
     </div>` : ''}
 
     <!-- PMCS compliance -->
-    ${data.pmcs_compliance && data.pmcs_compliance.length ? `
+    ${widgetOn('pmcs-compliance') && data.pmcs_compliance && data.pmcs_compliance.length ? `
     <div class="card mt-4" id="pmcs-compliance-card" style="${data.stale_pmcs ? 'border-left:4px solid #ea580c;' : ''}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
         <h2 class="font-semibold text-gray-700">PMCS Compliance</h2>
@@ -841,7 +853,7 @@ async function dashboardPage() {
     </div>` : ''}
 
     <!-- Lifecycle alerts -->
-    ${data.lifecycle_alerts && data.lifecycle_alerts.length ? `
+    ${widgetOn('lifecycle-alerts') && data.lifecycle_alerts && data.lifecycle_alerts.length ? `
     <div class="card mt-4" style="border-left:4px solid #b45309;">
       <h2 class="font-semibold text-gray-700 mb-3">Equipment Lifecycle Alerts</h2>
       <table class="w-full text-sm">
@@ -860,6 +872,47 @@ async function dashboardPage() {
       </table>
     </div>` : ''}
   `;
+}
+
+// ─── Dashboard widget customization ─────────────────────────────────────────
+const DASH_WIDGETS = [
+  { id: 'stat-cards',           label: 'Summary Stats' },
+  { id: 'upcoming-maintenance', label: 'Upcoming Maintenance' },
+  { id: 'calibration-due',      label: 'Calibration Due' },
+  { id: 'low-stock',            label: 'Low Stock Alerts' },
+  { id: 'pmcs-compliance',      label: 'PMCS Compliance' },
+  { id: 'lifecycle-alerts',     label: 'Lifecycle Alerts' },
+];
+function _dashCfgKey() { return `dash_cfg_${currentUser?.username||'default'}`; }
+function getDashCfg() { try { return JSON.parse(localStorage.getItem(_dashCfgKey()))||{}; } catch { return {}; } }
+function saveDashCfg(cfg) { localStorage.setItem(_dashCfgKey(), JSON.stringify(cfg)); }
+function widgetOn(id) { const c=getDashCfg(); return c[id]!==false; }
+
+function openDashCustomize() {
+  const cfg = getDashCfg();
+  modal(`<div class="modal" style="max-width:380px;">
+    <div class="modal-header"><h3 class="modal-title">Customize Dashboard</h3><button onclick="closeModal()" class="modal-close">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:0.6rem;">
+      <p style="font-size:0.8rem;color:#6b7280;margin-bottom:0.25rem;">Choose which widgets appear on your dashboard. Settings are saved per user.</p>
+      ${DASH_WIDGETS.map(w=>`
+        <label style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;border-radius:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;cursor:pointer;">
+          <input type="checkbox" id="dw-${w.id}" ${cfg[w.id]!==false?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#1e3a5f;">
+          <span style="font-size:0.875rem;font-weight:500;color:#1e293b;">${w.label}</span>
+        </label>`).join('')}
+    </div>
+    <div class="modal-footer">
+      <button onclick="applyDashCfg()" class="btn-primary">Apply</button>
+      <button onclick="closeModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>`);
+}
+
+function applyDashCfg() {
+  const cfg = {};
+  DASH_WIDGETS.forEach(w => { cfg[w.id] = document.getElementById('dw-'+w.id)?.checked !== false && document.getElementById('dw-'+w.id)?.checked; });
+  saveDashCfg(cfg);
+  closeModal();
+  dashboardPage();
 }
 
 function statCard(label, val, cls, sub) {
@@ -896,15 +949,20 @@ async function refreshEquipment() {
 
 function renderEquipmentTable(rows) {
   $('page-content').innerHTML = `
-    <div id="eq-bulk-bar" style="display:none;position:sticky;top:0;z-index:10;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;border-radius:0.5rem;margin-bottom:0.75rem;display:none;align-items:center;gap:0.75rem;font-size:0.85rem;">
-      <span id="eq-bulk-count" style="font-weight:700;"></span>
-      <span style="flex:1"></span>
-      <span style="font-size:0.78rem;opacity:.8;">Set status:</span>
-      <button onclick="bulkSetStatus('active')"      style="background:#4ade80;color:#14532d;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Active</button>
-      <button onclick="bulkSetStatus('inactive')"    style="background:#e5e7eb;color:#374151;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Inactive</button>
-      <button onclick="bulkSetStatus('maintenance')" style="background:#fbbf24;color:#78350f;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Maintenance</button>
-      <button onclick="bulkSetStatus('retired')"     style="background:#f87171;color:#7f1d1d;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Retired</button>
-      <button onclick="clearEqSelection()"           style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.78rem;">✕ Clear</button>
+    <div id="eq-bulk-bar" style="display:none;position:sticky;top:0;z-index:10;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;border-radius:0.5rem;margin-bottom:0.75rem;align-items:center;gap:0.5rem;font-size:0.85rem;flex-wrap:wrap;">
+      <span id="eq-bulk-count" style="font-weight:700;margin-right:0.25rem;"></span>
+      <span style="font-size:0.72rem;opacity:.7;margin-right:0.1rem;">Status:</span>
+      <button onclick="bulkSetStatus('active')"      style="background:#4ade80;color:#14532d;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;" title="Fully Mission Capable">FMC</button>
+      <button onclick="bulkSetStatus('maintenance')" style="background:#fbbf24;color:#78350f;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;" title="Partially Mission Capable">PMC</button>
+      <button onclick="bulkSetStatus('deadline')"    style="background:#f87171;color:#7f1d1d;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;" title="Non-Mission Capable">NMC</button>
+      <button onclick="bulkSetStatus('inactive')"    style="background:#e5e7eb;color:#374151;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Inactive</button>
+      <button onclick="bulkSetStatus('retired')"     style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">Retired</button>
+      <span style="width:1px;background:rgba(255,255,255,.2);height:20px;margin:0 0.1rem;"></span>
+      <span style="font-size:0.72rem;opacity:.7;">Out for:</span>
+      <button onclick="bulkSetOutFor('service')"     style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">→ Service</button>
+      <button onclick="bulkSetOutFor('calibration')" style="background:#1d4ed8;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">→ Cal</button>
+      <button onclick="bulkSetOutFor(null)"          style="background:none;border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;">← Return</button>
+      <button onclick="clearEqSelection()"           style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:0.78rem;">✕ Clear</button>
     </div>
     <div class="card overflow-hidden p-0">
       <div class="px-5 py-4 border-b flex items-center gap-3 eq-filter-bar">
@@ -972,12 +1030,25 @@ async function quickSetEqStatus(id, status) {
 async function bulkSetStatus(status) {
   const ids = [...document.querySelectorAll('.eq-row-check:checked')].map(cb => parseInt(cb.dataset.id));
   if (!ids.length) return;
-  if (!confirm(`Set ${ids.length} item${ids.length>1?'s':''} to "${status}"?`)) return;
+  const label = {active:'FMC',maintenance:'PMC',deadline:'NMC',inactive:'Inactive',retired:'Retired'}[status]||status;
+  if (!confirm(`Set ${ids.length} item${ids.length>1?'s':''} to "${label}"?`)) return;
   await Promise.all(ids.map(id => {
     const eq = equipmentData.find(e => e.id === id);
     if (!eq) return;
     return api('PUT', `/api/equipment/${id}`, { ...eq, status });
   }));
+  toast(`${ids.length} item${ids.length>1?'s':''} → ${label}`);
+  clearEqSelection();
+  await refreshEquipment();
+}
+
+async function bulkSetOutFor(outFor) {
+  const ids = [...document.querySelectorAll('.eq-row-check:checked')].map(cb => parseInt(cb.dataset.id));
+  if (!ids.length) return;
+  const label = outFor ? `mark ${ids.length} item${ids.length>1?'s':''} out for ${outFor}` : `return ${ids.length} item${ids.length>1?'s':''}`;
+  if (!confirm(`${label}?`)) return;
+  await Promise.all(ids.map(id => api('PATCH', `/api/equipment/${id}/out-for`, { out_for: outFor })));
+  toast(outFor ? `Marked out for ${outFor}` : 'Marked as returned');
   clearEqSelection();
   await refreshEquipment();
 }
@@ -999,8 +1070,12 @@ function equipmentRows(rows) {
       <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(e.location||'—')}</td>
       <td class="px-4 py-3">${isTech() ? `
         <select onchange="quickSetEqStatus(${e.id},this.value)" style="font-size:0.75rem;padding:0.15rem 0.4rem;border-radius:0.375rem;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;color:#374151;">
-          ${['active','inactive','maintenance','retired'].map(s=>`<option value="${s}" ${e.status===s?'selected':''}>${s}</option>`).join('')}
-        </select>` : `<span class="${sc[e.status]||'badge-gray'}">${e.status}</span>`}
+          <option value="active"      ${e.status==='active'     ?'selected':''}>FMC — Active</option>
+          <option value="maintenance" ${e.status==='maintenance'?'selected':''}>PMC — Partial</option>
+          <option value="deadline"    ${e.status==='deadline'   ?'selected':''}>NMC — Deadline</option>
+          <option value="inactive"    ${e.status==='inactive'   ?'selected':''}>Inactive</option>
+          <option value="retired"     ${e.status==='retired'    ?'selected':''}>Retired</option>
+        </select>` : `<span class="${sc[e.status]||'badge-gray'}">${e.status==='active'?'FMC':e.status==='deadline'?'NMC':e.status==='maintenance'?'PMC':e.status}</span>`}
       </td>
       <td class="px-4 py-3">
         ${e.overdue_tasks ? `<span class="badge-red">${e.overdue_tasks} overdue</span>` :
