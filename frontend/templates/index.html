@@ -605,7 +605,8 @@ function closeSidebar() {
 // ─── Calendar ─────────────────────────────────────────────────────────────────
 let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth() + 1;
-let _calView = 'grid'; // 'grid' | 'list'
+let _calView = 'grid';
+let _calByDate = {}; // populated by renderCalendar, used by day popover
 
 async function calendarPage() {
   $('page-title').textContent = 'Maintenance Calendar';
@@ -614,38 +615,40 @@ async function calendarPage() {
     <button onclick="calToday()" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;">Today</button>
     <button onclick="calNext()" class="btn-secondary" style="padding:0.3rem 0.6rem;">&#8250;</button>
     <button onclick="calToggleView()" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" id="cal-view-btn">List</button>
+    <button onclick="calScheduleModal()" class="btn-primary" style="padding:0.3rem 0.75rem;font-size:0.8rem;">＋ Schedule</button>
   `;
-  const main = $('page-content');
-  main.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--c-text-3);">Loading calendar…</div>`;
+  $('page-content').innerHTML = `<div style="padding:2rem;text-align:center;color:var(--c-text-3);">Loading…</div>`;
   await renderCalendar();
 }
 
 async function renderCalendar() {
   const data = await api('GET', `/api/calendar?year=${_calYear}&month=${_calMonth}`);
-  const maint = data.maintenance || [];
-  const cals  = data.calibrations || [];
-  const all   = [
-    ...maint.map(e => ({ ...e, _type: 'maint', _date: e.next_due?.slice(0,10) })),
-    ...cals.map(e => ({ ...e, _type: 'cal',   _date: e.next_due?.slice(0,10) })),
+  const today = new Date().toISOString().slice(0,10);
+  const all = [
+    ...(data.maintenance||[]).map(e => ({ ...e, _type:'maint', _date:e.next_due?.slice(0,10) })),
+    ...(data.calibrations||[]).map(e => ({ ...e, _type:'cal',   _date:e.next_due?.slice(0,10) })),
   ].filter(e => e._date);
+
+  _calByDate = {};
+  all.forEach(e => { if (!_calByDate[e._date]) _calByDate[e._date]=[]; _calByDate[e._date].push(e); });
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const heading = `${monthNames[_calMonth-1]} ${_calYear}`;
 
+  // ── List view ──
   if (_calView === 'list') {
     all.sort((a,b) => a._date.localeCompare(b._date));
     const rows = all.length ? all.map(e => {
-      const isOverdue = e._date < new Date().toISOString().slice(0,10);
-      const badge = e._type === 'cal'
-        ? `<span class="badge-blue badge" style="font-size:0.68rem;">Cal</span>`
-        : `<span class="badge-yellow badge" style="font-size:0.68rem;">Maint</span>`;
-      const statusBadge = isOverdue ? `<span class="badge-red badge" style="font-size:0.68rem;">Overdue</span>` : '';
-      const name = e.equipment_name || e.title || '—';
+      const isPast = e._date < today;
+      const typeBadge = e._type === 'cal'
+        ? `<span class="badge badge-blue">Cal</span>`
+        : `<span class="badge badge-yellow">Maint</span>`;
+      const statusBadge = isPast ? `<span class="badge badge-red">Overdue</span>` : '';
       return `<tr class="table-row">
-        <td class="px-4 py-2 text-sm" style="color:var(--c-text-3);">${e._date}</td>
-        <td class="px-4 py-2 text-sm font-semibold">${name}</td>
-        <td class="px-4 py-2 text-sm">${e.title || (e._type==='cal' ? 'Calibration Due' : '')}</td>
-        <td class="px-4 py-2">${badge} ${statusBadge}</td>
+        <td class="px-4 py-2 text-sm" style="color:var(--c-text-3);white-space:nowrap;">${e._date}</td>
+        <td class="px-4 py-2 text-sm font-semibold">${esc(e.equipment_name||'—')}</td>
+        <td class="px-4 py-2 text-sm">${esc(e.title||(e._type==='cal'?'Calibration Due':''))}</td>
+        <td class="px-4 py-2" style="white-space:nowrap;">${typeBadge} ${statusBadge}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="4" class="px-4 py-8 text-center text-sm" style="color:var(--c-text-3);">No events this month</td></tr>`;
 
@@ -672,66 +675,185 @@ async function renderCalendar() {
     return;
   }
 
-  // Grid view
-  const firstDow = new Date(_calYear, _calMonth - 1, 1).getDay();
+  // ── Grid view ──
+  const firstDow = new Date(_calYear, _calMonth-1, 1).getDay();
   const daysInMonth = new Date(_calYear, _calMonth, 0).getDate();
-  const today = new Date().toISOString().slice(0,10);
-
-  const byDate = {};
-  all.forEach(e => { if (!byDate[e._date]) byDate[e._date] = []; byDate[e._date].push(e); });
 
   const dayHeaders = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d =>
     `<div style="text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);padding:0.4rem 0;">${d}</div>`
   ).join('');
 
   let cells = '';
-  for (let i = 0; i < firstDow; i++) cells += `<div style="min-height:5rem;background:var(--c-surface);border-radius:0.375rem;opacity:0.4;"></div>`;
+  for (let i = 0; i < firstDow; i++)
+    cells += `<div style="min-height:5rem;background:var(--c-surface);border-radius:0.375rem;opacity:0.35;"></div>`;
+
   for (let d = 1; d <= daysInMonth; d++) {
     const key = `${_calYear}-${String(_calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const events = byDate[key] || [];
+    const events = _calByDate[key] || [];
     const isToday = key === today;
     const isPast  = key < today;
+
     const pills = events.slice(0,3).map(e => {
-      const color = e._type === 'cal' ? '#3b82f6' : (isPast ? '#ef4444' : '#f59e0b');
-      const label = e._type === 'cal' ? (e.equipment_name||'Cal') : (e.title||e.equipment_name||'Task');
-      return `<div style="font-size:0.6rem;font-weight:600;background:${color}22;color:${color};border-radius:3px;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;" title="${label}">${label}</div>`;
+      const color = e._type==='cal' ? '#3b82f6' : (isPast ? '#ef4444' : '#f59e0b');
+      const label = esc(e._type==='cal' ? (e.equipment_name||'Cal') : (e.title||e.equipment_name||'Task'));
+      return `<div style="font-size:0.6rem;font-weight:600;background:${color}22;color:${color};border-radius:3px;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${label}</div>`;
     }).join('');
-    const more = events.length > 3 ? `<div style="font-size:0.6rem;color:var(--c-text-3);margin-top:2px;">+${events.length-3} more</div>` : '';
-    cells += `<div style="min-height:5rem;background:var(--c-card);border:1px solid ${isToday ? 'var(--c-primary)' : 'var(--c-border)'};border-radius:0.375rem;padding:0.35rem 0.4rem;cursor:${events.length?'pointer':'default'};" ${events.length?`onclick="calShowDay('${key}',this)"`:''}>
-      <div style="font-size:0.75rem;font-weight:${isToday?'700':'500'};color:${isToday?'var(--c-primary)':'var(--c-text-2)'};width:1.4rem;height:1.4rem;border-radius:50%;${isToday?'background:var(--c-primary);color:#fff;':''}display:flex;align-items:center;justify-content:center;">${d}</div>
-      ${pills}${more}
+    const more = events.length>3 ? `<div style="font-size:0.6rem;color:var(--c-text-3);margin-top:2px;">+${events.length-3} more</div>` : '';
+
+    const dateDot = isToday
+      ? `<div style="font-size:0.75rem;font-weight:700;width:1.4rem;height:1.4rem;border-radius:50%;background:var(--c-primary);color:#fff;display:flex;align-items:center;justify-content:center;">${d}</div>`
+      : `<div style="font-size:0.75rem;font-weight:500;color:var(--c-text-2);">${d}</div>`;
+
+    cells += `<div data-calday="${key}" onclick="calDayClick('${key}',event)"
+      style="min-height:5rem;background:var(--c-card);border:1px solid ${isToday?'var(--c-primary)':'var(--c-border)'};border-radius:0.375rem;padding:0.35rem 0.4rem;cursor:pointer;transition:border-color 150ms;"
+      onmouseover="this.style.borderColor='var(--c-primary)'" onmouseout="this.style.borderColor='${isToday?'var(--c-primary)':'var(--c-border)'}'">
+      ${dateDot}${pills}${more}
     </div>`;
   }
 
   $('page-content').innerHTML = `
     <div style="padding:1.25rem;">
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
           <h2 style="font-size:1.1rem;font-weight:700;color:var(--c-text);">${heading}</h2>
-          <div style="display:flex;gap:0.5rem;font-size:0.75rem;align-items:center;">
+          <div style="display:flex;gap:0.75rem;font-size:0.72rem;align-items:center;color:var(--c-text-3);">
             <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block;"></span>Maintenance</span>
             <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block;"></span>Calibration</span>
             <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block;"></span>Overdue</span>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.25rem;margin-bottom:0.25rem;">${dayHeaders}</div>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.25rem;">${cells}</div>
+        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.25rem;">${cells}</div>
       </div>
     </div>`;
 }
 
-function calShowDay(dateKey, el) {
-  const existing = document.getElementById('cal-day-popup');
-  if (existing) existing.remove();
-  const data = _calDayData?.[dateKey] || [];
-  // get events from DOM re-fetch would be complex; just reload as list filtered
-  calFilterDay(dateKey);
+function calDayClick(dateKey, evt) {
+  evt.stopPropagation();
+  document.getElementById('cal-day-popup')?.remove();
+
+  const events = _calByDate[dateKey] || [];
+  const today = new Date().toISOString().slice(0,10);
+  const isPast = dateKey < today;
+  const [y,m,d] = dateKey.split('-');
+  const label = new Date(+y,+m-1,+d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  const eventRows = events.length ? events.map(e => {
+    const color = e._type==='cal' ? '#3b82f6' : (isPast ? '#ef4444' : '#f59e0b');
+    const typeLabel = e._type==='cal' ? 'Calibration' : 'Maintenance';
+    const name = esc(e._type==='cal' ? (e.equipment_name||'—') : (e.title||'—'));
+    const sub  = esc(e._type==='cal' ? 'Calibration due' : (e.equipment_name||''));
+    return `<div style="display:flex;align-items:flex-start;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid var(--c-border);">
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:0.35rem;flex-shrink:0;"></span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+        <div style="font-size:0.72rem;color:var(--c-text-3);">${sub} · <span style="color:${color};">${typeLabel}</span></div>
+      </div>
+    </div>`;
+  }).join('') : `<div style="font-size:0.82rem;color:var(--c-text-3);padding:0.5rem 0;">No events scheduled.</div>`;
+
+  const popup = document.createElement('div');
+  popup.id = 'cal-day-popup';
+  popup.style.cssText = 'position:fixed;z-index:300;background:var(--c-modal);border:1px solid var(--c-border);border-radius:0.75rem;box-shadow:0 12px 40px rgba(0,0,0,0.25);width:min(320px,92vw);padding:1rem;';
+
+  popup.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+      <div style="font-size:0.85rem;font-weight:700;color:var(--c-text);">${label}</div>
+      <button onclick="document.getElementById('cal-day-popup').remove()" style="background:none;border:none;cursor:pointer;color:var(--c-text-3);font-size:1.2rem;line-height:1;">&times;</button>
+    </div>
+    <div style="max-height:200px;overflow-y:auto;">${eventRows}</div>
+    <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+      <button onclick="calScheduleModal('${dateKey}')" class="btn-primary" style="flex:1;font-size:0.78rem;padding:0.4rem 0.5rem;justify-content:center;">＋ Maintenance Task</button>
+    </div>`;
+
+  document.body.appendChild(popup);
+
+  // Position near the clicked cell, keeping within viewport
+  const cell = evt.currentTarget;
+  const rect = cell.getBoundingClientRect();
+  const pw = 320, ph = 320;
+  let left = rect.left;
+  let top  = rect.bottom + 8;
+  if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+  if (top + ph > window.innerHeight - 12) top = rect.top - ph - 8;
+  popup.style.left = Math.max(8, left) + 'px';
+  popup.style.top  = Math.max(8, top)  + 'px';
+
+  // Close on outside click
+  setTimeout(() => document.addEventListener('click', function h(e) {
+    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', h); }
+  }), 10);
 }
-function calFilterDay(dateKey) {
-  _calView = 'list';
-  const btn = document.getElementById('cal-view-btn');
-  if (btn) btn.textContent = 'Grid';
-  renderCalendar();
+
+async function calScheduleModal(prefillDate) {
+  document.getElementById('cal-day-popup')?.remove();
+  // Fetch equipment list for the select
+  if (!window.equipmentData || !window.equipmentData.length)
+    window.equipmentData = await api('GET', '/api/equipment').catch(()=>[]);
+  const eqOptions = (window.equipmentData||[]).map(e =>
+    `<option value="${e.id}">${esc(e.name)}${e.serial_num?' ('+esc(e.serial_num)+')':''}</option>`
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'cal-schedule-backdrop';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Schedule Maintenance Task</h2>
+      <button onclick="document.getElementById('cal-schedule-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="calSaveTask(event)" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+      <div>
+        <label class="label">Equipment</label>
+        <select name="equipment_id" class="input" required>
+          <option value="">— Select equipment —</option>
+          ${eqOptions}
+        </select>
+      </div>
+      <div>
+        <label class="label">Task Title</label>
+        <input name="title" class="input" required placeholder="e.g. Annual service, Battery replacement…">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label class="label">Due Date</label>
+          <input name="next_due" type="date" class="input" value="${prefillDate||''}" required>
+        </div>
+        <div>
+          <label class="label">Priority</label>
+          <select name="priority" class="input">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="label">Notes <span style="font-weight:400;color:var(--c-text-3);">(optional)</span></label>
+        <textarea name="notes" class="input" rows="2" placeholder="Additional details…" style="resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('cal-schedule-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Schedule Task</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function calSaveTask(e) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  body.equipment_id = parseInt(body.equipment_id);
+  body.status = 'pending';
+  try {
+    await api('POST', '/api/maintenance', body);
+    document.getElementById('cal-schedule-backdrop')?.remove();
+    toast('Task scheduled.');
+    await renderCalendar();
+  } catch(err) { toast(err.message||'Failed to save', false); }
 }
 
 function calPrev() {
