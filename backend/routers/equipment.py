@@ -13,7 +13,7 @@ async def list_equipment(db=Depends(get_db)):
         SELECT e.*,
             (SELECT COUNT(*) FROM maintenance_tasks WHERE equipment_id = e.id AND status = 'pending') as pending_tasks,
             (SELECT COUNT(*) FROM maintenance_tasks WHERE equipment_id = e.id AND status = 'overdue') as overdue_tasks,
-            (SELECT next_due FROM calibration_records WHERE equipment_id = e.id ORDER BY calibrated_at DESC LIMIT 1) as cal_next_due
+            (SELECT next_due FROM calibration_records WHERE equipment_id = e.id ORDER BY id DESC LIMIT 1) as cal_next_due
         FROM equipment e ORDER BY e.name
     """) as cur:
         rows = await cur.fetchall()
