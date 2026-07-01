@@ -2738,6 +2738,8 @@ function maintenanceRows(rows) {
         ${t.status!=='completed' && isTech() ? `
           <button onclick="quickCompleteTask(${t.id})" title="Quick complete (no notes)" style="background:#dcfce7;color:#15803d;border:none;border-radius:0.375rem;padding:0.2rem 0.5rem;cursor:pointer;font-size:0.78rem;font-weight:700;min-height:28px;">✓</button>
           <button onclick="completeTaskModal(${t.id})" class="text-green-600 hover:underline text-xs" title="Complete with notes/parts">+notes</button>` : ''}
+        ${t.status==='completed' ? `<button onclick="viewTaskParts(${t.id},'${esc(t.title)}')" class="text-xs" style="color:var(--c-text-3);" title="View parts used">📦 parts</button>` : ''}
+        ${t.source_fault_id ? `<span style="font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:9999px;background:#fef3c7;color:#92400e;">fault</span>` : ''}
         ${isTech() ? `<button onclick="dashEditTask(${t.id})" class="text-gray-600 hover:underline text-xs">Edit</button>` : ''}
         <button onclick="openTaskAttachments(${t.id},'${esc(t.title)}')" class="text-blue-500 hover:underline text-xs">📎</button>
         ${isSuperAdmin() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
@@ -3496,6 +3498,7 @@ function inventoryRows(rows) {
           <button onclick="quickAdjustInv(${i.id},-1)" title="Remove 1" style="background:#fef2f2;color:#dc2626;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">−</button>
           <button onclick="quickAdjustInv(${i.id},1)"  title="Add 1"    style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">+</button>
           <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
+        <button onclick="viewItemUsage(${i.id},'${esc(i.name)}')" class="text-xs" style="color:var(--c-text-3);" title="View consumption history">📦 usage</button>
         ${isTech() ? `<button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>` : ''}
         ${isSuperAdmin() ? `<button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
@@ -5654,11 +5657,141 @@ async function openFaultModal() {
 }
 
 async function linkFaultTask(faultId) {
+  // Fetch the fault so we can pre-fill the modal
+  const faults = await api('GET', '/api/faults').catch(()=>[]);
+  const fault  = faults.find(f => f.id === faultId);
+  if (!fault) { toast('Fault not found', false); return; }
+
+  const severityToPriority = { critical:'urgent', urgent:'high', routine:'normal' };
+  const prefillPriority = severityToPriority[fault.severity] || 'normal';
+  const prefillTitle = `Fault: ${fault.title}`;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'link-task-backdrop';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Create Corrective Task</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);margin-top:2px;">From fault: ${esc(fault.title)} · ${esc(fault.equipment_name||'')}</div>
+      </div>
+      <button onclick="document.getElementById('link-task-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="submitLinkTask(event,${faultId})" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+      <div>
+        <label class="label">Task Title</label>
+        <input name="title" class="input" value="${esc(prefillTitle)}" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label class="label">Due Date</label>
+          <input name="next_due" type="date" class="input">
+        </div>
+        <div>
+          <label class="label">Priority</label>
+          <select name="priority" class="input">
+            <option value="urgent"  ${prefillPriority==='urgent' ?'selected':''}>Urgent</option>
+            <option value="high"    ${prefillPriority==='high'   ?'selected':''}>High</option>
+            <option value="normal"  ${prefillPriority==='normal' ?'selected':''}>Normal</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="label">Notes <span style="font-weight:400;color:var(--c-text-3);">(optional)</span></label>
+        <textarea name="notes" class="input" rows="2" placeholder="Work to be performed…">${esc(fault.description||'')}</textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('link-task-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Create Task</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function submitLinkTask(e, faultId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (!body.next_due) delete body.next_due;
   try {
-    await api('POST', `/api/faults/${faultId}/link-task`);
+    await api('POST', `/api/faults/${faultId}/link-task`, body);
+    document.getElementById('link-task-backdrop')?.remove();
     toast('Corrective task created.');
     window.renderFaultTab && window.renderFaultTab(window._currentFaultFilter || 'open');
-  } catch(err) { toast(err.message, false); }
+  } catch(err) { toast(err.message||'Failed', false); }
+}
+
+async function viewTaskParts(taskId, title) {
+  const parts = await api('GET', `/api/maintenance/${taskId}/parts`).catch(()=>[]);
+  const rows = parts.length ? parts.map(p => `
+    <tr class="table-row border-b last:border-0">
+      <td class="px-4 py-2 text-sm font-medium">${esc(p.item_name)}</td>
+      <td class="px-4 py-2 text-sm text-gray-500 font-mono">${esc(p.part_number||'—')}</td>
+      <td class="px-4 py-2 text-sm text-right font-medium">${p.quantity_used} ${esc(p.unit||'')}</td>
+      <td class="px-4 py-2 text-sm text-gray-400">${p.created_at?.slice(0,10)||''}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="4" class="px-4 py-6 text-center text-sm" style="color:var(--c-text-3);">No parts recorded for this task.</td></tr>`;
+  modal(`<div class="modal" style="max-width:520px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Parts Used</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);margin-top:2px;">${esc(title)}</div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--c-surface);">
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Item</th>
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Part #</th>
+          <th class="px-4 py-2 text-right text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Qty</th>
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Date</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="px-6 py-4" style="border-top:1px solid var(--c-border);">
+      <button onclick="closeModal()" class="btn-secondary" style="width:100%;justify-content:center;">Close</button>
+    </div>
+  </div>`);
+}
+
+async function viewItemUsage(itemId, itemName) {
+  const data = await api('GET', `/api/inventory/${itemId}/usage`).catch(()=>[]);
+  const total = data.reduce((s,r) => s + (r.quantity_used||0), 0);
+  const rows = data.length ? data.map(r => `
+    <tr class="table-row border-b last:border-0">
+      <td class="px-4 py-2 text-sm font-medium">${esc(r.task_title||'—')}</td>
+      <td class="px-4 py-2 text-sm text-gray-500">${esc(r.equipment_name||'—')}</td>
+      <td class="px-4 py-2 text-sm text-right font-medium">${r.quantity_used}</td>
+      <td class="px-4 py-2 text-sm text-gray-400">${r.used_at?.slice(0,10)||''}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="4" class="px-4 py-6 text-center text-sm" style="color:var(--c-text-3);">No consumption recorded yet.</td></tr>`;
+  modal(`<div class="modal" style="max-width:560px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Usage History</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);margin-top:2px;">${esc(itemName)}${data.length ? ` · ${total} total consumed` : ''}</div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--c-surface);">
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Task</th>
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Equipment</th>
+          <th class="px-4 py-2 text-right text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Qty</th>
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Date</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="px-6 py-4" style="border-top:1px solid var(--c-border);">
+      <button onclick="closeModal()" class="btn-secondary" style="width:100%;justify-content:center;">Close</button>
+    </div>
+  </div>`);
 }
 
 async function submitFault(e) {

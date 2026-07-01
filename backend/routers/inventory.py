@@ -19,6 +19,22 @@ async def list_items(low_stock: bool = False, db=Depends(get_db)):
     return [dict(r) for r in rows]
 
 
+@router.get("/{item_id}/usage")
+async def get_item_usage(item_id: int, db=Depends(get_db)):
+    async with db.execute("""
+        SELECT tp.quantity_used, tp.created_at as used_at,
+               m.title as task_title, e.name as equipment_name
+        FROM task_parts_used tp
+        JOIN maintenance_tasks m ON m.id = tp.task_id
+        JOIN equipment e ON e.id = m.equipment_id
+        WHERE tp.item_id = ?
+        ORDER BY tp.created_at DESC
+        LIMIT 100
+    """, (item_id,)) as cur:
+        rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 @router.get("/{item_id}")
 async def get_item(item_id: int, db=Depends(get_db)):
     async with db.execute("SELECT * FROM inventory_items WHERE id=?", (item_id,)) as cur:

@@ -111,18 +111,28 @@ async def update_fault(fault_id: int, data: FaultUpdate, request: Request, db=De
     return {"ok": True}
 
 
+class LinkTaskBody(BaseModel):
+    title: Optional[str] = None
+    next_due: Optional[str] = None
+    priority: Optional[str] = None
+    notes: Optional[str] = None
+
+
 @router.post("/{fault_id}/link-task", status_code=201)
-async def link_task_to_fault(fault_id: int, request: Request, db=Depends(get_db)):
+async def link_task_to_fault(fault_id: int, request: Request, body: LinkTaskBody = None, db=Depends(get_db)):
     require_tech(request)
     async with db.execute("SELECT * FROM fault_reports WHERE id=?", (fault_id,)) as cur:
         fault = await cur.fetchone()
     if not fault:
         raise HTTPException(404, "Fault not found")
+    title    = (body and body.title)    or f"Fault: {fault['title']}"
+    next_due = (body and body.next_due) or None
+    notes    = (body and body.notes)    or fault["description"]
     async with db.execute("""
         INSERT INTO maintenance_tasks
-            (equipment_id, title, description, task_type, status, source_fault_id)
-        VALUES (?, ?, ?, 'corrective', 'pending', ?)
-    """, (fault["equipment_id"], f"Fault: {fault['title']}", fault["description"], fault_id)) as cur:
+            (equipment_id, title, description, task_type, status, next_due, source_fault_id)
+        VALUES (?, ?, ?, 'corrective', 'pending', ?, ?)
+    """, (fault["equipment_id"], title, notes, next_due, fault_id)) as cur:
         task_id = cur.lastrowid
     await db.execute("UPDATE fault_reports SET linked_task_id=? WHERE id=?", (task_id, fault_id))
     await db.commit()
