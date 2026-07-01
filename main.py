@@ -22,6 +22,7 @@ from backend.routers import task_attachments as task_attachments_router
 from backend.routers import faults as faults_router
 from backend.routers import eq_checklists as eq_checklists_router
 from backend.routers import commander as commander_router
+from backend.routers import calendar_view as calendar_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
@@ -105,6 +106,7 @@ app.include_router(task_attachments_router.router)
 app.include_router(faults_router.router)
 app.include_router(eq_checklists_router.router)
 app.include_router(commander_router.router)
+app.include_router(calendar_router.router)
 
 
 @app.get("/sw.js")
@@ -190,7 +192,7 @@ async def labels_page(request: Request, ids: str = ""):
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{page}", response_class=HTMLResponse)
 async def spa(request: Request, page: str = "dashboard"):
-    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "faults"}
+    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "faults", "calendar", "commander"}
     if page not in valid:
         page = "dashboard"
     return templates.TemplateResponse("index.html", {"request": request, "page": page})

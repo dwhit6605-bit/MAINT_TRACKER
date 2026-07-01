@@ -36,46 +36,83 @@
        #FFFFFF  white       (cards, modals)
        #040404  text        (body copy)
     ── */
+    :root {
+      --c-bg:#f8fafc; --c-card:#fff; --c-card-border:#dce8f5; --c-border:#e5e7eb;
+      --c-border-input:#c8d8e8; --c-text:#141414; --c-text-2:#374151; --c-text-3:#6b7280;
+      --c-text-4:#9ca3af; --c-primary:#1e3a5f; --c-primary-h:#2a4a70;
+      --c-surface:#f9fafb; --c-row-hover:#f4f8fc; --c-shadow:rgba(0,0,0,0.08);
+      --c-topbar:#fff; --c-kbd:#f3f4f6; --c-modal:#fff;
+    }
+    [data-theme="dark"] {
+      --c-bg:#0f172a; --c-card:#1e293b; --c-card-border:#334155; --c-border:#334155;
+      --c-border-input:#475569; --c-text:#f1f5f9; --c-text-2:#cbd5e1; --c-text-3:#94a3b8;
+      --c-text-4:#64748b; --c-primary:#3b82f6; --c-primary-h:#2563eb;
+      --c-surface:#0f172a; --c-row-hover:rgba(59,130,246,0.08); --c-shadow:rgba(0,0,0,0.4);
+      --c-topbar:#0f172a; --c-kbd:#1e293b; --c-modal:#1e293b;
+    }
     *, *::before, *::after { font-family: 'Open Sans', sans-serif; }
     [x-cloak]{display:none!important}
+    body { background:var(--c-bg); color:var(--c-text); transition:background 0.2s,color 0.2s; }
 
     /* Nav */
     .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.625rem 1rem; border-radius:0.375rem; font-size:0.875rem; font-weight:500; transition:background-color 150ms; text-decoration:none; color:rgba(255,255,255,0.82); letter-spacing:0.01em; }
     .nav-link:hover { background-color:rgba(255,255,255,0.08); color:#fff; }
-    .nav-link.active { background-color:#1e3a5f; color:#fff; font-weight:700; }
+    .nav-link.active { background-color:rgba(255,255,255,0.15); color:#fff; font-weight:700; }
 
     /* Badges */
     .badge-red    { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#fee2e2; color:#b91c1c; white-space:nowrap; }
     .badge-yellow { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#fef3c7; color:#92400e; white-space:nowrap; }
     .badge-green  { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#d1fae5; color:#065f46; white-space:nowrap; }
-    .badge-blue   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#dce8f5; color:#141414; white-space:nowrap; }
+    .badge-blue   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#dce8f5; color:#1e3a5f; white-space:nowrap; }
     .badge-pink   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#fce7f3; color:#9d174d; white-space:nowrap; }
     .badge-gray   { display:inline-flex; align-items:center; padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:0.75rem; font-weight:600; background-color:#e5e7eb; color:#374151; white-space:nowrap; }
+    [data-theme="dark"] .badge-gray { background-color:#334155; color:#cbd5e1; }
+    [data-theme="dark"] .badge-blue { background-color:#1e3a5f; color:#93c5fd; }
 
     /* Cards */
-    .card { background-color:#fff; border-radius:0.75rem; box-shadow:0 1px 4px rgba(0,0,0,0.08); border:1px solid #dce8f5; padding:1.25rem; }
+    .card { background-color:var(--c-card); border-radius:0.75rem; box-shadow:0 1px 4px var(--c-shadow); border:1px solid var(--c-card-border); padding:1.25rem; }
 
     /* Buttons */
-    .btn-primary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#1e3a5f; color:#fff; font-size:0.875rem; font-weight:600; border-radius:0.375rem; border:none; cursor:pointer; transition:background-color 150ms; letter-spacing:0.01em; }
-    .btn-primary:hover { background-color:#2a4a70; }
-    .btn-secondary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:#fff; color:#141414; font-size:0.875rem; font-weight:500; border-radius:0.375rem; border:1px solid #c8d8e8; cursor:pointer; transition:background-color 150ms; }
-    .btn-secondary:hover { background-color:#dce8f5; }
+    .btn-primary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:var(--c-primary); color:#fff; font-size:0.875rem; font-weight:600; border-radius:0.375rem; border:none; cursor:pointer; transition:background-color 150ms; letter-spacing:0.01em; }
+    .btn-primary:hover { background-color:var(--c-primary-h); }
+    .btn-secondary { display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; background-color:var(--c-card); color:var(--c-text); font-size:0.875rem; font-weight:500; border-radius:0.375rem; border:1px solid var(--c-border-input); cursor:pointer; transition:background-color 150ms; }
+    .btn-secondary:hover { background-color:var(--c-row-hover); }
     .btn-danger { display:inline-flex; align-items:center; gap:0.5rem; padding:0.375rem 0.75rem; background-color:#fef2f2; color:#dc2626; font-size:0.75rem; font-weight:500; border-radius:0.375rem; border:none; cursor:pointer; transition:background-color 150ms; }
     .btn-danger:hover { background-color:#fee2e2; }
+    [data-theme="dark"] .btn-danger { background-color:#450a0a; color:#fca5a5; }
 
     /* Inputs */
-    .input { display:block; width:100%; border-radius:0.375rem; border:1px solid #c8d8e8; padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 2px rgba(0,0,0,0.04); outline:none; box-sizing:border-box; background:#fff; font-family:inherit; }
-    .input:focus { border-color:#141414; box-shadow:0 0 0 2px rgba(20,20,20,0.12); }
-    .label { display:block; font-size:0.875rem; font-weight:600; color:#141414; margin-bottom:0.25rem; }
+    .input { display:block; width:100%; border-radius:0.375rem; border:1px solid var(--c-border-input); padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 2px var(--c-shadow); outline:none; box-sizing:border-box; background:var(--c-card); color:var(--c-text); font-family:inherit; }
+    .input:focus { border-color:var(--c-text); box-shadow:0 0 0 2px rgba(99,102,241,0.15); }
+    .label { display:block; font-size:0.875rem; font-weight:600; color:var(--c-text); margin-bottom:0.25rem; }
 
     /* Table */
     .table-row { transition:background-color 150ms; }
-    .table-row:hover { background-color:#f4f8fc; }
+    .table-row:hover { background-color:var(--c-row-hover); }
     .col-m-show { display:none; }
 
     /* Modal */
     .modal-backdrop { position:fixed; inset:0; background-color:rgba(0,0,0,0.55); z-index:40; display:flex; align-items:center; justify-content:center; padding:1rem; }
-    .modal { background-color:#fff; border-radius:0.75rem; box-shadow:0 25px 50px rgba(0,0,0,0.3); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
+    .modal { background-color:var(--c-modal); border-radius:0.75rem; box-shadow:0 25px 50px rgba(0,0,0,0.3); width:100%; max-width:32rem; max-height:90vh; overflow-y:auto; z-index:50; position:relative; }
+
+    /* Dark mode: Tailwind utility overrides */
+    [data-theme="dark"] .text-gray-900, [data-theme="dark"] .text-gray-800,
+    [data-theme="dark"] .text-gray-700, [data-theme="dark"] .font-semibold { color:var(--c-text) !important; }
+    [data-theme="dark"] .text-gray-600, [data-theme="dark"] .text-gray-500 { color:var(--c-text-2) !important; }
+    [data-theme="dark"] .text-gray-400, [data-theme="dark"] .text-gray-300 { color:var(--c-text-3) !important; }
+    [data-theme="dark"] .text-sm { color:var(--c-text-2); }
+    [data-theme="dark"] .bg-gray-50, [data-theme="dark"] thead.bg-gray-50,
+    [data-theme="dark"] thead { background:var(--c-surface) !important; color:var(--c-text-3) !important; }
+    [data-theme="dark"] .border-b, [data-theme="dark"] .border-t { border-color:var(--c-border) !important; }
+    [data-theme="dark"] .overflow-x-auto { background:var(--c-card); }
+    [data-theme="dark"] td, [data-theme="dark"] th { border-color:var(--c-border) !important; color:var(--c-text-2); }
+    [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3 { color:var(--c-text) !important; }
+    [data-theme="dark"] select.input option { background:var(--c-card); color:var(--c-text); }
+    [data-theme="dark"] .modal-header, [data-theme="dark"] .modal-footer { background:var(--c-modal); border-color:var(--c-border) !important; }
+    [data-theme="dark"] .modal-body { background:var(--c-modal); color:var(--c-text-2); }
+    [data-theme="dark"] kbd { background:var(--c-kbd) !important; border-color:var(--c-border) !important; color:var(--c-text-3) !important; }
+    [data-theme="dark"] .px-5, [data-theme="dark"] .px-4, [data-theme="dark"] .py-3,
+    [data-theme="dark"] .py-2 { color:inherit; }
 
     /* ── Mobile ── */
     #sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:29; }
@@ -238,6 +275,10 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         Faults
       </a>
+      <a href="/calendar" class="nav-link" data-page="calendar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Calendar
+      </a>
       <a href="/commander" class="nav-link" data-page="commander">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         Commander
@@ -271,7 +312,7 @@
   <!-- Main content -->
   <main class="flex-1 flex flex-col overflow-hidden">
     <!-- Top bar -->
-    <header class="top-bar px-6 py-4 flex items-center justify-between flex-shrink-0" style="background:#fff;border-bottom:1px solid #dce8f5;">
+    <header class="top-bar px-6 py-4 flex items-center justify-between flex-shrink-0" id="top-bar" style="background:var(--c-topbar);border-bottom:1px solid var(--c-card-border);transition:background 0.2s,border-color 0.2s;">
       <div class="flex items-center">
         <button id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
           <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -279,16 +320,17 @@
         <h1 class="text-lg font-semibold text-gray-900" id="page-title">Dashboard</h1>
       </div>
       <div class="flex items-center gap-3">
-        <button id="gsearch-btn" onclick="openGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.3rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;color:#6b7280;font-size:0.8rem;">
+        <button id="gsearch-btn" onclick="openGlobalSearch()" title="Search (Ctrl+K)" style="background:none;border:1px solid var(--c-border);border-radius:0.5rem;padding:0.3rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;color:var(--c-text-3);font-size:0.8rem;">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <span class="col-m-hide">Search…</span>
-          <kbd class="col-m-hide" style="font-size:0.65rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:3px;padding:1px 4px;">Ctrl K</kbd>
+          <kbd class="col-m-hide" style="font-size:0.65rem;background:var(--c-kbd);border:1px solid var(--c-border);border-radius:3px;padding:1px 4px;">Ctrl K</kbd>
         </button>
+        <button id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode" style="background:none;border:1px solid var(--c-border);border-radius:0.5rem;padding:0.3rem 0.5rem;cursor:pointer;font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;">🌙</button>
         <div class="flex items-center gap-3" id="page-actions"></div>
-        <div id="user-badge" style="display:none;align-items:center;gap:0.5rem;font-size:0.8rem;color:#64748b;border-left:1px solid #e5e7eb;padding-left:0.75rem;margin-left:0.25rem;">
-          <span id="user-name" style="font-weight:600;color:#374151;"></span>
+        <div id="user-badge" style="display:none;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--c-text-3);border-left:1px solid var(--c-border);padding-left:0.75rem;margin-left:0.25rem;">
+          <span id="user-name" style="font-weight:600;color:var(--c-text-2);"></span>
           <span id="user-role-badge"></span>
-          <button onclick="logout()" style="font-size:0.75rem;color:#6b7280;background:none;border:1px solid #e5e7eb;cursor:pointer;padding:0.2rem 0.5rem;border-radius:0.25rem;line-height:1.4;">Sign out</button>
+          <button onclick="logout()" style="font-size:0.75rem;color:var(--c-text-3);background:none;border:1px solid var(--c-border);cursor:pointer;padding:0.2rem 0.5rem;border-radius:0.25rem;line-height:1.4;">Sign out</button>
         </div>
       </div>
     </header>
@@ -342,6 +384,22 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) 
 let currentUser = null;
 const ORG_NAME = '9th CST(WMD)';
 const cu = () => currentUser?.username || '';
+// Dark mode
+(function(){
+  const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = saved;
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('dark-toggle');
+    if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  });
+})();
+function toggleDarkMode() {
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = isDark ? 'light' : 'dark';
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+  const btn = document.getElementById('dark-toggle');
+  if (btn) btn.textContent = isDark ? '🌙' : '☀️';
+}
 function getToken() { return localStorage.getItem('auth_token'); }
 function isSuperAdmin()    { return currentUser?.role === 'admin'; }
 function isAdmin()         { return currentUser?.role === 'admin' || currentUser?.role === 'team_chief'; }
@@ -544,9 +602,163 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
+// ─── Calendar ─────────────────────────────────────────────────────────────────
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth() + 1;
+let _calView = 'grid'; // 'grid' | 'list'
+
+async function calendarPage() {
+  $('page-title').textContent = 'Maintenance Calendar';
+  $('page-actions').innerHTML = `
+    <button onclick="calPrev()" class="btn-secondary" style="padding:0.3rem 0.6rem;">&#8249;</button>
+    <button onclick="calToday()" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;">Today</button>
+    <button onclick="calNext()" class="btn-secondary" style="padding:0.3rem 0.6rem;">&#8250;</button>
+    <button onclick="calToggleView()" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" id="cal-view-btn">List</button>
+  `;
+  const main = $('page-content');
+  main.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--c-text-3);">Loading calendar…</div>`;
+  await renderCalendar();
+}
+
+async function renderCalendar() {
+  const data = await api('GET', `/api/calendar?year=${_calYear}&month=${_calMonth}`);
+  const maint = data.maintenance || [];
+  const cals  = data.calibrations || [];
+  const all   = [
+    ...maint.map(e => ({ ...e, _type: 'maint', _date: e.next_due?.slice(0,10) })),
+    ...cals.map(e => ({ ...e, _type: 'cal',   _date: e.next_due?.slice(0,10) })),
+  ].filter(e => e._date);
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const heading = `${monthNames[_calMonth-1]} ${_calYear}`;
+
+  if (_calView === 'list') {
+    all.sort((a,b) => a._date.localeCompare(b._date));
+    const rows = all.length ? all.map(e => {
+      const isOverdue = e._date < new Date().toISOString().slice(0,10);
+      const badge = e._type === 'cal'
+        ? `<span class="badge-blue badge" style="font-size:0.68rem;">Cal</span>`
+        : `<span class="badge-yellow badge" style="font-size:0.68rem;">Maint</span>`;
+      const statusBadge = isOverdue ? `<span class="badge-red badge" style="font-size:0.68rem;">Overdue</span>` : '';
+      const name = e.equipment_name || e.title || '—';
+      return `<tr class="table-row">
+        <td class="px-4 py-2 text-sm" style="color:var(--c-text-3);">${e._date}</td>
+        <td class="px-4 py-2 text-sm font-semibold">${name}</td>
+        <td class="px-4 py-2 text-sm">${e.title || (e._type==='cal' ? 'Calibration Due' : '')}</td>
+        <td class="px-4 py-2">${badge} ${statusBadge}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="4" class="px-4 py-8 text-center text-sm" style="color:var(--c-text-3);">No events this month</td></tr>`;
+
+    $('page-content').innerHTML = `
+      <div style="padding:1.25rem;">
+        <div class="card" style="padding:0;">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--c-border);display:flex;align-items:center;justify-content:space-between;">
+            <h2 style="font-size:1rem;font-weight:700;color:var(--c-text);">${heading}</h2>
+            <span style="font-size:0.78rem;color:var(--c-text-3);">${all.length} event${all.length!==1?'s':''}</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--c-surface);">
+                <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Date</th>
+                <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Equipment</th>
+                <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Task</th>
+                <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);">Type</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Grid view
+  const firstDow = new Date(_calYear, _calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(_calYear, _calMonth, 0).getDate();
+  const today = new Date().toISOString().slice(0,10);
+
+  const byDate = {};
+  all.forEach(e => { if (!byDate[e._date]) byDate[e._date] = []; byDate[e._date].push(e); });
+
+  const dayHeaders = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d =>
+    `<div style="text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);padding:0.4rem 0;">${d}</div>`
+  ).join('');
+
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) cells += `<div style="min-height:5rem;background:var(--c-surface);border-radius:0.375rem;opacity:0.4;"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${_calYear}-${String(_calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const events = byDate[key] || [];
+    const isToday = key === today;
+    const isPast  = key < today;
+    const pills = events.slice(0,3).map(e => {
+      const color = e._type === 'cal' ? '#3b82f6' : (isPast ? '#ef4444' : '#f59e0b');
+      const label = e._type === 'cal' ? (e.equipment_name||'Cal') : (e.title||e.equipment_name||'Task');
+      return `<div style="font-size:0.6rem;font-weight:600;background:${color}22;color:${color};border-radius:3px;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;" title="${label}">${label}</div>`;
+    }).join('');
+    const more = events.length > 3 ? `<div style="font-size:0.6rem;color:var(--c-text-3);margin-top:2px;">+${events.length-3} more</div>` : '';
+    cells += `<div style="min-height:5rem;background:var(--c-card);border:1px solid ${isToday ? 'var(--c-primary)' : 'var(--c-border)'};border-radius:0.375rem;padding:0.35rem 0.4rem;cursor:${events.length?'pointer':'default'};" ${events.length?`onclick="calShowDay('${key}',this)"`:''}>
+      <div style="font-size:0.75rem;font-weight:${isToday?'700':'500'};color:${isToday?'var(--c-primary)':'var(--c-text-2)'};width:1.4rem;height:1.4rem;border-radius:50%;${isToday?'background:var(--c-primary);color:#fff;':''}display:flex;align-items:center;justify-content:center;">${d}</div>
+      ${pills}${more}
+    </div>`;
+  }
+
+  $('page-content').innerHTML = `
+    <div style="padding:1.25rem;">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+          <h2 style="font-size:1.1rem;font-weight:700;color:var(--c-text);">${heading}</h2>
+          <div style="display:flex;gap:0.5rem;font-size:0.75rem;align-items:center;">
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block;"></span>Maintenance</span>
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block;"></span>Calibration</span>
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block;"></span>Overdue</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.25rem;margin-bottom:0.25rem;">${dayHeaders}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.25rem;">${cells}</div>
+      </div>
+    </div>`;
+}
+
+function calShowDay(dateKey, el) {
+  const existing = document.getElementById('cal-day-popup');
+  if (existing) existing.remove();
+  const data = _calDayData?.[dateKey] || [];
+  // get events from DOM re-fetch would be complex; just reload as list filtered
+  calFilterDay(dateKey);
+}
+function calFilterDay(dateKey) {
+  _calView = 'list';
+  const btn = document.getElementById('cal-view-btn');
+  if (btn) btn.textContent = 'Grid';
+  renderCalendar();
+}
+
+function calPrev() {
+  _calMonth--;
+  if (_calMonth < 1) { _calMonth = 12; _calYear--; }
+  renderCalendar();
+}
+function calNext() {
+  _calMonth++;
+  if (_calMonth > 12) { _calMonth = 1; _calYear++; }
+  renderCalendar();
+}
+function calToday() {
+  _calYear = new Date().getFullYear();
+  _calMonth = new Date().getMonth() + 1;
+  renderCalendar();
+}
+function calToggleView() {
+  _calView = _calView === 'grid' ? 'list' : 'grid';
+  const btn = document.getElementById('cal-view-btn');
+  if (btn) btn.textContent = _calView === 'grid' ? 'List' : 'Grid';
+  renderCalendar();
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work', commander:"Commander's Dashboard" };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
