@@ -275,6 +275,10 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         Faults
       </a>
+      <a href="/hazmat" class="nav-link" data-page="hazmat">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Hazmat Suits
+      </a>
       <a href="/calendar" class="nav-link" data-page="calendar">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         Calendar
@@ -602,6 +606,607 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
+// ─── Hazmat Suits ─────────────────────────────────────────────────────────────
+const HAZMAT_TYPES = ['Level A', 'Level B', 'MT94', 'GORE'];
+const HAZMAT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const HAZMAT_SHELF = { 'Level A': 10, 'Level B': 10, 'MT94': 7, 'GORE': 10 };
+const HAZMAT_STATUS_BADGE = {
+  serviceable: 'badge-green', out_for_test: 'badge-yellow',
+  expended: 'badge-gray', condemned: 'badge-red'
+};
+
+let _hazmatTab = 'dashboard';
+let _hazmatSuits = [];
+
+async function hazmatPage() {
+  $('page-title').textContent = 'Hazmat Suit Accountability';
+  _renderHazmatTabs();
+  await _loadHazmatTab(_hazmatTab);
+}
+
+function _renderHazmatTabs() {
+  const tabs = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'suits',     label: '🧪 Suits' },
+    { id: 'paper',     label: '📦 Paper Stock' },
+    { id: 'roster',    label: '📋 Roster' },
+  ];
+  $('page-actions').innerHTML = tabs.map(t =>
+    `<button onclick="hazmatTab('${t.id}')" id="hztab-${t.id}" class="btn-secondary"
+      style="font-size:0.8rem;padding:0.3rem 0.75rem;${_hazmatTab===t.id?'background:var(--c-primary);color:#fff;border-color:var(--c-primary);':''}"
+    >${t.label}</button>`
+  ).join('') + (isTech() ? `<button onclick="openAddSuitModal()" class="btn-primary" style="font-size:0.8rem;padding:0.3rem 0.75rem;">＋ Add Suit</button>` : '');
+}
+
+async function hazmatTab(tab) {
+  _hazmatTab = tab;
+  _renderHazmatTabs();
+  await _loadHazmatTab(tab);
+}
+
+async function _loadHazmatTab(tab) {
+  $('page-content').innerHTML = `<div style="padding:2rem;text-align:center;color:var(--c-text-3);">Loading…</div>`;
+  if (tab === 'dashboard')  await _renderHazmatDashboard();
+  else if (tab === 'suits') await _renderHazmatSuits();
+  else if (tab === 'paper') await _renderHazmatPaper();
+  else if (tab === 'roster') await _renderHazmatRoster();
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+async function _renderHazmatDashboard() {
+  const d = await api('GET', '/api/hazmat/dashboard');
+  const statCard = (label, val, sub, color='var(--c-text)') => `
+    <div class="card" style="padding:1.1rem 1.25rem;">
+      <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);margin-bottom:0.5rem;">${label}</div>
+      <div style="font-size:2rem;font-weight:700;line-height:1;color:${color};">${val}</div>
+      ${sub ? `<div style="font-size:0.72rem;margin-top:0.35rem;color:${color};">${sub}</div>` : ''}
+    </div>`;
+
+  const overdueRows = d.overdue_list.length
+    ? d.overdue_list.map(s => {
+        const label = s.next_due
+          ? `<span class="badge badge-red">${s.days_overdue}d overdue</span>`
+          : `<span class="badge badge-red">Never tested</span>`;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.45rem 0;border-bottom:1px solid var(--c-border);">
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;color:var(--c-text);">${esc(s.suit_type)} ${esc(s.size)} ${s.serial_num?'· '+esc(s.serial_num):''}</div>
+            <div style="font-size:0.72rem;color:var(--c-text-3);">${s.assigned_to ? 'Assigned: '+esc(s.assigned_to) : 'Unassigned'}</div>
+          </div>
+          ${label}
+        </div>`;
+      }).join('')
+    : `<div style="font-size:0.82rem;color:#15803d;padding:0.5rem 0;">All suits current ✓</div>`;
+
+  const paperRows = d.paper.map(p =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--c-border);">
+      <span style="font-size:0.85rem;font-weight:600;color:var(--c-text);">Size ${esc(p.size)}</span>
+      <span style="font-size:1rem;font-weight:700;color:${p.quantity===0?'#ef4444':p.quantity<5?'#f59e0b':'var(--c-text)'};">${p.quantity}</span>
+    </div>`
+  ).join('');
+
+  $('page-content').innerHTML = `
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;">
+        ${statCard('Total Serviceable', d.serviceable, `${d.total} in system`)}
+        ${statCard('Assigned', d.assigned, `${d.unassigned} unassigned`, d.assigned>0?'var(--c-text)':'var(--c-text-3)')}
+        ${statCard('Overdue Test', d.overdue_test + (d.never_tested?' + '+d.never_tested+' never':''), d.due_30+' due in 30 days', d.overdue_test>0?'#ef4444':'#15803d')}
+        ${statCard('Expiring Soon', d.expiring_90, 'within 90 days', d.expiring_90>0?'#f59e0b':'#15803d')}
+        ${statCard('Expended YTD', d.expended_ytd, 'this calendar year')}
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;">
+        <div class="card">
+          <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);margin-bottom:0.85rem;">Overdue / Never Tested</div>
+          ${overdueRows}
+        </div>
+        <div class="card">
+          <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);margin-bottom:0.85rem;">Paper Suit Stock</div>
+          ${paperRows}
+          ${isTech() ? `<button onclick="hazmatTab('paper')" class="btn-secondary" style="width:100%;margin-top:0.75rem;font-size:0.78rem;justify-content:center;">Adjust Stock</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Suits list ────────────────────────────────────────────────────────────────
+async function _renderHazmatSuits() {
+  _hazmatSuits = await api('GET', '/api/hazmat/suits');
+  let typeFilter = '', statusFilter = '';
+
+  function rows(suits) {
+    if (!suits.length) return `<tr><td colspan="8" class="px-4 py-8 text-center text-sm" style="color:var(--c-text-3);">No suits found.</td></tr>`;
+    const today = new Date().toISOString().slice(0,10);
+    return suits.map(s => {
+      const testBadge = !s.last_tested
+        ? `<span class="badge badge-red">Never</span>`
+        : s.next_due < today
+          ? `<span class="badge badge-red">${s.next_due} overdue</span>`
+          : s.next_due <= new Date(Date.now()+30*864e5).toISOString().slice(0,10)
+            ? `<span class="badge badge-yellow">Due ${s.next_due}</span>`
+            : `<span class="badge badge-green">Due ${s.next_due}</span>`;
+      const expiryBadge = s.expiry_date
+        ? s.expiry_date < today
+          ? `<span class="badge badge-red">Exp ${s.expiry_date}</span>`
+          : s.expiry_date <= new Date(Date.now()+90*864e5).toISOString().slice(0,10)
+            ? `<span class="badge badge-yellow">Exp ${s.expiry_date}</span>`
+            : `<span style="font-size:0.75rem;color:var(--c-text-3);">${s.expiry_date}</span>`
+        : `<span style="font-size:0.75rem;color:var(--c-text-3);">—</span>`;
+      return `<tr class="table-row border-b last:border-0">
+        <td class="px-4 py-3 font-medium">${esc(s.suit_type)}</td>
+        <td class="px-4 py-3 text-sm" style="color:var(--c-text-3);">${esc(s.size)}</td>
+        <td class="px-4 py-3 font-mono text-xs" style="color:var(--c-text-3);">${esc(s.serial_num||'—')}</td>
+        <td class="px-4 py-3"><span class="badge ${HAZMAT_STATUS_BADGE[s.status]||'badge-gray'}">${s.status.replace('_',' ')}</span></td>
+        <td class="px-4 py-3 text-sm">${s.assigned_to ? esc(s.assigned_to) : '<span style="color:var(--c-text-3);">Unassigned</span>'}</td>
+        <td class="px-4 py-3">${testBadge}</td>
+        <td class="px-4 py-3">${expiryBadge}</td>
+        <td class="px-4 py-3 text-right" style="white-space:nowrap;">
+          <button onclick="openSuitDetail(${s.id})" class="text-xs" style="color:var(--c-primary);">Detail</button>
+          ${isTech() ? `
+            <button onclick="openTestModal(${s.id},'${esc(s.suit_type)} ${esc(s.size)}')" class="text-xs" style="color:#15803d;margin-left:0.5rem;">+ Test</button>
+            <button onclick="openAssignModal(${s.id},'${esc(s.suit_type)} ${esc(s.size)}','${esc(s.assigned_to||'')}')" class="text-xs" style="color:#1d4ed8;margin-left:0.5rem;">${s.assigned_to?'Return':'Assign'}</button>
+            <button onclick="openEditSuitModal(${s.id})" class="text-xs" style="color:var(--c-text-3);margin-left:0.5rem;">Edit</button>` : ''}
+          ${isSuperAdmin() ? `<button onclick="deleteSuit(${s.id})" class="text-xs" style="color:#ef4444;margin-left:0.5rem;">Delete</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function applyFilters() {
+    let f = _hazmatSuits;
+    if (typeFilter)   f = f.filter(s => s.suit_type === typeFilter);
+    if (statusFilter) f = f.filter(s => s.status === statusFilter);
+    document.getElementById('hz-tbody').innerHTML = rows(f);
+  }
+
+  $('page-content').innerHTML = `
+    <div class="card overflow-hidden p-0">
+      <div class="px-5 py-4 border-b flex flex-wrap items-center gap-3" style="border-color:var(--c-border);">
+        <select id="hz-type-filter" class="input w-36" onchange="window._hzTypeF=this.value;window._hzApply()">
+          <option value="">All types</option>
+          ${HAZMAT_TYPES.map(t=>`<option>${t}</option>`).join('')}
+        </select>
+        <select id="hz-status-filter" class="input w-36" onchange="window._hzStatF=this.value;window._hzApply()">
+          <option value="">All statuses</option>
+          <option value="serviceable">Serviceable</option>
+          <option value="out_for_test">Out for Test</option>
+          <option value="expended">Expended</option>
+          <option value="condemned">Condemned</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--c-surface);">
+            ${['Type','Size','Serial','Status','Assigned To','Next Test','Expiry','Actions'].map(h=>
+              `<th class="px-4 py-3 text-left text-xs" style="color:var(--c-text-3);font-weight:600;border-bottom:1px solid var(--c-border);white-space:nowrap;">${h}</th>`
+            ).join('')}
+          </tr></thead>
+          <tbody id="hz-tbody">${rows(_hazmatSuits)}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  window._hzTypeF = ''; window._hzStatF = '';
+  window._hzApply = () => {
+    let f = _hazmatSuits;
+    if (window._hzTypeF)   f = f.filter(s => s.suit_type === window._hzTypeF);
+    if (window._hzStatF)   f = f.filter(s => s.status    === window._hzStatF);
+    document.getElementById('hz-tbody').innerHTML = rows(f);
+  };
+}
+
+// ── Paper stock ───────────────────────────────────────────────────────────────
+async function _renderHazmatPaper() {
+  const stock = await api('GET', '/api/hazmat/paper');
+  $('page-content').innerHTML = `
+    <div style="padding:1.25rem;">
+      <div class="card" style="max-width:480px;">
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);margin-bottom:1rem;">Paper / Disposable Suit Stock by Size</div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;" id="paper-stock-rows">
+          ${stock.map(p => `
+            <div style="display:flex;align-items:center;gap:1rem;">
+              <span style="width:3rem;font-weight:700;font-size:0.9rem;color:var(--c-text);">${esc(p.size)}</span>
+              ${isTech() ? `
+                <button onclick="paperAdj('${esc(p.size)}',-1)" style="background:#fef2f2;color:#dc2626;border:none;border-radius:0.25rem;padding:0.2rem 0.6rem;cursor:pointer;font-size:1rem;font-weight:700;min-height:36px;">−</button>` : ''}
+              <span id="paper-qty-${esc(p.size)}" style="font-size:1.4rem;font-weight:700;min-width:2.5rem;text-align:center;color:${p.quantity===0?'#ef4444':p.quantity<5?'#f59e0b':'var(--c-text)'};">${p.quantity}</span>
+              ${isTech() ? `
+                <button onclick="paperAdj('${esc(p.size)}',1)" style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.2rem 0.6rem;cursor:pointer;font-size:1rem;font-weight:700;min-height:36px;">＋</button>
+                <button onclick="paperSet('${esc(p.size)}')" style="font-size:0.75rem;color:var(--c-text-3);background:none;border:1px solid var(--c-border);border-radius:0.25rem;padding:0.2rem 0.5rem;cursor:pointer;margin-left:0.25rem;">Set qty</button>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function paperAdj(size, delta) {
+  const el = document.getElementById(`paper-qty-${size}`);
+  const cur = parseInt(el?.textContent) || 0;
+  const newQty = Math.max(0, cur + delta);
+  await api('PATCH', `/api/hazmat/paper/${size}`, { quantity: newQty });
+  if (el) {
+    el.textContent = newQty;
+    el.style.color = newQty===0?'#ef4444':newQty<5?'#f59e0b':'var(--c-text)';
+  }
+}
+
+async function paperSet(size) {
+  const cur = parseInt(document.getElementById(`paper-qty-${size}`)?.textContent) || 0;
+  const val = prompt(`Set quantity for size ${size}:`, cur);
+  if (val === null) return;
+  const qty = Math.max(0, parseInt(val)||0);
+  await api('PATCH', `/api/hazmat/paper/${size}`, { quantity: qty });
+  await _renderHazmatPaper();
+}
+
+// ── Roster ────────────────────────────────────────────────────────────────────
+async function _renderHazmatRoster() {
+  const suits = await api('GET', '/api/hazmat/roster');
+  const paper = await api('GET', '/api/hazmat/paper');
+  const today = new Date().toISOString().slice(0,10);
+
+  const suitRows = suits.map(s => {
+    const testStatus = !s.last_tested ? 'Never tested'
+      : s.next_due < today ? `OVERDUE (${s.next_due})`
+      : `Current (due ${s.next_due})`;
+    const testColor = !s.last_tested || s.next_due < today ? '#dc2626' : '#15803d';
+    return `<tr style="border-bottom:1px solid #e5e7eb;">
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;font-weight:600;">${esc(s.assigned_to||'— UNASSIGNED —')}</td>
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;">${esc(s.suit_type)}</td>
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;">${esc(s.size)}</td>
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;font-family:monospace;">${esc(s.serial_num||'—')}</td>
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;color:${testColor};">${testStatus}</td>
+      <td style="padding:0.5rem 0.75rem;font-size:0.82rem;">${s.expiry_date||'—'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="padding:2rem;text-align:center;color:#9ca3af;">No suits on record.</td></tr>`;
+
+  const paperSummary = paper.map(p =>
+    `<span style="font-size:0.82rem;margin-right:1rem;"><strong>${esc(p.size)}:</strong> ${p.quantity}</span>`
+  ).join('');
+
+  $('page-content').innerHTML = `
+    <div style="padding:1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+        <div style="font-size:0.78rem;color:var(--c-text-3);">As of ${today} · ${suits.length} suits</div>
+        <button onclick="window.print()" class="btn-secondary" style="font-size:0.78rem;">🖨 Print Roster</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.75rem 1rem;background:var(--c-surface);border-bottom:1px solid var(--c-border);font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);">Individual Suits</div>
+        <div class="overflow-x-auto">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:var(--c-surface);">
+              ${['Assigned To','Type','Size','Serial #','Test Status','Expiry'].map(h=>
+                `<th style="padding:0.5rem 0.75rem;text-align:left;font-size:0.72rem;font-weight:700;color:var(--c-text-3);border-bottom:1px solid var(--c-border);">${h}</th>`
+              ).join('')}
+            </tr></thead>
+            <tbody>${suitRows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:0.75rem;">
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--c-text-3);margin-bottom:0.5rem;">Paper / Disposable Suit Stock</div>
+        <div>${paperSummary||'No stock recorded.'}</div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:1.5rem;font-size:0.72rem;">
+        <span style="display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;border-radius:2px;background:#15803d;display:inline-block;"></span>Test current</span>
+        <span style="display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block;"></span>Overdue / never tested</span>
+      </div>
+    </div>`;
+}
+
+// ── Add / Edit Suit Modal ─────────────────────────────────────────────────────
+function _suitForm(suit={}) {
+  const typeOpts = HAZMAT_TYPES.map(t =>
+    `<option value="${t}" ${suit.suit_type===t?'selected':''}>${t}</option>`).join('');
+  const sizeOpts = HAZMAT_SIZES.map(s =>
+    `<option value="${s}" ${suit.size===s?'selected':''}>${s}</option>`).join('');
+  const statusOpts = ['serviceable','out_for_test','expended','condemned'].map(s =>
+    `<option value="${s}" ${(suit.status||'serviceable')===s?'selected':''}>${s.replace('_',' ')}</option>`).join('');
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div>
+        <label class="label">Suit Type *</label>
+        <select name="suit_type" class="input" required onchange="hazmatTypeChange(this)">${typeOpts}</select>
+      </div>
+      <div>
+        <label class="label">Size *</label>
+        <select name="size" class="input" required>${sizeOpts}</select>
+      </div>
+      <div>
+        <label class="label">Model / Manufacturer</label>
+        <input name="model" class="input" value="${esc(suit.model||'')}">
+      </div>
+      <div>
+        <label class="label">Serial Number</label>
+        <input name="serial_num" class="input" value="${esc(suit.serial_num||'')}">
+      </div>
+      <div>
+        <label class="label">Manufacture Date</label>
+        <input name="manufacture_date" type="date" class="input" value="${suit.manufacture_date||''}" onchange="hazmatMfgChange(this)">
+      </div>
+      <div>
+        <label class="label">Shelf Life (years)</label>
+        <input name="shelf_life_years" type="number" min="1" max="25" step="0.5" class="input" id="hz-shelf" value="${suit.shelf_life_years||''}" onchange="hazmatMfgChange()">
+      </div>
+      <div>
+        <label class="label">Expiry Date <span style="font-weight:400;color:var(--c-text-3);">(auto-calculated)</span></label>
+        <input name="expiry_date" type="date" class="input" id="hz-expiry" value="${suit.expiry_date||''}">
+      </div>
+      <div>
+        <label class="label">Status</label>
+        <select name="status" class="input">${statusOpts}</select>
+      </div>
+    </div>
+    <div style="margin-top:0.75rem;">
+      <label class="label">Notes</label>
+      <textarea name="notes" class="input" rows="2">${esc(suit.notes||'')}</textarea>
+    </div>`;
+}
+
+function hazmatTypeChange(sel) {
+  const shelf = HAZMAT_SHELF[sel.value];
+  const shelfEl = document.getElementById('hz-shelf');
+  if (shelfEl && shelf) shelfEl.value = shelf;
+  hazmatMfgChange();
+}
+
+function hazmatMfgChange() {
+  const mfg   = document.querySelector('[name="manufacture_date"]')?.value;
+  const shelf = parseFloat(document.getElementById('hz-shelf')?.value);
+  const exp   = document.getElementById('hz-expiry');
+  if (mfg && shelf && exp) {
+    const d = new Date(mfg);
+    d.setFullYear(d.getFullYear() + Math.floor(shelf));
+    exp.value = d.toISOString().slice(0,10);
+  }
+}
+
+async function openAddSuitModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop'; overlay.id = 'hz-suit-backdrop';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal" style="max-width:560px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Add Hazmat Suit</h2>
+      <button onclick="document.getElementById('hz-suit-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="hazmatSaveSuit(event)" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      ${_suitForm()}
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('hz-suit-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Add Suit</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  // Set default shelf life for first type
+  hazmatTypeChange(overlay.querySelector('[name="suit_type"]'));
+}
+
+async function openEditSuitModal(suitId) {
+  const suit = _hazmatSuits.find(s => s.id === suitId);
+  if (!suit) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop'; overlay.id = 'hz-suit-backdrop';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal" style="max-width:560px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Edit Suit</h2>
+      <button onclick="document.getElementById('hz-suit-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="hazmatUpdateSuit(event,${suitId})" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      ${_suitForm(suit)}
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('hz-suit-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function hazmatSaveSuit(e) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (body.shelf_life_years) body.shelf_life_years = parseFloat(body.shelf_life_years);
+  try {
+    await api('POST', '/api/hazmat/suits', body);
+    document.getElementById('hz-suit-backdrop')?.remove();
+    toast('Suit added.');
+    await _renderHazmatSuits();
+  } catch(err) { toast(err.message||'Failed', false); }
+}
+
+async function hazmatUpdateSuit(e, suitId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (body.shelf_life_years) body.shelf_life_years = parseFloat(body.shelf_life_years);
+  try {
+    await api('PUT', `/api/hazmat/suits/${suitId}`, body);
+    document.getElementById('hz-suit-backdrop')?.remove();
+    toast('Suit updated.');
+    await _renderHazmatSuits();
+  } catch(err) { toast(err.message||'Failed', false); }
+}
+
+async function deleteSuit(suitId) {
+  if (!confirm('Delete this suit and all its records?')) return;
+  await api('DELETE', `/api/hazmat/suits/${suitId}`);
+  toast('Deleted.');
+  await _renderHazmatSuits();
+}
+
+// ── Test Modal ────────────────────────────────────────────────────────────────
+function openTestModal(suitId, label) {
+  const today = new Date().toISOString().slice(0,10);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop'; overlay.id = 'hz-test-backdrop';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal" style="max-width:440px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Record Pressure Test</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);">${esc(label)}</div>
+      </div>
+      <button onclick="document.getElementById('hz-test-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="hazmatSaveTest(event,${suitId})" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label class="label">Test Date *</label>
+          <input name="tested_date" type="date" class="input" value="${today}" required>
+        </div>
+        <div>
+          <label class="label">Result *</label>
+          <select name="result" class="input">
+            <option value="pass">Pass</option>
+            <option value="fail">Fail</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label class="label">Tested By</label>
+          <input name="tested_by" class="input" value="${esc(cu())}">
+        </div>
+        <div>
+          <label class="label">Next Due <span style="font-weight:400;color:var(--c-text-3);">(auto +1yr)</span></label>
+          <input name="next_due" type="date" class="input">
+        </div>
+      </div>
+      <div>
+        <label class="label">Notes</label>
+        <textarea name="notes" class="input" rows="2" placeholder="Test conditions, equipment used, failure mode if applicable…"></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('hz-test-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save Test Record</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function hazmatSaveTest(e, suitId) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (!body.next_due) delete body.next_due;
+  try {
+    await api('POST', `/api/hazmat/suits/${suitId}/tests`, body);
+    document.getElementById('hz-test-backdrop')?.remove();
+    toast('Test recorded.');
+    await _renderHazmatSuits();
+  } catch(err) { toast(err.message||'Failed', false); }
+}
+
+// ── Assign / Return Modal ─────────────────────────────────────────────────────
+function openAssignModal(suitId, label, currentAssignee) {
+  const today = new Date().toISOString().slice(0,10);
+  const isReturn = !!currentAssignee;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop'; overlay.id = 'hz-assign-backdrop';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal" style="max-width:400px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">${isReturn ? 'Return Suit' : 'Assign Suit'}</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);">${esc(label)}${isReturn?' · Currently: '+esc(currentAssignee):''}</div>
+      </div>
+      <button onclick="document.getElementById('hz-assign-backdrop').remove()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <form onsubmit="hazmatSaveAssign(event,${suitId},${isReturn})" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      ${!isReturn ? `
+        <div>
+          <label class="label">Assign To (Last Name) *</label>
+          <input name="assigned_to" class="input" required placeholder="e.g. SMITH">
+        </div>
+        <div>
+          <label class="label">Issue Date</label>
+          <input name="issued_date" type="date" class="input" value="${today}">
+        </div>` : `
+        <div>
+          <label class="label">Return Date</label>
+          <input name="returned_date" type="date" class="input" value="${today}">
+        </div>`}
+      <div>
+        <label class="label">Notes</label>
+        <input name="notes" class="input" placeholder="Optional">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button type="button" onclick="document.getElementById('hz-assign-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">${isReturn ? 'Return Suit' : 'Assign Suit'}</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function hazmatSaveAssign(e, suitId, isReturn) {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  if (isReturn) body.assigned_to = null;
+  try {
+    await api('POST', `/api/hazmat/suits/${suitId}/assign`, body);
+    document.getElementById('hz-assign-backdrop')?.remove();
+    toast(isReturn ? 'Suit returned.' : 'Suit assigned.');
+    await _renderHazmatSuits();
+  } catch(err) { toast(err.message||'Failed', false); }
+}
+
+// ── Suit Detail ───────────────────────────────────────────────────────────────
+async function openSuitDetail(suitId) {
+  const suit = _hazmatSuits.find(s => s.id === suitId);
+  if (!suit) return;
+  const [tests, assignments] = await Promise.all([
+    api('GET', `/api/hazmat/suits/${suitId}/tests`),
+    api('GET', `/api/hazmat/suits/${suitId}/assignments`),
+  ]);
+  const testRows = tests.length ? tests.map(t => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.45rem 0;border-bottom:1px solid var(--c-border);">
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--c-text);">${t.tested_date} · <span style="color:${t.result==='pass'?'#15803d':'#dc2626'};">${t.result.toUpperCase()}</span></div>
+        <div style="font-size:0.72rem;color:var(--c-text-3);">By ${esc(t.tested_by||'—')} · Next due: ${t.next_due||'—'}</div>
+        ${t.notes ? `<div style="font-size:0.72rem;color:var(--c-text-3);">${esc(t.notes)}</div>` : ''}
+      </div>
+    </div>`).join('')
+    : `<div style="font-size:0.82rem;color:var(--c-text-3);padding:0.5rem 0;">No test records.</div>`;
+
+  const assignRows = assignments.length ? assignments.map(a => `
+    <div style="font-size:0.82rem;padding:0.35rem 0;border-bottom:1px solid var(--c-border);color:var(--c-text);">
+      <strong>${esc(a.assigned_to)}</strong> · Issued ${a.issued_date}${a.returned_date?' · Returned '+a.returned_date:' <span style="color:#f59e0b;font-weight:600;">(current)</span>'}
+    </div>`).join('')
+    : `<div style="font-size:0.82rem;color:var(--c-text-3);padding:0.5rem 0;">No assignment history.</div>`;
+
+  modal(`<div class="modal" style="max-width:520px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">${esc(suit.suit_type)} · ${esc(suit.size)}</h2>
+        <div style="font-size:0.75rem;color:var(--c-text-3);">${suit.serial_num?'S/N: '+esc(suit.serial_num)+' · ':''}${suit.model?esc(suit.model)+' · ':''}${suit.status.replace('_',' ')}</div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;max-height:70vh;overflow-y:auto;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.82rem;">
+        <div><span style="color:var(--c-text-3);">Assigned to:</span> <strong>${suit.assigned_to?esc(suit.assigned_to):'Unassigned'}</strong></div>
+        <div><span style="color:var(--c-text-3);">Manufacture date:</span> ${suit.manufacture_date||'—'}</div>
+        <div><span style="color:var(--c-text-3);">Shelf life:</span> ${suit.shelf_life_years?suit.shelf_life_years+' yr':'—'}</div>
+        <div><span style="color:var(--c-text-3);">Expiry:</span> <strong style="color:${suit.expiry_date&&suit.expiry_date<new Date().toISOString().slice(0,10)?'#dc2626':'var(--c-text)'};">${suit.expiry_date||'—'}</strong></div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);margin-bottom:0.5rem;">Pressure Test History</div>
+        ${testRows}
+      </div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);margin-bottom:0.5rem;">Assignment History</div>
+        ${assignRows}
+      </div>
+    </div>
+    <div class="px-6 py-4" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;justify-content:flex-end;">
+      ${isTech() ? `
+        <button onclick="closeModal();openTestModal(${suitId},'${esc(suit.suit_type)} ${esc(suit.size)}')" class="btn-secondary" style="font-size:0.82rem;">+ Test Record</button>
+        <button onclick="closeModal();openAssignModal(${suitId},'${esc(suit.suit_type)} ${esc(suit.size)}','${esc(suit.assigned_to||'')}')" class="btn-secondary" style="font-size:0.82rem;">${suit.assigned_to?'Return':'Assign'}</button>` : ''}
+      <button onclick="closeModal()" class="btn-primary" style="font-size:0.82rem;">Close</button>
+    </div>
+  </div>`);
+}
+
 // ─── Calendar ─────────────────────────────────────────────────────────────────
 let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth() + 1;
@@ -879,8 +1484,8 @@ function calToggleView() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);

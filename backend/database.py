@@ -358,4 +358,61 @@ async def init_db():
         if "source_fault_id" not in task_cols:
             await db.execute("ALTER TABLE maintenance_tasks ADD COLUMN source_fault_id INTEGER REFERENCES fault_reports(id) ON DELETE SET NULL")
 
+        # Hazmat suit tracking
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hazmat_suits (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                suit_type        TEXT NOT NULL,
+                model            TEXT,
+                size             TEXT NOT NULL,
+                serial_num       TEXT,
+                manufacture_date TEXT,
+                shelf_life_years REAL,
+                expiry_date      TEXT,
+                status           TEXT NOT NULL DEFAULT 'serviceable',
+                assigned_to      TEXT,
+                assigned_date    TEXT,
+                notes            TEXT,
+                created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hazmat_suit_tests (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                suit_id     INTEGER NOT NULL REFERENCES hazmat_suits(id) ON DELETE CASCADE,
+                tested_date TEXT NOT NULL,
+                tested_by   TEXT,
+                result      TEXT NOT NULL DEFAULT 'pass',
+                next_due    TEXT,
+                notes       TEXT,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_hazmat_tests ON hazmat_suit_tests(suit_id)")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hazmat_suit_assignments (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                suit_id       INTEGER NOT NULL REFERENCES hazmat_suits(id) ON DELETE CASCADE,
+                assigned_to   TEXT NOT NULL,
+                issued_date   TEXT NOT NULL,
+                returned_date TEXT,
+                notes         TEXT
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_hazmat_assign ON hazmat_suit_assignments(suit_id)")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hazmat_paper_stock (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                size       TEXT NOT NULL UNIQUE,
+                quantity   INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        # Seed default paper stock sizes
+        for sz in ('XS', 'S', 'M', 'L', 'XL', 'XXL'):
+            await db.execute(
+                "INSERT OR IGNORE INTO hazmat_paper_stock (size, quantity) VALUES (?, 0)", (sz,)
+            )
+
         await db.commit()
