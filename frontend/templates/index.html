@@ -154,7 +154,7 @@
       #eq-bulk-bar { flex-wrap: wrap; gap: 0.4rem !important; padding: 0.75rem !important; }
       #eq-bulk-bar button { min-height: 40px; font-size: 0.8rem !important; padding: 0.4rem 0.8rem !important; }
       /* Bottom nav bar */
-      #bottom-nav { display:flex; }
+      #bottom-nav { display:flex !important; }
       /* Cards stack full-width */
       .card { border-radius:0.5rem; }
       /* Toast above bottom nav */
@@ -1678,14 +1678,14 @@ async function dashboardPage() {
     <!-- Stat cards -->
     ${widgetOn('stat-cards') ? `
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-      ${statCard('Equipment', c.total_equipment, 'bg-stone-100 text-stone-800', 'Active')}
-      ${statCard('Overdue Tasks', c.overdue_tasks, c.overdue_tasks?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Maintenance')}
-      ${statCard('Cal Overdue', c.cal_overdue, c.cal_overdue?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Calibration')}
+      ${statCard('Equipment', c.total_equipment, 'bg-stone-100 text-stone-800', 'Active', 'equipment')}
+      ${statCard('Overdue Tasks', c.overdue_tasks, c.overdue_tasks?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Maintenance', 'maintenance')}
+      ${statCard('Cal Overdue', c.cal_overdue, c.cal_overdue?'bg-red-50 text-red-700':'bg-green-50 text-green-700', 'Calibration', 'calibration')}
     </div>
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-      ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items')}
-      ${statCard('My Tasks', data.my_tasks_count||0, (data.my_tasks_count||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', 'Assigned to me')}
-      ${statCard('PMCS Stale', data.stale_pmcs||0, (data.stale_pmcs||0)?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700', 'Checklists >30d or never run')}
+      ${statCard('Low Stock', c.low_stock, c.low_stock?'bg-yellow-50 text-yellow-700':'bg-green-50 text-green-700', 'Inventory items', 'inventory')}
+      ${statCard('My Tasks', data.my_tasks_count||0, (data.my_tasks_count||0)?'bg-blue-50 text-blue-700':'bg-green-50 text-green-700', 'Assigned to me', 'mywork')}
+      ${statCard('PMCS Stale', data.stale_pmcs||0, (data.stale_pmcs||0)?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700', 'Checklists >30d or never run', 'pmcs')}
     </div>` : ''}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1871,8 +1871,10 @@ function applyDashCfg() {
   dashboardPage();
 }
 
-function statCard(label, val, cls, sub) {
-  return `<div class="card flex flex-col gap-1">
+function statCard(label, val, cls, sub, dest='') {
+  const tap = dest ? `onclick="navigate('${dest}')" style="cursor:pointer;"` : '';
+  const hover = dest ? ' transition-opacity hover:opacity-80 active:opacity-60' : '';
+  return `<div class="card flex flex-col gap-1${hover}" ${tap}>
     <div class="text-3xl font-bold ${cls}">${val}</div>
     <div class="text-sm font-medium text-gray-700">${label}</div>
     <div class="text-xs text-gray-400">${sub}</div>
