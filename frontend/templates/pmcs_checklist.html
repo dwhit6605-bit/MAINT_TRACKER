@@ -42,8 +42,15 @@
 
   /* ── Equipment group header ── */
   .eq-section { margin: 0.75rem 0.75rem 0; }
-  .eq-section-header { background: #1e3a5f; color: #fff; border-radius: 0.6rem 0.6rem 0 0;
-                         padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
+  .eq-section-header { background: #1e3a5f; color: #fff; border-radius: 0.6rem;
+                         padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem;
+                         cursor: pointer; user-select: none; transition: border-radius 150ms; }
+  .eq-section-header:hover { background: #16305a; }
+  .eq-section.open .eq-section-header { border-radius: 0.6rem 0.6rem 0 0; }
+  .eq-section-header .eq-chevron { margin-left: auto; font-size: 0.85rem; transition: transform 200ms; flex-shrink: 0; opacity: 0.7; }
+  .eq-section.open .eq-section-header .eq-chevron { transform: rotate(90deg); }
+  .eq-section-body { display: none; }
+  .eq-section.open .eq-section-body { display: block; }
   .eq-section-header .eq-name { font-size: 0.9rem; font-weight: 700; }
   .eq-section-header .eq-count { font-size: 0.72rem; background:rgba(255,255,255,.15);
                                    padding:2px 8px; border-radius:9999px; margin-left:auto; }
@@ -428,12 +435,13 @@ function renderChecklist() {
         ? sec.groupEqs.map(e => e.serial_num || '—').join(' · ')
         : sec.groupEqs.slice(0,3).map(e => e.serial_num || '—').join(' · ') + ` +${sec.groupEqs.length-3} more`;
       html += `<div class="eq-section">
-        <div class="eq-section-header">
+        <div class="eq-section-header" onclick="toggleEqSection(this.parentElement)">
           <div>
             <div class="eq-name">${esc(sec.groupName)}</div>
             <div class="eq-serials">${esc(shortSerials)}</div>
           </div>
           <div class="eq-count">${sec.groupEqs.length} units</div>
+          <span class="eq-chevron">▶</span>
         </div>
         <div class="eq-section-body">`;
       lastInterval = '';
@@ -451,12 +459,13 @@ function renderChecklist() {
 
     } else if (sec.type === 'single') {
       html += `<div class="eq-section">
-        <div class="eq-section-header">
+        <div class="eq-section-header" onclick="toggleEqSection(this.parentElement)">
           <div>
             <div class="eq-name">${esc(sec.eq.name)}</div>
             ${sec.eq.serial_num ? `<div class="eq-serials">S/N: ${esc(sec.eq.serial_num)}</div>` : ''}
           </div>
           <div class="eq-count">${sec.items.length} items</div>
+          <span class="eq-chevron">▶</span>
         </div>
         <div class="eq-section-body">`;
       lastInterval = '';
@@ -837,6 +846,7 @@ function restoreDraft() {
     }
   });
   updateCounts();
+  autoExpandAnsweredSections();
 }
 
 function dismissDraft() {
@@ -1059,6 +1069,20 @@ async function submitFaultReports() {
   }
   btn.style.display='none';
   document.getElementById('fault-report-done').style.display='block';
+}
+
+// ── Section collapse ──────────────────────────────────────────────────────────
+function toggleEqSection(el) {
+  el.classList.toggle('open');
+}
+
+function autoExpandAnsweredSections() {
+  Object.keys(statuses).forEach(id => {
+    const card = document.getElementById('card-' + id);
+    if (!card) return;
+    const section = card.closest('.eq-section');
+    if (section) section.classList.add('open');
+  });
 }
 
 // ── Advanced toggle ───────────────────────────────────────────────────────────
