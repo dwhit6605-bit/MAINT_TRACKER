@@ -6798,79 +6798,220 @@ async function deleteUser(id, username) {
 // ─── Rolling Stock ────────────────────────────────────────────────────────────
 let rsData = [];
 
-const RS_CHECKLIST = [
-  {section:'At Dispatch', items:[
-    {key:'dispatch_window',  label:'Window'},
-    {key:'dispatch_license', label:'License'},
-    {key:'dispatch_cc_key',  label:'Credit Card & Key'},
-  ]},
-  {section:'Lights', items:[
-    {key:'lights_headlights',label:'Headlights — High & Low Beam'},
-    {key:'lights_brake',     label:'Brake Lights'},
-    {key:'lights_tail',      label:'Tail Lights'},
-    {key:'lights_backup',    label:'Backup Lights'},
-    {key:'lights_plate',     label:'License Plate Lights'},
-    {key:'lights_turn',      label:'Turn Signals'},
-    {key:'lights_flasher',   label:'Emergency Flasher'},
-    {key:'lights_dome',      label:'Dome Light & Panel Lights'},
-  ]},
-  {section:'Glass and Mirrors', items:[
-    {key:'glass_windows', label:'A. All Windows'},
-    {key:'glass_mirrors', label:'B. Side & Rearview Mirrors'},
-    {key:'glass_wipers',  label:'C. Windshield Wipers'},
-  ]},
-  {section:'Tires and Spare', items:[
-    {key:'tire_inflation',label:'A. Proper Inflation'},
-    {key:'tire_cuts',     label:'B. Cuts, Gouges, or Bulges'},
-    {key:'tire_tread',    label:'C. Tread Wear Left'},
-    {key:'tire_lugnuts',  label:'D. Lug Nuts Present & Tight'},
-    {key:'tire_jack',     label:'E. Jack & Lug Wrench'},
-    {key:'tire_wheels',   label:'F. Wheels / Wheel Covers'},
-  ]},
-  {section:'Brakes', items:[
-    {key:'brake_parking',   label:'A. Emergency / Parking Brake'},
-    {key:'brake_operation', label:'B. Braking Operation (No Pull / No Metal-on-Metal Noise)'},
-  ]},
-  {section:'Steering', items:[
-    {key:'steering_op',label:'Steering Operation with Engine Running'},
-  ]},
-  {section:'Under the Hood', items:[
-    {key:'hood_ps_fluid',    label:'A. Power Steering Fluid'},
-    {key:'hood_brake_fluid', label:'B. Brake Fluid'},
-    {key:'hood_trans_fluid', label:'C. Transmission Fluid'},
-    {key:'hood_engine_oil',  label:'D. Engine Oil'},
-    {key:'hood_belts',       label:'E. Belts For Wear & Tightness'},
-    {key:'hood_leaks',       label:'F. Fluid / Oil Leaks'},
-    {key:'hood_washer',      label:'G. Windshield Washer Fluid'},
-  ]},
-  {section:'Battery', items:[
-    {key:'batt_cables', label:'A. Ensure Cables are Tight'},
-    {key:'batt_visual', label:'B. Visually Check Battery'},
-  ]},
-  {section:'Exterior', items:[
-    {key:'ext_chrome',   label:'A. Chrome / Body Molding & Grill'},
-    {key:'ext_bumpers',  label:'B. Front & Rear Bumper'},
-    {key:'ext_doors',    label:'C. Doors'},
-    {key:'ext_fenders',  label:'D. Fenders'},
-    {key:'ext_hood',     label:'E. Hood / Trunk Lid'},
-    {key:'ext_roof',     label:'F. Roof / Vehicle Sides'},
-    {key:'ext_exhaust',  label:'G. Muffler / Exhaust System'},
-    {key:'ext_antenna',  label:'H. Antenna'},
-    {key:'ext_clean',    label:'I. Exterior Cleanliness'},
-  ]},
-  {section:'Interior', items:[
-    {key:'int_carpet',     label:'A. Carpet'},
-    {key:'int_doors',      label:'B. Door Panels & Hardware'},
-    {key:'int_headliner',  label:'C. Headliner'},
-    {key:'int_upholstery', label:'D. Upholstery'},
-    {key:'int_hvac',       label:'E. Heater / Air Conditioning'},
-    {key:'int_radio',      label:'F. Radio'},
-    {key:'int_horn',       label:'G. Horn'},
-    {key:'int_instruments',label:'H. Instruments & Gages'},
-    {key:'int_form1627',   label:'I. GSA Form 1627 (Accident Envelope in Glove Box)'},
-    {key:'int_clean',      label:'J. Interior Cleanliness'},
-  ]},
-];
+const RS_CHECKLISTS = {
+  truck: [
+    {section:'At Dispatch', items:[
+      {key:'dispatch_window',  label:'Window'},
+      {key:'dispatch_license', label:'License'},
+      {key:'dispatch_cc_key',  label:'Credit Card & Key'},
+    ]},
+    {section:'Lights', items:[
+      {key:'lights_headlights',label:'Headlights — High & Low Beam'},
+      {key:'lights_brake',     label:'Brake Lights'},
+      {key:'lights_tail',      label:'Tail Lights'},
+      {key:'lights_backup',    label:'Backup Lights'},
+      {key:'lights_plate',     label:'License Plate Lights'},
+      {key:'lights_turn',      label:'Turn Signals'},
+      {key:'lights_flasher',   label:'Emergency Flasher'},
+      {key:'lights_dome',      label:'Dome Light & Panel Lights'},
+    ]},
+    {section:'Glass and Mirrors', items:[
+      {key:'glass_windows', label:'A. All Windows'},
+      {key:'glass_mirrors', label:'B. Side & Rearview Mirrors'},
+      {key:'glass_wipers',  label:'C. Windshield Wipers'},
+    ]},
+    {section:'Tires and Spare', items:[
+      {key:'tire_inflation',label:'A. Proper Inflation'},
+      {key:'tire_cuts',     label:'B. Cuts, Gouges, or Bulges'},
+      {key:'tire_tread',    label:'C. Tread Wear Left'},
+      {key:'tire_lugnuts',  label:'D. Lug Nuts Present & Tight'},
+      {key:'tire_jack',     label:'E. Jack & Lug Wrench'},
+      {key:'tire_wheels',   label:'F. Wheels / Wheel Covers'},
+    ]},
+    {section:'Brakes', items:[
+      {key:'brake_parking',   label:'A. Emergency / Parking Brake'},
+      {key:'brake_operation', label:'B. Braking Operation (No Pull / No Metal-on-Metal Noise)'},
+    ]},
+    {section:'Steering', items:[
+      {key:'steering_op',label:'Steering Operation with Engine Running'},
+    ]},
+    {section:'Under the Hood', items:[
+      {key:'hood_ps_fluid',    label:'A. Power Steering Fluid'},
+      {key:'hood_brake_fluid', label:'B. Brake Fluid'},
+      {key:'hood_trans_fluid', label:'C. Transmission Fluid'},
+      {key:'hood_engine_oil',  label:'D. Engine Oil'},
+      {key:'hood_belts',       label:'E. Belts For Wear & Tightness'},
+      {key:'hood_leaks',       label:'F. Fluid / Oil Leaks'},
+      {key:'hood_washer',      label:'G. Windshield Washer Fluid'},
+    ]},
+    {section:'Battery', items:[
+      {key:'batt_cables', label:'A. Ensure Cables are Tight'},
+      {key:'batt_visual', label:'B. Visually Check Battery'},
+    ]},
+    {section:'Exterior', items:[
+      {key:'ext_chrome',   label:'A. Chrome / Body Molding & Grill'},
+      {key:'ext_bumpers',  label:'B. Front & Rear Bumper'},
+      {key:'ext_doors',    label:'C. Doors'},
+      {key:'ext_fenders',  label:'D. Fenders'},
+      {key:'ext_hood',     label:'E. Hood / Trunk Lid'},
+      {key:'ext_roof',     label:'F. Roof / Vehicle Sides'},
+      {key:'ext_exhaust',  label:'G. Muffler / Exhaust System'},
+      {key:'ext_antenna',  label:'H. Antenna'},
+      {key:'ext_clean',    label:'I. Exterior Cleanliness'},
+    ]},
+    {section:'Interior', items:[
+      {key:'int_carpet',     label:'A. Carpet'},
+      {key:'int_doors',      label:'B. Door Panels & Hardware'},
+      {key:'int_headliner',  label:'C. Headliner'},
+      {key:'int_upholstery', label:'D. Upholstery'},
+      {key:'int_hvac',       label:'E. Heater / Air Conditioning'},
+      {key:'int_radio',      label:'F. Radio'},
+      {key:'int_horn',       label:'G. Horn'},
+      {key:'int_instruments',label:'H. Instruments & Gages'},
+      {key:'int_form1627',   label:'I. GSA Form 1627 (Accident Envelope in Glove Box)'},
+      {key:'int_clean',      label:'J. Interior Cleanliness'},
+    ]},
+  ],
+  polaris: [
+    {section:'Before', items:[
+      {key:'pol_ext_damage',    label:'Inspect exterior for damage'},
+      {key:'pol_wheel_lugs',    label:'Inspect wheel lugs'},
+      {key:'pol_tire_pressure', label:'Check tire pressure (~15 psi)'},
+      {key:'pol_engine_oil',    label:'Check engine oil level'},
+      {key:'pol_leaks',         label:'Check for leaks'},
+      {key:'pol_air_filter',    label:'Inspect air filter; clean if necessary'},
+      {key:'pol_battery',       label:'Inspect battery terminals'},
+      {key:'pol_coolant',       label:'Check coolant level (NOT WHEN HOT!)'},
+      {key:'pol_seatbelts',     label:'Inspect seat belts'},
+      {key:'pol_dash',          label:'Inspect dash controls for damage'},
+      {key:'pol_odo_before',    label:'Record Odometer Miles (Before) — enter miles in Remark'},
+    ]},
+    {section:'During', items:[
+      {key:'pol_seatbelt_on',  label:'Fasten seat belt'},
+      {key:'pol_neutral',      label:'Ensure gear shift is in Neutral setting'},
+      {key:'pol_aux',          label:'Turn key to Auxiliary position to prime fuel pump'},
+      {key:'pol_brake_hold',   label:'Hold down brake pedal'},
+      {key:'pol_start',        label:'Turn key to Start position until vehicle is running'},
+      {key:'pol_lights',       label:'Test all vehicle lights'},
+      {key:'pol_horn',         label:'Test vehicle horn'},
+      {key:'pol_drive_modes',  label:'Test all three 2WD and 4WD settings'},
+      {key:'pol_park_brake',   label:'Disengage parking brake'},
+      {key:'pol_gears',        label:'Test Reverse, Low, and High gears'},
+      {key:'pol_gauges',       label:'Monitor gauges during operation'},
+    ]},
+    {section:'After', items:[
+      {key:'pol_ext_after',    label:'Inspect exterior for damage'},
+      {key:'pol_leaks_after',  label:'Check for leaks'},
+      {key:'pol_tires_after',  label:'Inspect tires/wheels for damage'},
+      {key:'pol_oil_after',    label:'Check oil level'},
+      {key:'pol_odo_after',    label:'Record Odometer Miles (After) — enter miles in Remark'},
+    ]},
+  ],
+  trailer: [
+    {section:'Exterior', items:[
+      {key:'trl_chrome',   label:'A. Chrome / Body Molding'},
+      {key:'trl_doors',    label:'B. Doors & Latches'},
+      {key:'trl_fenders',  label:'C. Fenders'},
+      {key:'trl_roof',     label:'D. Roof / Vehicle Sides'},
+      {key:'trl_tongue',   label:'E. Tongue — Safety Chains, Power Cord, Safety Pins, Locking Mechanism'},
+      {key:'trl_landing',  label:'F. Landing Gear'},
+      {key:'trl_windows',  label:'G. All Windows'},
+    ]},
+    {section:'Tires and Spare', items:[
+      {key:'trl_tire_inf',  label:'A. Proper Inflation'},
+      {key:'trl_tire_cuts', label:'B. Cuts, Gouges, or Bulges'},
+      {key:'trl_tire_tread',label:'C. Tread Wear Left'},
+      {key:'trl_tire_lugs', label:'D. Lug Nuts Present & Tight'},
+      {key:'trl_spare',     label:'E. Spare Tire / Mount'},
+      {key:'trl_wheels',    label:'F. Wheels / Wheel Covers'},
+    ]},
+    {section:'Interior', items:[
+      {key:'trl_floor',     label:'A. Floor'},
+      {key:'trl_etrack',    label:'B. E-Track / Tie Downs'},
+      {key:'trl_headliner', label:'C. Headliner / Walls / Vents'},
+      {key:'trl_outlets',   label:'D. Outlets / Switches'},
+      {key:'trl_hvac',      label:'E. Heater / Air Conditioning'},
+    ]},
+    {section:'Lights', items:[
+      {key:'trl_running',   label:'A. Running Lights'},
+      {key:'trl_brake_lt',  label:'B. Brake Lights'},
+      {key:'trl_tail',      label:'C. Tail Lights'},
+      {key:'trl_plate',     label:'D. License Plate Lights'},
+      {key:'trl_turn',      label:'E. Turn Signals'},
+      {key:'trl_flasher',   label:'F. Emergency Flasher'},
+      {key:'trl_interior',  label:'G. Interior / Exterior Lights'},
+      {key:'trl_battery',   label:'I. Battery & Cables'},
+    ]},
+    {section:'Safety Accessories', items:[
+      {key:'trl_extinguisher',label:'A. Fire Extinguisher (tag, gauge, seal)'},
+      {key:'trl_triangles',   label:'B. Reflective Triangles'},
+    ]},
+    {section:'Customized Accessories', items:[
+      {key:'trl_solar',    label:'A. Solar Panel / Battery Volt Reader'},
+    ]},
+    {section:'Brakes (During)', items:[
+      {key:'trl_brake_eng',label:'A. Trailer Brake — Engages & Releases Properly'},
+      {key:'trl_brake_op', label:'B. Braking Operation — No Pull / No Metal-on-Metal'},
+    ]},
+  ],
+};
+
+// Keep alias for any legacy references
+const RS_CHECKLIST = RS_CHECKLISTS.truck;
+
+let _rsActiveType = 'truck';
+
+const RS_FORM_TITLES = {
+  truck:   'FK Form 5105 — Dispatch Inspection',
+  polaris: 'Polaris Ranger PMCS Checklist',
+  trailer: 'CBRN TF GSA Trailer Inspection/PMCS',
+};
+
+function rsDetectType(v) {
+  const n = [v.year||'', v.make||'', v.model||''].join(' ').toLowerCase();
+  if (n.includes('polaris') || n.includes('ranger')) return 'polaris';
+  if (n.includes('trailer')) return 'trailer';
+  return 'truck';
+}
+
+function rsChecklistRows(type) {
+  return (RS_CHECKLISTS[type] || RS_CHECKLISTS.truck).map(sec => `
+    <tr><td colspan="3" style="background:#dce8f5;font-weight:700;font-size:0.78rem;padding:5px 8px;">${esc(sec.section)}</td></tr>
+    ${sec.items.map(item => `
+    <tr>
+      <td style="padding:5px 8px;font-size:0.82rem;">${esc(item.label)}</td>
+      <td style="text-align:center;padding:4px;">
+        <div style="display:flex;gap:4px;justify-content:center;">
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="SAT" style="accent-color:#22c55e;"> SAT
+          </label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="UNSAT" style="accent-color:#ef4444;"> UNSAT
+          </label>
+        </div>
+      </td>
+      <td style="padding:4px;"><input class="form-input" name="rem_${item.key}" placeholder="Remark" style="font-size:0.75rem;padding:3px 6px;width:100%;"></td>
+    </tr>`).join('')}
+  `).join('');
+}
+
+function rsChangeType(type) {
+  _rsActiveType = type;
+  const body = document.getElementById('rs-checklist-body');
+  if (body) body.innerHTML = rsChecklistRows(type);
+  const titleEl = document.getElementById('rs-form-title');
+  if (titleEl) titleEl.textContent = RS_FORM_TITLES[type] || RS_FORM_TITLES.truck;
+  document.querySelectorAll('#dispatch-backdrop input[type=radio]').forEach(r =>
+    r.addEventListener('change', rsCountUnsat));
+}
+
+function rsCountUnsat() {
+  const n = document.querySelectorAll('#dispatch-backdrop input[value="UNSAT"]:checked').length;
+  const b = document.getElementById('rs-unsat-banner');
+  if (!b) return;
+  b.style.display = n > 0 ? 'block' : 'none';
+  if (n > 0) b.textContent = `⚠ ${n} UNSAT item${n>1?'s':''} — vehicle requires attention`;
+}
 
 async function rollingStockPage() {
   $('page-actions').innerHTML = `${isTech()?'<button onclick="openRsModal()" class="btn-primary">+ Add Vehicle</button>':''}`;
@@ -6970,24 +7111,8 @@ async function openDispatchForm(vid) {
     if (last) prefillMileage = last.ending_mileage;
   } catch(e) { /* ignore */ }
 
-  const checkRows = RS_CHECKLIST.map(sec => `
-    <tr><td colspan="3" style="background:#dce8f5;font-weight:700;font-size:0.78rem;padding:5px 8px;">${esc(sec.section)}</td></tr>
-    ${sec.items.map(item => `
-    <tr>
-      <td style="padding:5px 8px;font-size:0.82rem;">${esc(item.label)}</td>
-      <td style="text-align:center;padding:4px;">
-        <div style="display:flex;gap:4px;justify-content:center;">
-          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
-            <input type="radio" name="chk_${item.key}" value="SAT" style="accent-color:#22c55e;"> SAT
-          </label>
-          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
-            <input type="radio" name="chk_${item.key}" value="UNSAT" style="accent-color:#ef4444;"> UNSAT
-          </label>
-        </div>
-      </td>
-      <td style="padding:4px;"><input class="form-input" name="rem_${item.key}" placeholder="Remark" style="font-size:0.75rem;padding:3px 6px;width:100%;"></td>
-    </tr>`).join('')}
-  `).join('');
+  _rsActiveType = rsDetectType(v);
+  const checkRows = rsChecklistRows(_rsActiveType);
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop';
@@ -6995,8 +7120,16 @@ async function openDispatchForm(vid) {
   overlay.innerHTML = `<div class="modal" style="max-width:700px;max-height:92vh;overflow-y:auto;">
     <div class="px-6 py-4 border-b flex items-center justify-between" style="position:sticky;top:0;background:#fff;z-index:10;">
       <div>
-        <div style="font-size:1rem;font-weight:700;">FK Form 5105 — Dispatch Inspection</div>
+        <div id="rs-form-title" style="font-size:1rem;font-weight:700;">${RS_FORM_TITLES[_rsActiveType]}</div>
         <div style="font-size:0.78rem;color:#6b7280;">${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}${v.tag_number?' · Tag '+esc(v.tag_number):''}</div>
+        <div style="margin-top:0.35rem;">
+          <label style="font-size:0.72rem;font-weight:600;color:#6b7280;margin-right:0.4rem;">Checklist type:</label>
+          <select onchange="rsChangeType(this.value)" style="font-size:0.75rem;padding:2px 6px;border:1px solid #d1d5db;border-radius:4px;">
+            <option value="truck"   ${_rsActiveType==='truck'   ?'selected':''}>Truck / GSA Vehicle</option>
+            <option value="polaris" ${_rsActiveType==='polaris' ?'selected':''}>Polaris Ranger (UTV)</option>
+            <option value="trailer" ${_rsActiveType==='trailer' ?'selected':''}>Trailer</option>
+          </select>
+        </div>
       </div>
       <button onclick="document.getElementById('dispatch-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
     </div>
@@ -7046,24 +7179,14 @@ async function openDispatchForm(vid) {
   document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
-  // Live UNSAT counter
-  overlay.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => {
-    const unsats = overlay.querySelectorAll('input[value="UNSAT"]:checked').length;
-    const banner = document.getElementById('rs-unsat-banner');
-    if (unsats > 0) {
-      banner.style.display = 'block';
-      banner.textContent = `⚠ ${unsats} UNSAT item${unsats>1?'s':''} — vehicle requires attention`;
-    } else {
-      banner.style.display = 'none';
-    }
-  }));
+  overlay.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', rsCountUnsat));
 }
 
 async function submitDispatch(e, vid) {
   e.preventDefault();
   const fd = new FormData(e.target);
   const results = {}, remarks = {};
-  RS_CHECKLIST.forEach(sec => sec.items.forEach(item => {
+  RS_CHECKLISTS[_rsActiveType].forEach(sec => sec.items.forEach(item => {
     const v = fd.get(`chk_${item.key}`);
     if (v) results[item.key] = v;
     const r = fd.get(`rem_${item.key}`);
@@ -7078,6 +7201,7 @@ async function submitDispatch(e, vid) {
     operator_phone: fd.get('operator_phone') || null,
     dispatcher_name: fd.get('dispatcher_name') || null,
     notes: fd.get('notes') || null,
+    checklist_type: _rsActiveType,
     results, remarks, status: 'complete',
   };
   const resp = await api('POST', `/api/rolling-stock/${vid}/inspections`, body);
