@@ -87,11 +87,17 @@ async def update_vehicle(vid: int, request: Request, data: VehicleCreate, db=Dep
     return {"ok": True}
 
 
-@router.delete("/{vid}", status_code=204)
+@router.delete("/{vid}")
 async def delete_vehicle(vid: int, request: Request, db=Depends(get_db)):
     require_superadmin(request)
+    async with db.execute("SELECT id FROM rolling_stock WHERE id=?", (vid,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Vehicle not found")
+    # SQLite enforces ON DELETE CASCADE only with the foreign_keys pragma on
+    await db.execute("DELETE FROM vehicle_inspections WHERE vehicle_id=?", (vid,))
     await db.execute("DELETE FROM rolling_stock WHERE id=?", (vid,))
     await db.commit()
+    return {"ok": True}
 
 
 # ── Inspections ───────────────────────────────────────────────────────────────

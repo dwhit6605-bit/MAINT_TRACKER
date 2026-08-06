@@ -7048,6 +7048,7 @@ function renderRsTable() {
               : `<button onclick="openDispatchForm(${v.id})" class="btn-primary" style="font-size:0.78rem;flex:1;">📋 Dispatch / Inspect</button>`) : ''}
             <button onclick="openRsHistory(${v.id},'${esc(v.year||'')} ${esc(v.make)} ${esc(v.model)}')" class="btn-secondary" style="font-size:0.78rem;">History</button>
             ${isTech()?`<button onclick="openRsModal(${v.id})" class="btn-secondary" style="font-size:0.78rem;">Edit</button>`:''}
+            ${isSuperAdmin()?`<button onclick="deleteRsVehicle(${v.id})" class="btn-secondary" style="font-size:0.78rem;color:#dc2626;">Delete</button>`:''}
           </div>
         </div>`).join('')}
       </div>`;
@@ -7095,6 +7096,23 @@ async function saveRs(e, id) {
   closeModal();
   rsData = await api('GET', '/api/rolling-stock');
   renderRsTable();
+}
+
+async function deleteRsVehicle(id) {
+  const v = rsData.find(x => x.id === id);
+  if (!v) return;
+  const name = `${v.year||''} ${v.make} ${v.model}`.trim();
+  const n = v.inspection_count || 0;
+  const extra = n ? `\n\nThis also permanently deletes ${n} inspection record${n!==1?'s':''}.` : '';
+  if (!confirm(`Delete "${name}"?${extra}\n\nThis cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/api/rolling-stock/${id}`);
+    toast(`Deleted ${name}.`);
+    rsData = await api('GET', '/api/rolling-stock');
+    renderRsTable();
+  } catch (err) {
+    toast(err.message || 'Delete failed.', false);
+  }
 }
 
 // ── Dispatch / Inspection form ────────────────────────────────────────────────
