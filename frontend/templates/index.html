@@ -260,6 +260,10 @@
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         Rolling Stock
       </a>
+      <a href="/power" class="nav-link" data-page="power">
+        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Power &amp; Air
+      </a>
       <a href="/equipment"   class="nav-link" data-page="equipment">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         Equipment
@@ -1501,8 +1505,8 @@ function calToggleView() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, power: powerPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', power:'Power & Air', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -7322,6 +7326,543 @@ async function submitReturn(e, iid, vid) {
   toast('Vehicle returned — status set to Available');
   rsData = await api('GET', '/api/rolling-stock');
   renderRsTable();
+}
+
+// ═══ Power & Air — Generators & Compressors ═══════════════════════════════════
+// Two lifecycles share one log: `run` for fixed/vehicle-mounted units, `dispatch`
+// for portables signed out to an operator. Service is driven by hours, not days.
+let paData = [];
+let _paActiveType = 'gen_diesel';
+let _paLogMode    = 'run';
+
+const PA_CHECKLISTS = {
+  gen_diesel: [
+    {section:'Before Operation', items:[
+      {key:'gd_damage',     label:'Inspect unit for damage and loose hardware'},
+      {key:'gd_oil',        label:'Engine oil level'},
+      {key:'gd_coolant',    label:'Coolant level (NOT WHEN HOT!)'},
+      {key:'gd_fuel',       label:'Fuel level; drain water separator'},
+      {key:'gd_airfilter',  label:'Air filter / restriction indicator'},
+      {key:'gd_belts',      label:'Belts for wear and tightness'},
+      {key:'gd_battery',    label:'Battery terminals clean and tight'},
+      {key:'gd_leaks',      label:'Check for fuel, oil, or coolant leaks'},
+      {key:'gd_exhaust',    label:'Exhaust system secure and unobstructed'},
+      {key:'gd_ground',     label:'Ground rod / grounding cable connected'},
+      {key:'gd_breakers',   label:'Output breakers OFF before start'},
+      {key:'gd_hours_pre',  label:'Record hour meter (Before) — enter reading in Remark'},
+    ]},
+    {section:'During Operation', items:[
+      {key:'gd_start',      label:'Start engine; no abnormal noise or vibration'},
+      {key:'gd_oil_press',  label:'Oil pressure within range'},
+      {key:'gd_temp',       label:'Coolant temperature within range'},
+      {key:'gd_voltage',    label:'Output voltage within range'},
+      {key:'gd_freq',       label:'Output frequency (Hz) within range'},
+      {key:'gd_load',       label:'Applied load within nameplate rating'},
+      {key:'gd_smoke',      label:'Exhaust smoke normal'},
+      {key:'gd_leaks_load', label:'No leaks under load'},
+    ]},
+    {section:'After Operation', items:[
+      {key:'gd_cooldown',   label:'Cool-down at no load before shutdown'},
+      {key:'gd_shutdown',   label:'Shut down; secure output breakers'},
+      {key:'gd_leaks_post', label:'Inspect for leaks'},
+      {key:'gd_refuel',     label:'Refuel'},
+      {key:'gd_clean',      label:'Clean unit and secure'},
+      {key:'gd_hours_post', label:'Record hour meter (After) — enter reading in Remark'},
+    ]},
+  ],
+  gen_portable: [
+    {section:'Before Operation', items:[
+      {key:'gp_damage',     label:'Inspect exterior for damage'},
+      {key:'gp_oil',        label:'Engine oil level'},
+      {key:'gp_fuel',       label:'Fuel level; fuel valve position'},
+      {key:'gp_airfilter',  label:'Air filter clean'},
+      {key:'gp_exhaust',    label:'Spark arrestor / exhaust clear'},
+      {key:'gp_cords',      label:'Cords and receptacles undamaged; GFCI test'},
+      {key:'gp_siting',     label:'Level surface, ventilated, clear of occupied spaces'},
+      {key:'gp_hours_pre',  label:'Record hour meter (Before) — enter reading in Remark'},
+    ]},
+    {section:'During Operation', items:[
+      {key:'gp_start',      label:'Choke and start procedure'},
+      {key:'gp_eco',        label:'Eco-throttle set as required'},
+      {key:'gp_voltage',    label:'Output voltage at receptacle'},
+      {key:'gp_load',       label:'Applied load within rating'},
+      {key:'gp_noise',      label:'No abnormal noise or vibration'},
+      {key:'gp_co',         label:'CO hazard — placement and exhaust direction verified'},
+    ]},
+    {section:'After Operation', items:[
+      {key:'gp_unload',     label:'Remove load; cool down; shut off'},
+      {key:'gp_valve',      label:'Fuel valve OFF'},
+      {key:'gp_leaks',      label:'Inspect for leaks'},
+      {key:'gp_refuel',     label:'Refuel'},
+      {key:'gp_store',      label:'Store secured'},
+      {key:'gp_hours_post', label:'Record hour meter (After) — enter reading in Remark'},
+    ]},
+  ],
+  compressor: [
+    {section:'Before Operation', items:[
+      {key:'bc_damage',     label:'Inspect unit and fill station for damage'},
+      {key:'bc_oil',        label:'Compressor oil level'},
+      {key:'bc_belt',       label:'Drive belt condition and tension'},
+      {key:'bc_intake',     label:'Intake clear of exhaust and contaminants'},
+      {key:'bc_separator',  label:'Moisture separator drained'},
+      {key:'bc_cartridge',  label:'Purification cartridge hours remaining within limit'},
+      {key:'bc_comonitor',  label:'CO monitor powered and within calibration date'},
+      {key:'bc_hoses',      label:'Fill hoses and connections inspected'},
+      {key:'bc_shield',     label:'Fill station shield / containment intact'},
+      {key:'bc_hours_pre',  label:'Record hour meter (Before) — enter reading in Remark'},
+    ]},
+    {section:'During Operation', items:[
+      {key:'bc_start',      label:'Start; monitor pressure build'},
+      {key:'bc_autodrain',  label:'Auto-drain cycling correctly'},
+      {key:'bc_pressure',   label:'Final pressure setting correct'},
+      {key:'bc_co_read',    label:'CO monitor reading within limit — enter ppm in Remark'},
+      {key:'bc_noise',      label:'No abnormal noise, vibration, or overheating'},
+      {key:'bc_hydro',      label:'Cylinder hydro date and visual inspection current before fill'},
+      {key:'bc_fillrate',   label:'Fill rate controlled; cylinders not overheating'},
+    ]},
+    {section:'After Operation', items:[
+      {key:'bc_depress',    label:'Depressurize and bleed lines'},
+      {key:'bc_drain',      label:'Drain moisture separators'},
+      {key:'bc_cart_log',   label:'Log purification cartridge hours used'},
+      {key:'bc_leaks',      label:'Inspect for leaks'},
+      {key:'bc_hours_post', label:'Record hour meter (After) — enter reading in Remark'},
+    ]},
+    {section:'Air Quality (Quarterly)', items:[
+      {key:'bc_sample',     label:'Air sample taken and submitted'},
+      {key:'bc_coa',        label:'Certificate of analysis on file (O2, CO, CO2, moisture, oil)'},
+    ]},
+  ],
+};
+
+const PA_FORM_TITLES = {
+  gen_diesel:   'Generator / APU PMCS — Before, During, After Operation',
+  gen_portable: 'Portable Generator PMCS (Honda EU/EM Series)',
+  compressor:   'Breathing Air Compressor — Operation & Fill Station Checklist',
+};
+
+function paDetectType(a) {
+  if (a.asset_type === 'compressor') return 'compressor';
+  const n = [a.name||'', a.make||'', a.model||''].join(' ').toLowerCase();
+  if (n.includes('honda') || n.includes('eu2000') || n.includes('em7000')) return 'gen_portable';
+  return 'gen_diesel';
+}
+
+function paChecklistRows(type) {
+  return (PA_CHECKLISTS[type] || PA_CHECKLISTS.gen_diesel).map(sec => `
+    <tr><td colspan="3" style="background:#dce8f5;font-weight:700;font-size:0.78rem;padding:5px 8px;">${esc(sec.section)}</td></tr>
+    ${sec.items.map(item => `
+    <tr>
+      <td style="padding:5px 8px;font-size:0.82rem;">${esc(item.label)}</td>
+      <td style="text-align:center;padding:4px;">
+        <div style="display:flex;gap:4px;justify-content:center;">
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="SAT" style="accent-color:#22c55e;"> SAT
+          </label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:0.75rem;cursor:pointer;">
+            <input type="radio" name="chk_${item.key}" value="UNSAT" style="accent-color:#ef4444;"> UNSAT
+          </label>
+        </div>
+      </td>
+      <td style="padding:4px;"><input class="form-input" name="rem_${item.key}" placeholder="Remark" style="font-size:0.75rem;padding:3px 6px;width:100%;"></td>
+    </tr>`).join('')}
+  `).join('');
+}
+
+function paChangeType(type) {
+  _paActiveType = type;
+  document.getElementById('pa-checklist-body').innerHTML = paChecklistRows(type);
+  document.getElementById('pa-form-title').textContent = PA_FORM_TITLES[type];
+  document.querySelectorAll('#pa-log-backdrop input[type=radio]').forEach(r =>
+    r.addEventListener('change', paCountUnsat));
+}
+
+function paCountUnsat() {
+  const n = document.querySelectorAll('#pa-log-backdrop input[value="UNSAT"]:checked').length;
+  const b = document.getElementById('pa-unsat-banner');
+  if (!b) return;
+  b.style.display = n > 0 ? 'block' : 'none';
+  if (n > 0) b.textContent = `⚠ ${n} UNSAT item${n>1?'s':''} — unit requires attention`;
+}
+
+async function powerPage() {
+  $('page-actions').innerHTML = isTech() ? `
+    <button onclick="openPaModal()" class="btn-primary">+ Add Unit</button>
+    <button onclick="paImportFromEquipment()" class="btn-secondary col-m-hide">Import from Equipment</button>` : '';
+  paData = await api('GET', '/api/power-assets');
+  renderPaTable();
+}
+
+async function paImportFromEquipment() {
+  if (!confirm('Copy every "Generators / APU" equipment record into the Power & Air registry?\n\nAlready-imported units are skipped.')) return;
+  try {
+    const r = await api('POST', '/api/power-assets/import-from-equipment', {});
+    toast(r.imported ? `Imported ${r.imported} unit${r.imported!==1?'s':''} (${r.skipped} already present).`
+                     : `Nothing new to import — all ${r.skipped} already present.`);
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Import failed.', false); }
+}
+
+function renderPaTable() {
+  const statusColor = {available:'#22c55e', running:'#f59e0b', dispatched:'#3b82f6', down:'#ef4444'};
+  const typeIcon = {generator:'⚡', compressor:'🫁'};
+
+  if (paData.length === 0) {
+    $('page-content').innerHTML = `<div class="card" style="text-align:center;padding:3rem;color:#9ca3af;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">⚡</div>
+        <div style="font-weight:600;">No generators or compressors registered</div>
+        <div style="font-size:0.8rem;margin-top:0.35rem;">You already have 9 units under Equipment → “Generators / APU”.</div>
+        ${isTech()?`<div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+          <button onclick="paImportFromEquipment()" class="btn-primary">Import from Equipment</button>
+          <button onclick="openPaModal()" class="btn-secondary">Add Manually</button></div>`:''}
+      </div>`;
+    return;
+  }
+
+  $('page-content').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;">
+      ${paData.map(a => {
+        const due = a.hours_until_service;
+        const svc = due === null || due === undefined ? ''
+          : due <= 0
+            ? `<div style="font-size:0.72rem;font-weight:700;color:#dc2626;">⚠ Service overdue by ${Math.abs(due)} hrs</div>`
+            : `<div style="font-size:0.72rem;color:${due<=25?'#f59e0b':'#6b7280'};">Service in ${due} hrs</div>`;
+        return `
+        <div class="card" style="display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+            <div style="min-width:0;">
+              <div style="font-weight:700;font-size:1rem;">${typeIcon[a.asset_type]||'⚡'} ${esc(a.name)}</div>
+              <div style="font-size:0.75rem;color:#6b7280;">${[a.make,a.model].filter(Boolean).map(esc).join(' ')||'—'}${a.rating?' · '+esc(a.rating):''}</div>
+            </div>
+            <span style="font-size:0.7rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${(statusColor[a.status]||'#9ca3af')}22;color:${statusColor[a.status]||'#9ca3af'};white-space:nowrap;">${esc(a.status)}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem;font-size:0.78rem;color:#6b7280;">
+            <div>Hours: <span style="font-weight:600;color:#374151;">${a.hour_meter ?? 0}</span></div>
+            ${a.serial_num?`<div style="overflow:hidden;text-overflow:ellipsis;">S/N: <span style="font-weight:600;color:#374151;">${esc(a.serial_num)}</span></div>`:''}
+            ${a.location?`<div>Loc: <span style="font-weight:600;color:#374151;">${esc(a.location)}</span></div>`:''}
+            ${a.portable?`<div style="color:#3b82f6;font-weight:600;">Portable</div>`:''}
+          </div>
+          ${svc}
+          <div style="font-size:0.72rem;color:#9ca3af;">${a.log_count||0} log${a.log_count!==1?'s':''} · Last: ${a.last_run||'Never'}</div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.25rem;flex-wrap:wrap;">
+            ${isTech() ? (a.open_log_id
+              ? `<button onclick="openPaCloseModal(${a.id},${a.open_log_id})" class="btn-primary" style="font-size:0.78rem;flex:1;background:#ef4444;">🔄 ${a.status==='dispatched'?'Return Unit':'Close Run'}</button>`
+              : `<button onclick="openPaLogForm(${a.id},'run')" class="btn-primary" style="font-size:0.78rem;flex:1;">▶ Start Run</button>
+                 ${a.portable?`<button onclick="openPaLogForm(${a.id},'dispatch')" class="btn-secondary" style="font-size:0.78rem;">Dispatch</button>`:''}`) : ''}
+            <button onclick="openPaHistory(${a.id})" class="btn-secondary" style="font-size:0.78rem;">History</button>
+            ${isTech()?`<button onclick="openPaModal(${a.id})" class="btn-secondary" style="font-size:0.78rem;">Edit</button>`:''}
+            ${isTech()&&a.service_interval_hours?`<button onclick="paMarkServiced(${a.id})" class="btn-secondary" style="font-size:0.78rem;">Serviced</button>`:''}
+            ${isSuperAdmin()?`<button onclick="deletePaAsset(${a.id})" class="btn-secondary" style="font-size:0.78rem;color:#dc2626;">Delete</button>`:''}
+          </div>
+        </div>`;}).join('')}
+    </div>`;
+}
+
+// ── Asset modal (add/edit) ────────────────────────────────────────────────────
+function openPaModal(id) {
+  const a = id ? paData.find(x=>x.id===id) : {};
+  modal(`<div class="modal" style="max-width:560px;max-height:92vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:700;">${id?'Edit Unit':'Add Generator / Compressor'}</h2>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="savePa(event,${id||'null'})" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div style="grid-column:1/-1;"><label class="label">Name / Designator *</label>
+        <input name="name" class="input w-full" value="${esc(a.name||'')}" required placeholder="Cummins 12.5HDKCB (V4TG SOC GEN)"></div>
+      <div><label class="label">Type *</label>
+        <select name="asset_type" class="input w-full">
+          <option value="generator"  ${a.asset_type!=='compressor'?'selected':''}>Generator / APU</option>
+          <option value="compressor" ${a.asset_type==='compressor'?'selected':''}>Breathing Air Compressor</option>
+        </select></div>
+      <div><label class="label">Status</label>
+        <select name="status" class="input w-full">
+          ${['available','running','dispatched','down'].map(s=>`<option value="${s}" ${a.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></div>
+      <div><label class="label">Make</label><input name="make" class="input w-full" value="${esc(a.make||'')}" placeholder="Cummins"></div>
+      <div><label class="label">Model</label><input name="model" class="input w-full" value="${esc(a.model||'')}" placeholder="12.5HDKCB-11506H"></div>
+      <div><label class="label">Serial #</label><input name="serial_num" class="input w-full" value="${esc(a.serial_num||'')}"></div>
+      <div><label class="label">Rating</label><input name="rating" class="input w-full" value="${esc(a.rating||'')}" placeholder="12.5 kW / 6 CFM"></div>
+      <div><label class="label">Fuel</label><input name="fuel_type" class="input w-full" value="${esc(a.fuel_type||'')}" placeholder="Diesel"></div>
+      <div><label class="label">Location</label><input name="location" class="input w-full" value="${esc(a.location||'')}" placeholder="V4 (SOC)"></div>
+      <div><label class="label">Hour Meter</label><input name="hour_meter" type="number" step="0.1" min="0" class="input w-full" value="${a.hour_meter ?? 0}"></div>
+      <div><label class="label">Service Interval (hrs)</label><input name="service_interval_hours" type="number" step="1" min="0" class="input w-full" value="${a.service_interval_hours ?? ''}" placeholder="250"></div>
+      <div><label class="label">Last Serviced At (hrs)</label><input name="last_service_hours" type="number" step="0.1" min="0" class="input w-full" value="${a.last_service_hours ?? 0}"></div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:0.4rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;">
+          <input type="checkbox" name="portable" ${a.portable?'checked':''}> Portable (can be dispatched)
+        </label></div>
+      <div style="grid-column:1/-1;"><label class="label">Notes</label>
+        <textarea name="notes" class="input w-full" style="min-height:56px;">${esc(a.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.25rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">${id?'Save Changes':'Add Unit'}</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function savePa(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const num = k => { const v = fd.get(k); return v === '' || v === null ? null : parseFloat(v); };
+  const body = {
+    asset_type: fd.get('asset_type'),
+    name:       fd.get('name'),
+    make:       fd.get('make') || null,
+    model:      fd.get('model') || null,
+    serial_num: fd.get('serial_num') || null,
+    rating:     fd.get('rating') || null,
+    fuel_type:  fd.get('fuel_type') || null,
+    location:   fd.get('location') || null,
+    portable:   fd.get('portable') === 'on',
+    hour_meter: num('hour_meter') ?? 0,
+    service_interval_hours: num('service_interval_hours'),
+    last_service_hours:     num('last_service_hours') ?? 0,
+    status:     fd.get('status'),
+    notes:      fd.get('notes') || null,
+  };
+  try {
+    if (id) await api('PUT', `/api/power-assets/${id}`, body);
+    else    await api('POST', '/api/power-assets', body);
+    closeModal();
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Save failed.', false); }
+}
+
+async function deletePaAsset(id) {
+  const a = paData.find(x => x.id === id);
+  if (!a) return;
+  const n = a.log_count || 0;
+  const extra = n ? `\n\nThis also permanently deletes ${n} run/dispatch log${n!==1?'s':''}.` : '';
+  if (!confirm(`Delete "${a.name}"?${extra}\n\nThis cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/api/power-assets/${id}`);
+    toast(`Deleted ${a.name}.`);
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Delete failed.', false); }
+}
+
+async function paMarkServiced(id) {
+  const a = paData.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm(`Mark "${a.name}" serviced at ${a.hour_meter} hrs?\n\nThe next ${a.service_interval_hours}-hour interval starts from here.`)) return;
+  try {
+    await api('POST', `/api/power-assets/${id}/service`, {});
+    toast(`Service logged at ${a.hour_meter} hrs.`);
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Failed.', false); }
+}
+
+// ── Run / dispatch form ───────────────────────────────────────────────────────
+function openPaLogForm(aid, mode) {
+  const a = paData.find(x=>x.id===aid);
+  if (!a) return;
+  _paActiveType = paDetectType(a);
+  _paLogMode    = mode || 'run';
+  const today = new Date().toISOString().slice(0,10);
+  const isDispatch = _paLogMode === 'dispatch';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'pa-log-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:700px;max-height:92vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="position:sticky;top:0;background:#fff;z-index:10;">
+      <div>
+        <div id="pa-form-title" style="font-size:1rem;font-weight:700;">${PA_FORM_TITLES[_paActiveType]}</div>
+        <div style="font-size:0.78rem;color:#6b7280;">${isDispatch?'Dispatch':'Run'} · ${esc(a.name)}${a.serial_num?' · S/N '+esc(a.serial_num):''}</div>
+        <div style="margin-top:0.35rem;">
+          <label style="font-size:0.72rem;font-weight:600;color:#6b7280;margin-right:0.4rem;">Checklist type:</label>
+          <select onchange="paChangeType(this.value)" style="font-size:0.75rem;padding:2px 6px;border:1px solid #d1d5db;border-radius:4px;">
+            <option value="gen_diesel"   ${_paActiveType==='gen_diesel'  ?'selected':''}>Generator / APU (diesel)</option>
+            <option value="gen_portable" ${_paActiveType==='gen_portable'?'selected':''}>Portable Generator (Honda)</option>
+            <option value="compressor"   ${_paActiveType==='compressor'  ?'selected':''}>Breathing Air Compressor</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="document.getElementById('pa-log-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <form onsubmit="submitPaLog(event,${aid})" class="px-6 py-4">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1rem;">
+        <div><label class="label">Date Out</label><input name="date_out" type="date" class="form-input" style="width:100%;" value="${today}" required></div>
+        <div><label class="label">Hour Meter (Start)</label><input name="hours_start" type="number" step="0.1" min="0" class="form-input" style="width:100%;background:#fefce8;" value="${a.hour_meter ?? 0}"></div>
+        ${isDispatch
+          ? `<div><label class="label">Destination</label><input name="destination" class="form-input" style="width:100%;" placeholder="Site / mission"></div>`
+          : `<div><label class="label">Location</label><input name="destination" class="form-input" style="width:100%;" value="${esc(a.location||'')}"></div>`}
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+          <div><label class="label">Operator Name</label><input name="operator_name" class="form-input" style="width:100%;" placeholder="Last, First MI" value="${esc(cu())}"></div>
+          <div><label class="label">Unit Phone</label><input name="operator_phone" class="form-input" style="width:100%;" placeholder="DSN or commercial"></div>
+          <div><label class="label">Supervisor (Print)</label><input name="dispatcher_name" class="form-input" style="width:100%;" value="${esc(cu())}"></div>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:0.5rem;margin-bottom:1rem;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#1e3a5f;color:#fff;font-size:0.75rem;">
+            <th style="text-align:left;padding:6px 8px;min-width:200px;">Item</th>
+            <th style="padding:6px 8px;width:130px;">SAT / UNSAT</th>
+            <th style="text-align:left;padding:6px 8px;">Remark</th>
+          </tr></thead>
+          <tbody id="pa-checklist-body">${paChecklistRows(_paActiveType)}</tbody>
+        </table>
+      </div>
+
+      <div id="pa-unsat-banner" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:0.4rem;padding:0.5rem 0.75rem;font-size:0.82rem;color:#dc2626;font-weight:600;margin-bottom:0.75rem;"></div>
+
+      <div style="margin-bottom:0.75rem;">
+        <label class="label">Notes</label>
+        <textarea name="notes" class="form-input" style="width:100%;min-height:60px;" placeholder="Any overall notes…"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="document.getElementById('pa-log-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">${isDispatch?'Dispatch Unit':'Start Run'}</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', paCountUnsat));
+}
+
+async function submitPaLog(e, aid) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const results = {}, remarks = {};
+  PA_CHECKLISTS[_paActiveType].forEach(sec => sec.items.forEach(item => {
+    const v = fd.get(`chk_${item.key}`);
+    if (v) results[item.key] = v;
+    const r = fd.get(`rem_${item.key}`);
+    if (r) remarks[item.key] = r;
+  }));
+
+  const hs = fd.get('hours_start');
+  const body = {
+    log_type:       _paLogMode,
+    checklist_type: _paActiveType,
+    date_out:       fd.get('date_out'),
+    hours_start:    hs === '' ? null : parseFloat(hs),
+    operator_name:  fd.get('operator_name') || null,
+    operator_phone: fd.get('operator_phone') || null,
+    dispatcher_name:fd.get('dispatcher_name') || null,
+    destination:    fd.get('destination') || null,
+    notes:          fd.get('notes') || null,
+    results, remarks,
+  };
+  try {
+    await api('POST', `/api/power-assets/${aid}/logs`, body);
+    document.getElementById('pa-log-backdrop').remove();
+    toast(_paLogMode === 'dispatch' ? 'Unit dispatched.' : 'Run started — close it out to log hours.');
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Save failed.', false); }
+}
+
+// ── Close-out / return modal ──────────────────────────────────────────────────
+async function openPaCloseModal(aid, lid) {
+  const a = paData.find(x=>x.id===aid);
+  if (!a) return;
+  let log = null;
+  try { log = await api('GET', `/api/power-assets/logs/${lid}`); }
+  catch (err) { return toast(err.message || 'Could not load the open log.', false); }
+  const today = new Date().toISOString().slice(0,10);
+  const isDispatch = log.log_type === 'dispatch';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.id = 'pa-close-backdrop';
+  overlay.innerHTML = `<div class="modal" style="max-width:480px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">${isDispatch?'Return Unit':'Close Run'}</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(a.name)} · out ${esc(log.date_out||'—')}</div>
+      </div>
+      <button onclick="document.getElementById('pa-close-backdrop').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="submitPaClose(event,${lid})" class="px-6 py-4" style="display:grid;gap:0.75rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div><label class="label">Date In</label><input name="date_in" type="date" class="input w-full" value="${today}" required></div>
+        <div><label class="label">Hour Meter (End)</label>
+          <input name="hours_end" type="number" step="0.1" min="${log.hours_start ?? 0}" class="input w-full" value="${log.hours_start ?? 0}" required>
+          <div style="font-size:0.7rem;color:#9ca3af;margin-top:2px;">Started at ${log.hours_start ?? 0} hrs</div></div>
+      </div>
+      <div><label class="label">Received By (Print)</label><input name="dispatcher_in_name" class="input w-full" value="${esc(cu())}"></div>
+      <div><label class="label">Notes</label><textarea name="notes" class="input w-full" style="min-height:56px;" placeholder="Condition on return, faults found…"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="document.getElementById('pa-close-backdrop').remove()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">${isDispatch?'Return Unit':'Close Run'}</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function submitPaClose(e, lid) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const he = fd.get('hours_end');
+  try {
+    await api('PATCH', `/api/power-assets/logs/${lid}/close`, {
+      date_in:   fd.get('date_in'),
+      hours_end: he === '' ? null : parseFloat(he),
+      dispatcher_in_name: fd.get('dispatcher_in_name') || null,
+      notes:     fd.get('notes') || null,
+    });
+    document.getElementById('pa-close-backdrop').remove();
+    toast('Closed out — hour meter updated.');
+    paData = await api('GET', '/api/power-assets');
+    renderPaTable();
+  } catch (err) { toast(err.message || 'Close-out failed.', false); }
+}
+
+// ── Log history panel ─────────────────────────────────────────────────────────
+async function openPaHistory(aid) {
+  const a = paData.find(x=>x.id===aid);
+  const logs = await api('GET', `/api/power-assets/${aid}/logs`);
+  const rows = logs.length === 0
+    ? `<tr><td colspan="6" style="padding:1.5rem;text-align:center;color:#9ca3af;">No runs or dispatches logged yet.</td></tr>`
+    : logs.map(l => {
+        const unsat = Object.values(l.results||{}).filter(v=>v==='UNSAT').length;
+        const hrs = (l.hours_start!=null && l.hours_end!=null)
+          ? Math.round((l.hours_end - l.hours_start)*10)/10 : '—';
+        return `<tr style="border-top:1px solid #e5e7eb;">
+          <td style="padding:6px 8px;font-size:0.78rem;white-space:nowrap;">${esc(l.date_out||'—')}${l.date_in?' → '+esc(l.date_in):''}</td>
+          <td style="padding:6px 8px;font-size:0.78rem;">${l.log_type==='dispatch'?'Dispatch':'Run'}</td>
+          <td style="padding:6px 8px;font-size:0.78rem;">${esc(l.operator_name||'—')}</td>
+          <td style="padding:6px 8px;font-size:0.78rem;text-align:right;">${hrs}</td>
+          <td style="padding:6px 8px;font-size:0.78rem;">${unsat
+            ? `<span style="color:#dc2626;font-weight:700;">${unsat} UNSAT</span>`
+            : `<span style="color:#16a34a;">All SAT</span>`}${l.status==='open'?' <span style="color:#f59e0b;font-weight:700;">· OPEN</span>':''}</td>
+          <td style="padding:6px 8px;text-align:right;">
+            <a href="/api/power-assets/logs/${l.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">Print</a>
+          </td></tr>`;
+      }).join('');
+
+  modal(`<div class="modal" style="max-width:760px;max-height:88vh;overflow-y:auto;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Run &amp; Dispatch History</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(a?.name||'')} · ${a?.hour_meter ?? 0} hrs on the meter</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <div class="px-6 py-4" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#f3f4f6;font-size:0.72rem;text-transform:uppercase;color:#6b7280;">
+          <th style="text-align:left;padding:6px 8px;">Dates</th>
+          <th style="text-align:left;padding:6px 8px;">Type</th>
+          <th style="text-align:left;padding:6px 8px;">Operator</th>
+          <th style="text-align:right;padding:6px 8px;">Hrs</th>
+          <th style="text-align:left;padding:6px 8px;">Result</th>
+          <th style="text-align:right;padding:6px 8px;">Form</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`);
 }
 
 // ─── Readiness Page ───────────────────────────────────────────────────────────

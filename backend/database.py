@@ -257,6 +257,49 @@ async def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_insp_vehicle ON vehicle_inspections(vehicle_id);
 
+            CREATE TABLE IF NOT EXISTS power_assets (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_type    TEXT NOT NULL DEFAULT 'generator',
+                name          TEXT NOT NULL,
+                make          TEXT,
+                model         TEXT,
+                serial_num    TEXT,
+                rating        TEXT,
+                fuel_type     TEXT,
+                location      TEXT,
+                portable      INTEGER NOT NULL DEFAULT 0,
+                hour_meter    REAL NOT NULL DEFAULT 0,
+                service_interval_hours REAL,
+                last_service_hours     REAL NOT NULL DEFAULT 0,
+                status        TEXT NOT NULL DEFAULT 'available',
+                equipment_id  INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                notes         TEXT,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS power_asset_logs (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_id       INTEGER NOT NULL REFERENCES power_assets(id) ON DELETE CASCADE,
+                log_type       TEXT NOT NULL DEFAULT 'run',
+                checklist_type TEXT NOT NULL DEFAULT 'gen_diesel',
+                date_out       TEXT NOT NULL DEFAULT (date('now')),
+                date_in        TEXT,
+                hours_start    REAL,
+                hours_end      REAL,
+                operator_name  TEXT,
+                operator_phone TEXT,
+                dispatcher_name TEXT,
+                destination    TEXT,
+                results        TEXT NOT NULL DEFAULT '{}',
+                remarks        TEXT NOT NULL DEFAULT '{}',
+                notes          TEXT,
+                status         TEXT NOT NULL DEFAULT 'open',
+                created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_palog_asset ON power_asset_logs(asset_id);
+
             CREATE TABLE IF NOT EXISTS reorder_requests (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_id      INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
