@@ -456,7 +456,17 @@ async function api(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(path, opts);
   if (r.status === 401) { localStorage.removeItem('auth_token'); window.location.href = '/login'; return; }
-  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({}));
+    let msg = e.detail;
+    // FastAPI 422s are an array of objects — stringifying gives "[object Object]"
+    if (Array.isArray(msg)) {
+      msg = msg.map(d => `${(d.loc||[]).slice(1).join('.') || 'field'}: ${d.msg}`).join('; ');
+    } else if (msg && typeof msg === 'object') {
+      msg = JSON.stringify(msg);
+    }
+    throw new Error(msg || r.statusText);
+  }
   return r.json();
 }
 
@@ -4284,7 +4294,10 @@ async function openItemModal(id) {
   // otherwise a location typed here never becomes a real bin you can move into
   const locs = (invLocations||[]).map(l=>l.code);
   const catVal = i.category || '';
-  const locVal = i.location || '';
+  // Where the stock ACTUALLY is, not the vestigial text column — those disagree
+  // on any item touched since the multi-location migration
+  const bins   = i.stock || [];
+  const locVal = bins.length === 1 ? bins[0].code : (bins.length ? '' : (i.location || ''));
   const catOther = catVal && !cats.includes(catVal);
   const locOther = locVal && !locs.includes(locVal);
 
@@ -4297,8 +4310,18 @@ async function openItemModal(id) {
     <input class="input" id="inv-cat-new" placeholder="New category" style="margin-top:0.3rem;display:${catOther?'block':'none'};" value="${catOther?esc(catVal):''}">
     <input type="hidden" name="category" id="inv-cat-val" value="${esc(catVal)}">`;
 
-  const locSelect = `
-    <select class="input" id="inv-loc-select" onchange="invDropChange('loc')">
+  // Split across bins? One dropdown can't express that — show it, and send
+  // people to Move rather than silently consolidating their stock on save.
+  const locSelect = bins.length > 1
+    ? `<div style="padding:0.45rem 0.6rem;border:1px dashed var(--c-border,#d1d5db);border-radius:0.375rem;">
+         <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.3rem;">
+           ${bins.map(b=>`<span style="font-size:0.72rem;padding:2px 8px;border-radius:9999px;border:1px solid #d1d5db;">
+             ${esc(b.code)} <strong>${b.quantity}</strong></span>`).join('')}
+         </div>
+         <div style="font-size:0.7rem;color:#9ca3af;">In ${bins.length} locations — use ⇄ Move to change.</div>
+       </div>
+       <input type="hidden" name="location" id="inv-loc-val" value="">`
+    : `<select class="input" id="inv-loc-select" onchange="invDropChange('loc')">
       <option value="">— None —</option>
       ${locs.map(l=>`<option ${locVal===l?'selected':''}>${esc(l)}</option>`).join('')}
       <option value="__new__" ${locOther?'selected':''}>+ Add new…</option>
@@ -4350,9 +4373,16 @@ function invDropChange(field) {
 async function saveItem(e, id) {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target));
-  if (body.quantity) body.quantity = parseInt(body.quantity);
-  if (body.min_stock) body.min_stock = parseInt(body.min_stock);
-  if (body.unit_cost) body.unit_cost = parseFloat(body.unit_cost);
+  // Blank numeric inputs arrive as "" — Pydantic rejects that, so send a real
+  // number or null rather than an empty string
+  const num = (v, fallback) => {
+    if (v === '' || v == null) return fallback;
+    const n = Number(v);
+    return Number.isNaN(n) ? fallback : n;
+  };
+  body.quantity  = Math.trunc(num(body.quantity, 0));
+  body.min_stock = Math.trunc(num(body.min_stock, 0));
+  body.unit_cost = num(body.unit_cost, null);
   try {
     // A location typed via "+ Add new…" has to become a real bin before the
     // item references it, or the stock has nowhere to land
@@ -4363,8 +4393,19 @@ async function saveItem(e, id) {
         invLocations = await api('GET', '/api/inventory/locations');
       }
     }
-    if (id) await api('PUT', `/api/inventory/${id}`, body);
-    else await api('POST', '/api/inventory', body);
+    if (id) {
+      await api('PUT', `/api/inventory/${id}`, body);
+      // The Location field has to actually move stock, or it silently lies
+      const prev = inventoryData.find(x => x.id === id);
+      const bins = (prev && prev.stock) || [];
+      const dest = (invLocations||[]).find(l => l.code === body.location);
+      if (dest && bins.length <= 1 && bins[0]?.location_id !== dest.id) {
+        await api('POST', `/api/inventory/${id}/relocate`,
+                  { location_id: dest.id, quantity: 0, performed_by: cu() });
+      }
+    } else {
+      await api('POST', '/api/inventory', body);
+    }
     closeModal();
     toast(id ? 'Item updated.' : 'Item added.');
     await reloadInventory();

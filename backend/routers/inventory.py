@@ -310,6 +310,56 @@ async def update_item(item_id: int, data: InventoryItemCreate, request: Request,
     return {"ok": True}
 
 
+@router.post("/{item_id}/relocate")
+async def relocate_item(item_id: int, data: StockSet, request: Request, db=Depends(get_db)):
+    """Move an item's whole holding to one location.
+
+    Backs the Location field in the edit dialog. Refuses when the item is split
+    across bins — consolidating several bins is a real stock movement and should
+    go through transfer, not a side effect of editing a name.
+    """
+    require_tech(request)
+    async with db.execute("SELECT name FROM inventory_items WHERE id=?", (item_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Item not found")
+    async with db.execute(
+        "SELECT location_id, quantity FROM inventory_stock WHERE item_id=? AND quantity<>0",
+        (item_id,),
+    ) as cur:
+        held = [dict(r) for r in await cur.fetchall()]
+    if len(held) > 1:
+        raise HTTPException(
+            409, f"This item is stored in {len(held)} locations. Use Move to transfer stock.")
+
+    dest = data.location_id
+    async with db.execute("SELECT code FROM inventory_locations WHERE id=?", (dest,)) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Location not found")
+
+    qty = held[0]["quantity"] if held else 0
+    src = held[0]["location_id"] if held else None
+    if src == dest:
+        return {"ok": True, "moved": 0}
+
+    if src is not None:
+        await _apply_delta(db, item_id, src, -qty)
+    await _apply_delta(db, item_id, dest, qty)
+    # Keep the legacy text column agreeing with reality for CSV export
+    await db.execute(
+        "UPDATE inventory_items SET location=?, updated_at=datetime('now') WHERE id=?",
+        (row["code"], item_id))
+    if qty:
+        await db.execute(
+            "INSERT INTO inventory_transactions "
+            "(item_id,action,quantity,reference,performed_by,location_id,to_location_id) "
+            "VALUES (?,'transfer',?,?,?,?,?)",
+            (item_id, qty, data.reference or "relocated via edit",
+             data.performed_by, src, dest))
+    await db.commit()
+    return {"ok": True, "moved": qty, "to": row["code"]}
+
+
 @router.post("/{item_id}/adjust")
 async def adjust_stock(item_id: int, data: InventoryAdjust, request: Request, db=Depends(get_db)):
     require_tech(request)
