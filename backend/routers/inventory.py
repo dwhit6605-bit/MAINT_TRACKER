@@ -174,7 +174,9 @@ async def create_location(data: LocationCreate, request: Request, db=Depends(get
         (code, data.name or code.replace("-", " ").title(), data.zone,
          1 if data.active else 0, data.sort_order),
     ) as cur:
-        return {"id": cur.lastrowid, "code": code}
+        loc_id = cur.lastrowid
+    await db.commit()
+    return {"id": loc_id, "code": code}
 
 
 @router.put("/locations/{loc_id}")

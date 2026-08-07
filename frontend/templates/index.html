@@ -4060,6 +4060,7 @@ async function inventoryPage(tab) {
     ${isTech() ? `<button onclick="openCsvImport('inventory')" class="btn-secondary col-m-hide" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary col-m-hide" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openOrderForm()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">📋 Order Form</button>
+    ${isTech() ? `<button onclick="openLocationsModal()" class="btn-secondary" style="font-size:0.8rem;">📍 Locations</button>` : ''}
     ${isTech() ? `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>` : ''}`;
   [inventoryData, invLocations] = await Promise.all([
     api('GET', '/api/inventory'),
@@ -4279,7 +4280,9 @@ async function reloadInventory() {
 async function openItemModal(id) {
   const i = id ? inventoryData.find(x=>x.id===id) || {} : {};
   const cats = [...new Set(inventoryData.map(x=>x.category).filter(Boolean))].sort();
-  const locs = [...new Set(inventoryData.map(x=>x.location).filter(Boolean))].sort();
+  // Canonical location list — NOT the vestigial inventory_items.location text,
+  // otherwise a location typed here never becomes a real bin you can move into
+  const locs = (invLocations||[]).map(l=>l.code);
   const catVal = i.category || '';
   const locVal = i.location || '';
   const catOther = catVal && !cats.includes(catVal);
@@ -4351,13 +4354,100 @@ async function saveItem(e, id) {
   if (body.min_stock) body.min_stock = parseInt(body.min_stock);
   if (body.unit_cost) body.unit_cost = parseFloat(body.unit_cost);
   try {
+    // A location typed via "+ Add new…" has to become a real bin before the
+    // item references it, or the stock has nowhere to land
+    if (body.location) {
+      body.location = body.location.trim().toUpperCase();
+      if (!(invLocations||[]).some(l => l.code === body.location)) {
+        await api('POST', '/api/inventory/locations', { code: body.location });
+        invLocations = await api('GET', '/api/inventory/locations');
+      }
+    }
     if (id) await api('PUT', `/api/inventory/${id}`, body);
     else await api('POST', '/api/inventory', body);
     closeModal();
     toast(id ? 'Item updated.' : 'Item added.');
-    inventoryData = await api('GET', '/api/inventory');
-    renderInventoryTable(inventoryData);
+    await reloadInventory();
   } catch(err) { toast(err.message, false); }
+}
+
+// ── Manage storage locations ──────────────────────────────────────────────────
+async function openLocationsModal() {
+  invLocations = await api('GET', '/api/inventory/locations');
+  const rows = invLocations.map(l => `
+    <tr style="border-top:1px solid #e5e7eb;">
+      <td style="padding:6px 8px;font-weight:600;font-size:0.82rem;">${esc(l.code)}</td>
+      <td style="padding:6px 8px;font-size:0.78rem;color:#6b7280;">${esc(l.name||'')}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.item_count}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.unit_count}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
+        <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#1e3a5f;">Rename</button>
+        ${isSuperAdmin() ? `<button onclick="deleteLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#dc2626;margin-left:0.5rem;">Delete</button>` : ''}
+      </td>
+    </tr>`).join('');
+
+  modal(`<div class="modal" style="max-width:600px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Storage Locations</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${invLocations.length} locations · used by the Move and Add Item dialogs</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    ${isTech() ? `<form onsubmit="addLocation(event)" class="px-6 pt-4" style="display:flex;gap:0.5rem;align-items:flex-end;">
+      <div style="flex:1;"><label class="label">New location code</label>
+        <input name="code" class="input w-full" placeholder="e.g. D-SHELF-3" required
+               style="text-transform:uppercase;"></div>
+      <button type="submit" class="btn-primary" style="white-space:nowrap;">+ Add</button>
+    </form>` : ''}
+    <div class="px-6 py-4" style="max-height:52vh;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="font-size:0.7rem;text-transform:uppercase;color:#6b7280;">
+          <th style="text-align:left;padding:4px 8px;">Code</th>
+          <th style="text-align:left;padding:4px 8px;">Name</th>
+          <th style="text-align:right;padding:4px 8px;">Items</th>
+          <th style="text-align:right;padding:4px 8px;">Units</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`);
+}
+
+async function addLocation(e) {
+  e.preventDefault();
+  const code = new FormData(e.target).get('code').trim().toUpperCase();
+  try {
+    await api('POST', '/api/inventory/locations', { code });
+    toast(`Added ${code}.`);
+    await reloadInventory();
+    openLocationsModal();
+  } catch (err) { toast(err.message || 'Could not add location.', false); }
+}
+
+async function renameLocation(id, current) {
+  const code = prompt(`Rename "${current}" to:`, current);
+  if (!code || code.trim().toUpperCase() === current) return;
+  const l = invLocations.find(x => x.id === id) || {};
+  try {
+    await api('PUT', `/api/inventory/locations/${id}`,
+              { code: code.trim().toUpperCase(), name: l.name, zone: l.zone,
+                active: true, sort_order: l.sort_order || 0 });
+    toast('Location renamed.');
+    await reloadInventory();
+    openLocationsModal();
+  } catch (err) { toast(err.message || 'Rename failed.', false); }
+}
+
+async function deleteLocation(id, code) {
+  if (!confirm(`Delete location "${code}"?\n\nOnly works if nothing is stored there.`)) return;
+  try {
+    await api('DELETE', `/api/inventory/locations/${id}`);
+    toast(`Deleted ${code}.`);
+    await reloadInventory();
+    openLocationsModal();
+  } catch (err) { toast(err.message || 'Delete failed.', false); }
 }
 
 async function quickAdjustInv(id, delta) {
