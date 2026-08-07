@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from backend.database import get_db
 from backend.auth import require_admin
+from backend.routers.inventory import receive_stock
 
 router = APIRouter(prefix="/api/reorder", tags=["reorder"])
 
@@ -59,16 +60,10 @@ async def update_reorder(rid: int, data: ReorderUpdate, request: Request, db=Dep
         ) as cur:
             row = await cur.fetchone()
         if row:
-            await db.execute("""
-                UPDATE inventory_items
-                SET quantity = quantity + ?, updated_at=datetime('now')
-                WHERE id=?
-            """, (row["qty_requested"], row["item_id"]))
-            await db.execute("""
-                INSERT INTO inventory_transactions
-                    (item_id, action, quantity, reference, performed_by)
-                VALUES (?, 'add', ?, 'Reorder received', 'system')
-            """, (row["item_id"], row["qty_requested"]))
+            await receive_stock(
+                db, row["item_id"], row["qty_requested"],
+                reference="Reorder received", performed_by="system",
+            )
     await db.commit()
     return {"ok": True}
 

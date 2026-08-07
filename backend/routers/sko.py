@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
 from backend.auth import require_admin, require_tech
 from backend.models import SkoCreate, SkoCheckout, SkoCheckin, SkoPartsUsed
+from backend.routers.inventory import consume_stock
 
 router = APIRouter(prefix="/api/skos", tags=["skos"])
 
@@ -234,13 +235,9 @@ async def log_parts(sko_id: int, data: SkoPartsUsed, db=Depends(get_db)):
         "INSERT INTO sko_parts_used (sko_id, item_id, quantity, used_by, notes) VALUES (?,?,?,?,?)",
         (sko_id, data.item_id, data.quantity, data.used_by, data.notes)
     )
-    await db.execute(
-        "UPDATE inventory_items SET quantity = MAX(0, quantity - ?), updated_at=datetime('now') WHERE id=?",
-        (data.quantity, data.item_id)
-    )
-    await db.execute(
-        "INSERT INTO inventory_transactions (item_id, action, quantity, reference, performed_by) VALUES (?,?,?,?,?)",
-        (data.item_id, "remove", data.quantity, f"SKO #{sko_id}", data.used_by)
+    await consume_stock(
+        db, data.item_id, data.quantity,
+        reference=f"SKO #{sko_id}", performed_by=data.used_by,
     )
     await db.commit()
     return {"ok": True}

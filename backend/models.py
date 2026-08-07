@@ -84,6 +84,8 @@ class InventoryAdjust(BaseModel):
     quantity: int
     reference: Optional[str] = None
     performed_by: Optional[str] = None
+    # Which bin to move. Omitted -> the item's largest bin, else UNASSIGNED.
+    location_id: Optional[int] = None
 
 
 class CalibrationBulkEdit(BaseModel):

@@ -4050,13 +4050,17 @@ function applyCalInterval(calInputId, nextDueId, val) {
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 let inventoryData = [];
+let invLocations  = [];
 async function inventoryPage(tab) {
   $('page-actions').innerHTML = `
     ${isTech() ? `<button onclick="openCsvImport('inventory')" class="btn-secondary col-m-hide" style="font-size:0.8rem;">⬆ Import CSV</button>` : ''}
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary col-m-hide" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openOrderForm()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">📋 Order Form</button>
     ${isTech() ? `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>` : ''}`;
-  inventoryData = await api('GET', '/api/inventory');
+  [inventoryData, invLocations] = await Promise.all([
+    api('GET', '/api/inventory'),
+    api('GET', '/api/inventory/locations'),
+  ]);
   // Tab bar
   $('page-content').innerHTML = `
     <div style="display:flex;border-bottom:1px solid #e5e7eb;margin-bottom:1rem;">
@@ -4088,6 +4092,10 @@ function renderInventoryTable(rows, inTab) {
     <div class="card overflow-hidden p-0">
       <div class="px-5 py-4 border-b flex flex-wrap items-center gap-3">
         <input id="inv-search" class="input max-w-xs" placeholder="Search inventory…" oninput="filterInventory()">
+        <select id="inv-loc-filter" class="input" style="max-width:14rem;" onchange="filterInventory()">
+          <option value="">All locations</option>
+          ${(invLocations||[]).map(l=>`<option value="${l.id}">${esc(l.code)} (${l.item_count})</option>`).join('')}
+        </select>
         <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input type="checkbox" id="inv-low-filter" onchange="filterInventory()"> Low stock only
         </label>
@@ -4114,10 +4122,18 @@ function renderInventoryTable(rows, inTab) {
 function inventoryRows(rows) {
   return rows.map(i=>{
     const low = i.min_stock > 0 && i.quantity <= i.min_stock;
+    const st = i.stock || [];
+    // One bin reads as a plain location; several become an expandable breakdown
+    const locCell = st.length === 0
+      ? '<span class="text-gray-400">—</span>'
+      : st.length === 1
+        ? esc(st[0].code)
+        : `<button onclick="toggleInvStock(${i.id})" style="background:none;border:none;padding:0;cursor:pointer;color:#1e3a5f;font-size:0.8rem;font-weight:600;text-decoration:underline;">
+             <span id="inv-caret-${i.id}">▸</span> ${st.length} locations</button>`;
     return `<tr class="table-row border-b last:border-0">
       <td class="px-4 py-3 font-medium">${esc(i.name)}</td>
       <td class="px-4 py-3 font-mono text-xs text-gray-500 col-m-hide">${esc(i.part_number||'—')}</td>
-      <td class="px-4 py-3 text-gray-500 col-m-hide">${esc(i.location||'—')}</td>
+      <td class="px-4 py-3 text-gray-500 col-m-hide">${locCell}</td>
       <td class="px-4 py-3 text-right font-mono font-medium ${i.quantity===0?'text-red-600':low?'text-yellow-600':''}">${i.quantity} ${i.unit}</td>
       <td class="px-4 py-3 text-right text-gray-400 col-m-hide">${i.min_stock} ${i.unit}</td>
       <td class="px-4 py-3">${low?'<span class="badge-yellow">Low</span>':'<span class="badge-green">OK</span>'}</td>
@@ -4127,21 +4143,133 @@ function inventoryRows(rows) {
           <button onclick="quickAdjustInv(${i.id},1)"  title="Add 1"    style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">+</button>
           <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
         <button onclick="viewItemUsage(${i.id},'${esc(i.name)}')" class="text-xs" style="color:var(--c-text-3);" title="View consumption history">📦 usage</button>
+        ${isTech() && st.length ? `<button onclick="openTransferModal(${i.id})" class="text-xs hover:underline" style="color:#1e3a5f;" title="Move stock between locations">⇄ Move</button>` : ''}
         ${isTech() ? `<button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>` : ''}
         ${isSuperAdmin() ? `<button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
-    </tr>`;
+    </tr>
+    ${st.length > 1 ? `<tr id="inv-stock-${i.id}" style="display:none;background:var(--c-bg-2,#f9fafb);">
+      <td colspan="7" class="px-4 py-2">
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+          ${st.map(s=>`<span style="font-size:0.75rem;padding:3px 10px;border-radius:9999px;border:1px solid #d1d5db;">
+            <span style="color:#6b7280;">${esc(s.code)}</span>
+            <span style="font-weight:700;margin-left:0.35rem;">${s.quantity}</span>
+            <span style="color:#9ca3af;"> ${esc(i.unit)}</span></span>`).join('')}
+        </div>
+      </td></tr>` : ''}`;
   }).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No items found.</td></tr>';
+}
+
+function toggleInvStock(id) {
+  const row = document.getElementById('inv-stock-' + id);
+  const caret = document.getElementById('inv-caret-' + id);
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'table-row';
+  if (caret) caret.textContent = open ? '▸' : '▾';
 }
 
 function filterInventory() {
   const s = $('inv-search').value.toLowerCase();
   const low = $('inv-low-filter').checked;
-  const filtered = inventoryData.filter(i =>
-    (!s || i.name.toLowerCase().includes(s) || (i.part_number||'').toLowerCase().includes(s) || (i.location||'').toLowerCase().includes(s)) &&
-    (!low || (i.min_stock > 0 && i.quantity <= i.min_stock))
-  );
+  const locId = parseInt(document.getElementById('inv-loc-filter')?.value) || 0;
+  const filtered = inventoryData.filter(i => {
+    const codes = (i.stock||[]).map(x=>x.code.toLowerCase()).join(' ');
+    return (!s || i.name.toLowerCase().includes(s)
+              || (i.part_number||'').toLowerCase().includes(s)
+              || codes.includes(s))
+        && (!low   || (i.min_stock > 0 && i.quantity <= i.min_stock))
+        && (!locId || (i.stock||[]).some(x=>x.location_id===locId));
+  });
   $('inv-tbody').innerHTML = inventoryRows(filtered);
+}
+
+// ── Move stock between locations ──────────────────────────────────────────────
+async function openTransferModal(id) {
+  const i = inventoryData.find(x=>x.id===id);
+  if (!i) return;
+  const st = i.stock || [];
+  if (!st.length) return toast('This item has no stock to move.', false);
+  const dests = (invLocations||[]);
+  modal(`<div class="modal" style="max-width:440px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Move Stock</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(i.name)} · ${i.quantity} ${esc(i.unit)} total</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="submitTransfer(event,${id})" class="px-6 py-4" style="display:grid;gap:0.75rem;">
+      <div>
+        <label class="label">From</label>
+        <select name="from_location_id" id="xfer-from" class="input w-full" onchange="xferSyncMax()" required>
+          ${st.map(s=>`<option value="${s.location_id}" data-max="${s.quantity}">${esc(s.code)} — ${s.quantity} ${esc(i.unit)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="label">To</label>
+        <select name="to_location_id" id="xfer-to" class="input w-full" required>
+          ${dests.map(l=>`<option value="${l.id}" ${l.id!==st[0].location_id?'':'disabled'}>${esc(l.code)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="label">Quantity</label>
+        <input name="quantity" id="xfer-qty" type="number" min="1" max="${st[0].quantity}" value="1" class="input w-full" required>
+        <div id="xfer-hint" style="font-size:0.7rem;color:#9ca3af;margin-top:2px;">Max ${st[0].quantity} available in ${esc(st[0].code)}</div>
+      </div>
+      <div><label class="label">Reference</label><input name="reference" class="input w-full" placeholder="Why it moved (optional)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Move</button>
+      </div>
+    </form>
+  </div>`, xferSyncMax);
+}
+
+// Keep the quantity ceiling on the chosen source, and never let To equal From
+function xferSyncMax() {
+  const sel = document.getElementById('xfer-from');
+  const opt = sel.options[sel.selectedIndex];
+  const max = parseInt(opt.dataset.max) || 0;
+  const qty = document.getElementById('xfer-qty');
+  qty.max = max;
+  if (parseInt(qty.value) > max) qty.value = max;
+  document.getElementById('xfer-hint').textContent =
+    `Max ${max} available in ${opt.textContent.split(' — ')[0]}`;
+
+  const to = document.getElementById('xfer-to');
+  const fromId = sel.value;
+  [...to.options].forEach(o => { o.disabled = (o.value === fromId); });
+  if (to.value === fromId || to.selectedOptions[0]?.disabled) {
+    const first = [...to.options].find(o => !o.disabled);
+    if (first) to.value = first.value;
+  }
+}
+
+async function submitTransfer(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    await api('POST', `/api/inventory/${id}/transfer`, {
+      from_location_id: parseInt(fd.get('from_location_id')),
+      to_location_id:   parseInt(fd.get('to_location_id')),
+      quantity:         parseInt(fd.get('quantity')),
+      reference:        fd.get('reference') || null,
+      performed_by:     cu(),
+    });
+    closeModal();
+    toast('Stock moved.');
+    await reloadInventory();
+  } catch (err) { toast(err.message || 'Move failed.', false); }
+}
+
+async function reloadInventory() {
+  [inventoryData, invLocations] = await Promise.all([
+    api('GET', '/api/inventory'),
+    api('GET', '/api/inventory/locations'),
+  ]);
+  const body = document.getElementById('inv-tab-body');
+  if (body && !body.hasAttribute('data-reorder-table')) renderInventoryTable(inventoryData, true);
 }
 
 async function openItemModal(id) {

@@ -19,6 +19,7 @@ from backend.routers import readiness as readiness_router
 from backend.routers import reorder as reorder_router
 from backend.routers import rolling_stock as rolling_stock_router
 from backend.routers import power_assets as power_assets_router
+from backend.routers import cylinders as cylinders_router
 from backend.routers import task_attachments as task_attachments_router
 from backend.routers import faults as faults_router
 from backend.routers import eq_checklists as eq_checklists_router
@@ -105,6 +106,7 @@ app.include_router(readiness_router.router)
 app.include_router(reorder_router.router)
 app.include_router(rolling_stock_router.router)
 app.include_router(power_assets_router.router)
+app.include_router(cylinders_router.router)
 app.include_router(task_attachments_router.router)
 app.include_router(faults_router.router)
 app.include_router(eq_checklists_router.router)
@@ -196,7 +198,7 @@ async def labels_page(request: Request, ids: str = ""):
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{page}", response_class=HTMLResponse)
 async def spa(request: Request, page: str = "dashboard"):
-    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "power", "faults", "calendar", "commander", "hazmat"}
+    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "power", "cylinders", "faults", "calendar", "commander", "hazmat"}
     if page not in valid:
         page = "dashboard"
     return templates.TemplateResponse("index.html", {"request": request, "page": page})

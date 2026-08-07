@@ -6,6 +6,7 @@ from backend.database import get_db
 from backend.models import MaintenanceTaskCreate, MaintenanceComplete, MaintenanceBulkCreate
 from backend.da2404 import generate_da2404
 from backend.auth import require_admin, require_tech, require_superadmin
+from backend.routers.inventory import consume_stock
 from backend import audit
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
@@ -91,17 +92,13 @@ async def complete_task(task_id: int, data: MaintenanceComplete, request: Reques
                 INSERT INTO task_parts_used (task_id, item_id, quantity_used, notes)
                 VALUES (?, ?, ?, ?)
             """, (task_id, part.item_id, part.quantity_used, part.notes))
-            # Deduct from inventory (no negative stock)
-            await db.execute("""
-                UPDATE inventory_items
-                SET quantity = MAX(0, quantity - ?), updated_at=datetime('now')
-                WHERE id=?
-            """, (part.quantity_used, part.item_id))
-            await db.execute("""
-                INSERT INTO inventory_transactions (item_id, action, quantity, reference, performed_by)
-                VALUES (?, 'remove', ?, ?, ?)
-            """, (part.item_id, part.quantity_used,
-                  f"Task #{task_id}: {task['title']}", data.completed_by))
+            # Draw from the item's largest bin; logs the transaction and keeps
+            # inventory_items.quantity in step with the per-location stock rows
+            await consume_stock(
+                db, part.item_id, part.quantity_used,
+                reference=f"Task #{task_id}: {task['title']}",
+                performed_by=data.completed_by,
+            )
 
     # if recurring, create the next task
     if task["interval_days"] and next_due:

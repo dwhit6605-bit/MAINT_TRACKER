@@ -300,6 +300,69 @@ async def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_palog_asset ON power_asset_logs(asset_id);
 
+            CREATE TABLE IF NOT EXISTS cylinder_tests (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
+                test_type    TEXT NOT NULL DEFAULT 'hydrostatic',
+                tested_at    TEXT NOT NULL,
+                next_due     TEXT,
+                result       TEXT NOT NULL DEFAULT 'pass',
+                facility     TEXT,
+                rin          TEXT,
+                notes        TEXT,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_cyltest_eq ON cylinder_tests(equipment_id);
+
+            -- Multi-location inventory.
+            -- inventory_stock is the source of truth per bin; inventory_items.quantity
+            -- is a rollup of SUM(stock) kept current by the triggers below, so the six
+            -- existing modules that read .quantity keep working unchanged.
+            CREATE TABLE IF NOT EXISTS inventory_locations (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                code       TEXT NOT NULL UNIQUE,
+                name       TEXT,
+                zone       TEXT,
+                active     INTEGER NOT NULL DEFAULT 1,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS inventory_stock (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id     INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                location_id INTEGER NOT NULL REFERENCES inventory_locations(id) ON DELETE CASCADE,
+                quantity    INTEGER NOT NULL DEFAULT 0,
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(item_id, location_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_invstock_item ON inventory_stock(item_id);
+            CREATE INDEX IF NOT EXISTS idx_invstock_loc  ON inventory_stock(location_id);
+
+            CREATE TRIGGER IF NOT EXISTS trg_invstock_ai AFTER INSERT ON inventory_stock
+            BEGIN
+                UPDATE inventory_items SET quantity =
+                    (SELECT COALESCE(SUM(quantity),0) FROM inventory_stock WHERE item_id=NEW.item_id)
+                WHERE id = NEW.item_id;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_invstock_au AFTER UPDATE ON inventory_stock
+            BEGIN
+                UPDATE inventory_items SET quantity =
+                    (SELECT COALESCE(SUM(quantity),0) FROM inventory_stock WHERE item_id=NEW.item_id)
+                WHERE id = NEW.item_id;
+                UPDATE inventory_items SET quantity =
+                    (SELECT COALESCE(SUM(quantity),0) FROM inventory_stock WHERE item_id=OLD.item_id)
+                WHERE id = OLD.item_id AND OLD.item_id <> NEW.item_id;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_invstock_ad AFTER DELETE ON inventory_stock
+            BEGIN
+                UPDATE inventory_items SET quantity =
+                    (SELECT COALESCE(SUM(quantity),0) FROM inventory_stock WHERE item_id=OLD.item_id)
+                WHERE id = OLD.item_id;
+            END;
+
             CREATE TABLE IF NOT EXISTS reorder_requests (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_id      INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
@@ -386,6 +449,15 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN expected_return TEXT")
         if "reference_url" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN reference_url TEXT")
+        # Pressure cylinders (SCBA / O2 bottles) — DOT requalification tracking
+        if "mfg_date" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN mfg_date TEXT")
+        if "cylinder_type" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN cylinder_type TEXT")
+        if "hydro_interval_months" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN hydro_interval_months INTEGER")
+        if "service_life_years" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN service_life_years INTEGER")
 
         pmcs_item_cols = {row[1] async for row in await db.execute("PRAGMA table_info(pmcs_items)")}
         if "equipment_id" not in pmcs_item_cols:
@@ -396,6 +468,12 @@ async def init_db():
         fault_cols = {row[1] async for row in await db.execute("PRAGMA table_info(fault_reports)")}
         if "linked_task_id" not in fault_cols:
             await db.execute("ALTER TABLE fault_reports ADD COLUMN linked_task_id INTEGER REFERENCES maintenance_tasks(id) ON DELETE SET NULL")
+
+        tx_cols = {row[1] async for row in await db.execute("PRAGMA table_info(inventory_transactions)")}
+        if "location_id" not in tx_cols:
+            await db.execute("ALTER TABLE inventory_transactions ADD COLUMN location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL")
+        if "to_location_id" not in tx_cols:
+            await db.execute("ALTER TABLE inventory_transactions ADD COLUMN to_location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL")
 
         task_cols = {row[1] async for row in await db.execute("PRAGMA table_info(maintenance_tasks)")}
         if "source_fault_id" not in task_cols:
