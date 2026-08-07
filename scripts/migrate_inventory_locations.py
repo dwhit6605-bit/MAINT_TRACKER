@@ -13,6 +13,7 @@ Run the dry run first; it writes nothing and prints the full plan:
 Safe to re-run: items that already have stock rows are skipped.
 """
 import argparse
+import os
 import re
 import shutil
 import sqlite3
@@ -21,7 +22,30 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-DB = Path(__file__).resolve().parent.parent / "maint.db"
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def resolve_db() -> Path:
+    """Mirror the app's lookup: $DB_PATH, else DB_PATH from .env, else maint.db.
+
+    systemd hands the service its EnvironmentFile, but a shell running this
+    script by hand does not, so read .env directly rather than guessing.
+    """
+    val = os.getenv("DB_PATH")
+    if not val:
+        env = ROOT / ".env"
+        if env.exists():
+            for line in env.read_text().splitlines():
+                line = line.strip()
+                if line.startswith("DB_PATH=") and not line.startswith("#"):
+                    val = line.split("=", 1)[1].strip().strip("'\"")
+                    break
+    val = val or "maint.db"
+    p = Path(val)
+    return p if p.is_absolute() else (ROOT / p)
+
+
+DB = resolve_db()
 
 # Reviewed and approved 2026-08-07: these normalize to different strings but are
 # the same physical place. Everything else merges only on punctuation/case.
@@ -63,8 +87,17 @@ def main():
         "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
         "('inventory_locations','inventory_stock')")}
     if len(have) < 2:
-        sys.exit("inventory_locations / inventory_stock not found — start the app once "
-                 "so init_db() creates them, then re-run.")
+        tables = [r[0] for r in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+        sys.exit(
+            f"inventory_locations / inventory_stock not found in {DB}\n"
+            f"  this database has {len(tables)} tables"
+            f"{' (looks empty — wrong file?)' if len(tables) < 5 else ''}\n"
+            f"  missing: {', '.join(sorted({'inventory_locations','inventory_stock'} - have))}\n\n"
+            "Either the service has not restarted onto the new code (init_db creates them\n"
+            "at startup), or DB_PATH points somewhere else. Check with:\n"
+            "  systemctl status maint-super\n"
+            "  grep DB_PATH /opt/maint-super/.env")
 
     items = [dict(r) for r in con.execute(
         "SELECT id, name, location, quantity FROM inventory_items ORDER BY id")]
