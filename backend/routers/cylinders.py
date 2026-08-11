@@ -12,8 +12,11 @@ A cylinder has two independent clocks:
 Cylinders live in the ``equipment`` table; this router adds the date fields and
 the test history on top rather than duplicating the 70 existing records.
 """
+import csv
+import io
 from datetime import date, datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 from backend.database import get_db
@@ -27,6 +30,18 @@ DUE_SOON_DAYS = 90
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
+
+class CylinderCreate(BaseModel):
+    name: str = "SCBA Bottle"
+    serial_num: Optional[str] = None
+    location: Optional[str] = None
+    mfg_date: Optional[str] = None
+    hydro_due_date: Optional[str] = None
+    cylinder_type: Optional[str] = None
+    service_life_years: Optional[int] = None
+    status: Optional[str] = "active"
+    notes: Optional[str] = None
+
 
 class CylinderUpdate(BaseModel):
     location: Optional[str] = None
@@ -145,6 +160,147 @@ async def list_cylinders(db=Depends(get_db)):
     # Anything that must not be filled
     grounded = sum(counts.get(k, 0) for k in ("overdue", "expired", "condemned"))
     return {"cylinders": rows, "counts": counts, "total": len(rows), "grounded": grounded}
+
+
+@router.get("/template")
+async def cylinder_template():
+    """Blank CSV with the columns the importer expects."""
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["serial_num", "name", "location", "mfg_date", "hydro_due_date", "notes"])
+    w.writerow(["OP399188", "Scotts SCBA Bottle", "CAGE", "2019-04-01", "2029-04-01", ""])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="cylinders_template.csv"'})
+
+
+@router.get("/export")
+async def export_cylinders(db=Depends(get_db)):
+    rows = await _fetch(db)
+    if not rows:
+        raise HTTPException(404, "No cylinders to export")
+    out = [{
+        "serial_num": r["serial_num"] or "", "name": r["name"] or "",
+        "location": r["location"] or "", "mfg_date": r["mfg_date"] or "",
+        "hydro_due_date": r["hydro_due_date"] or "", "status": r["cyl_status"],
+        "notes": r["notes"] or "",
+    } for r in rows]
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=list(out[0].keys()))
+    w.writeheader()
+    w.writerows(out)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="cylinders.csv"'})
+
+
+@router.post("", status_code=201)
+async def create_cylinder(request: Request, data: CylinderCreate, db=Depends(get_db)):
+    """Cylinders are equipment rows; this just pins the category and dates."""
+    require_tech(request)
+    serial = (data.serial_num or "").strip() or None
+    if serial:
+        async with db.execute(
+            "SELECT id, category FROM equipment WHERE serial_num=?", (serial,)
+        ) as cur:
+            dup = await cur.fetchone()
+        if dup:
+            where = ("already a cylinder" if dup["category"] == CYLINDER_CATEGORY
+                     else f"already used by other equipment ({dup['category']})")
+            raise HTTPException(409, f"Serial '{serial}' is {where}.")
+
+    async with db.execute("""
+        INSERT INTO equipment
+            (name, category, serial_num, location, status, notes,
+             mfg_date, hydro_due_date, cylinder_type, service_life_years)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+    """, (data.name.strip() or "SCBA Bottle", CYLINDER_CATEGORY, serial,
+          data.location, data.status or "active", data.notes,
+          data.mfg_date, data.hydro_due_date, data.cylinder_type,
+          data.service_life_years)) as cur:
+        eq_id = cur.lastrowid
+    await db.commit()
+    return {"id": eq_id}
+
+
+@router.post("/import")
+async def import_cylinders(request: Request, file: UploadFile = File(...), db=Depends(get_db)):
+    """Upsert cylinders from CSV, matched on serial number.
+
+    Rows without a serial are created rather than skipped, since plenty of older
+    bottles are identified only by an admin number in the notes.
+    """
+    require_tech(request)
+    text = (await file.read()).decode("utf-8-sig")   # Excel writes a BOM
+    reader = csv.DictReader(io.StringIO(text))
+    rows = [dict(r) for r in reader]
+    if not rows:
+        raise HTTPException(400, "That file has no data rows.")
+
+    def g(row, *names):
+        for n in names:
+            for k in row:
+                if k and k.strip().lower().replace(" ", "_") == n:
+                    return (row[k] or "").strip() or None
+        return None
+
+    created = updated = skipped = 0
+    errors = []
+    for i, row in enumerate(rows, start=2):
+        serial = g(row, "serial_num", "serial", "serial_number")
+        name = g(row, "name", "description")   # None = leave existing alone
+        loc = g(row, "location", "loc")
+        mfg = g(row, "mfg_date", "manufacture_date", "dom")
+        due = g(row, "hydro_due_date", "hydro_due", "hydrostatic_due_date")
+        notes = g(row, "notes", "note")
+
+        for label, val in (("mfg_date", mfg), ("hydro_due_date", due)):
+            if val and not _parse(val):
+                errors.append(f"Row {i}: {label} '{val}' is not YYYY-MM-DD")
+                val = None
+                if label == "mfg_date":
+                    mfg = None
+                else:
+                    due = None
+        if mfg and due and due < mfg:
+            errors.append(f"Row {i}: hydro due {due} is before manufacture {mfg}")
+            skipped += 1
+            continue
+
+        existing = None
+        if serial:
+            async with db.execute(
+                "SELECT id, category FROM equipment WHERE serial_num=?", (serial,)
+            ) as cur:
+                existing = await cur.fetchone()
+            if existing and existing["category"] != CYLINDER_CATEGORY:
+                errors.append(f"Row {i}: serial '{serial}' belongs to other equipment "
+                              f"({existing['category']}) — skipped")
+                skipped += 1
+                continue
+
+        if existing:
+            # COALESCE so a blank cell leaves the stored value alone
+            await db.execute("""
+                UPDATE equipment SET name=COALESCE(?,name), location=COALESCE(?,location),
+                    mfg_date=COALESCE(?,mfg_date), hydro_due_date=COALESCE(?,hydro_due_date),
+                    notes=COALESCE(?,notes), updated_at=datetime('now')
+                WHERE id=?
+            """, (name, loc, mfg, due, notes, existing["id"]))
+            updated += 1
+        else:
+            await db.execute("""
+                INSERT INTO equipment
+                    (name, category, serial_num, location, status, notes, mfg_date, hydro_due_date)
+                VALUES (?,?,?,?, 'active', ?,?,?)
+            """, (name or "SCBA Bottle", CYLINDER_CATEGORY, serial, loc, notes, mfg, due))
+            created += 1
+
+    await db.commit()
+    return {"created": created, "updated": updated, "skipped": skipped,
+            "errors": errors[:25], "error_count": len(errors)}
 
 
 @router.put("/{eq_id}")

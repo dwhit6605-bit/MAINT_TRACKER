@@ -5624,6 +5624,13 @@ const CSV_CONFIG = {
     refreshFn: () => calibrationPage(),
     columns: 'equipment_name* (or serial_num*), calibrated_at*, next_due, calibrated_by, certificate_num, result (pass/fail), notes',
   },
+  cylinders: {
+    label: 'Cylinders',
+    uploadUrl: '/api/cylinders/import',
+    templateUrl: '/api/cylinders/template',
+    refreshFn: () => cylindersPage(),
+    columns: 'serial_num, name, location, mfg_date (YYYY-MM-DD), hydro_due_date (YYYY-MM-DD), notes',
+  },
   'pmcs-items': {
     label: 'PMCS Check Items',
     uploadUrl: null, // set dynamically
@@ -8306,9 +8313,11 @@ const CYL_STATUS = {
 };
 
 async function cylindersPage() {
-  $('page-actions').innerHTML = isTech()
-    ? `<button onclick="openCylBulkModal()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">Bulk Edit</button>`
-    : '';
+  $('page-actions').innerHTML = isTech() ? `
+    <button onclick="openCsvImport('cylinders')" class="btn-secondary col-m-hide" style="font-size:0.8rem;">⬆ Import CSV</button>
+    <a href="#" onclick="event.preventDefault();window.open('/api/cylinders/export?token='+getToken(),'_blank')" class="btn-secondary col-m-hide" style="font-size:0.8rem;text-decoration:none;">⬇ Export</a>
+    <button onclick="openCylBulkModal()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">Bulk Edit</button>
+    <button onclick="openCylAddModal()" class="btn-primary" style="font-size:0.8rem;">＋ Add Cylinder</button>` : '';
   cylData = await api('GET', '/api/cylinders');
   _cylSel.clear();
   renderCylTable();
@@ -8361,7 +8370,10 @@ function renderCylTable() {
             <th style="text-align:right;padding:6px 10px;">Actions</th>
           </tr></thead>
           <tbody>
-            ${list.length===0 ? `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#9ca3af;">No cylinders match.</td></tr>`
+            ${list.length===0 ? `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#9ca3af;">
+                ${cylData.total===0
+                  ? `No cylinders yet.${isTech()?' <button onclick="openCylAddModal()" class="btn-primary" style="font-size:0.78rem;margin-left:0.5rem;">＋ Add Cylinder</button>':''}`
+                  : 'No cylinders match.'}</td></tr>`
             : list.map(r=>{
               const st=CYL_STATUS[r.cyl_status]||CYL_STATUS.unknown;
               const days = r.days_to_hydro;
@@ -8392,6 +8404,55 @@ function cylSelectAll(on) {
     cb.checked = on;
     cb.dispatchEvent(new Event('change'));
   });
+}
+
+function openCylAddModal() {
+  modal(`<div class="modal" style="max-width:480px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:700;">Add Cylinder</h2>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveNewCyl(event)" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div><label class="label">Serial #</label>
+        <input name="serial_num" class="input w-full" placeholder="OP399188"></div>
+      <div><label class="label">Type / Name</label>
+        <input name="name" class="input w-full" list="cyl-names" value="Scotts SCBA Bottle">
+        <datalist id="cyl-names">
+          <option>Scotts SCBA Bottle</option><option>Draeger SCBA Bottle</option><option>Draeger O2 Bottle</option>
+        </datalist></div>
+      <div style="grid-column:1/-1;"><label class="label">Location</label>
+        <input name="location" class="input w-full" placeholder="CAGE"></div>
+      <div><label class="label">Manufacture Date</label>
+        <input name="mfg_date" type="date" class="input w-full"></div>
+      <div><label class="label">Hydrostatic Due</label>
+        <input name="hydro_due_date" type="date" class="input w-full"></div>
+      <div style="grid-column:1/-1;"><label class="label">Notes</label>
+        <input name="notes" class="input w-full" placeholder="Admin # / ensemble"></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Add Cylinder</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveNewCyl(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const mfg = fd.get('mfg_date') || null, due = fd.get('hydro_due_date') || null;
+  if (mfg && due && due < mfg) return toast('Hydro due date is before the manufacture date.', false);
+  try {
+    await api('POST', '/api/cylinders', {
+      name: fd.get('name') || 'SCBA Bottle',
+      serial_num: fd.get('serial_num') || null,
+      location: fd.get('location') || null,
+      mfg_date: mfg, hydro_due_date: due,
+      notes: fd.get('notes') || null,
+    });
+    closeModal();
+    toast('Cylinder added.');
+    await cylindersPage();
+  } catch (err) { toast(err.message || 'Could not add cylinder.', false); }
 }
 
 function openCylModal(id) {
