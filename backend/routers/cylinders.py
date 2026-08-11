@@ -29,7 +29,9 @@ DUE_SOON_DAYS = 90
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class CylinderUpdate(BaseModel):
+    location: Optional[str] = None
     mfg_date: Optional[str] = None
+    hydro_due_date: Optional[str] = None
     cylinder_type: Optional[str] = None
     hydro_interval_months: Optional[int] = None
     service_life_years: Optional[int] = None
@@ -38,6 +40,7 @@ class CylinderUpdate(BaseModel):
 class BulkUpdate(BaseModel):
     equipment_ids: List[int]
     mfg_date: Optional[str] = None
+    hydro_due_date: Optional[str] = None
     cylinder_type: Optional[str] = None
     hydro_interval_months: Optional[int] = None
     service_life_years: Optional[int] = None
@@ -83,36 +86,31 @@ def _add_years(d: date, years: int) -> date:
 
 
 def _assess(cyl: dict, today: Optional[date] = None) -> dict:
-    """Derive hydro-due, expiry, and an overall status for one cylinder."""
+    """Grade one cylinder off its stamped hydro due date."""
     today = today or date.today()
     mfg = _parse(cyl.get("mfg_date"))
-    interval = cyl.get("hydro_interval_months") or DEFAULT_HYDRO_MONTHS
     life = cyl.get("service_life_years")
-
-    last_pass = _parse(cyl.get("last_hydro"))
-    # Fall back to the manufacture date: a new cylinder's clock starts at DOM
-    basis = last_pass or mfg
-    hydro_due = _add_months(basis, interval) if basis else None
+    due = _parse(cyl.get("hydro_due_date"))
     expires = _add_years(mfg, life) if (mfg and life) else None
 
     if cyl.get("last_result") in ("fail", "condemned"):
         status, detail = "condemned", "Failed requalification"
     elif expires and today >= expires:
         status, detail = "expired", f"Past {life}-year service life"
-    elif hydro_due and today > hydro_due:
-        status, detail = "overdue", f"Hydro overdue since {hydro_due}"
-    elif hydro_due and (hydro_due - today).days <= DUE_SOON_DAYS:
-        status, detail = "due_soon", f"Hydro due {hydro_due}"
-    elif not basis:
-        status, detail = "unknown", "No manufacture date or hydro on file"
+    elif due is None:
+        status, detail = "unknown", "No hydro due date on file"
+    elif today > due:
+        status, detail = "overdue", f"Hydro overdue since {due}"
+    elif (due - today).days <= DUE_SOON_DAYS:
+        status, detail = "due_soon", f"Hydro due {due}"
     else:
-        status, detail = "current", f"Hydro due {hydro_due}"
+        status, detail = "current", f"Hydro due {due}"
 
     return {
         **cyl,
-        "hydro_due":      hydro_due.isoformat() if hydro_due else None,
+        "hydro_due":      due.isoformat() if due else None,
         "expires":        expires.isoformat() if expires else None,
-        "days_to_hydro":  (hydro_due - today).days if hydro_due else None,
+        "days_to_hydro":  (due - today).days if due else None,
         "days_to_expiry": (expires - today).days if expires else None,
         "cyl_status":     status,
         "cyl_detail":     detail,
@@ -122,7 +120,7 @@ def _assess(cyl: dict, today: Optional[date] = None) -> dict:
 async def _fetch(db, where: str = "", params: tuple = ()) -> List[dict]:
     async with db.execute(f"""
         SELECT e.id, e.name, e.serial_num, e.status, e.location, e.notes,
-               e.mfg_date, e.cylinder_type, e.hydro_interval_months, e.service_life_years,
+               e.mfg_date, e.hydro_due_date, e.cylinder_type, e.hydro_interval_months, e.service_life_years,
                (SELECT tested_at FROM cylinder_tests t
                  WHERE t.equipment_id=e.id AND t.result='pass'
                  ORDER BY t.tested_at DESC LIMIT 1) as last_hydro,
@@ -158,11 +156,11 @@ async def update_cylinder(eq_id: int, request: Request, data: CylinderUpdate, db
         if not await cur.fetchone():
             raise HTTPException(404, "Cylinder not found")
     await db.execute("""
-        UPDATE equipment SET mfg_date=?, cylinder_type=?, hydro_interval_months=?,
-            service_life_years=?, updated_at=datetime('now')
+        UPDATE equipment SET location=?, mfg_date=?, hydro_due_date=?, cylinder_type=?,
+            hydro_interval_months=?, service_life_years=?, updated_at=datetime('now')
         WHERE id=?
-    """, (data.mfg_date, data.cylinder_type, data.hydro_interval_months,
-          data.service_life_years, eq_id))
+    """, (data.location, data.mfg_date, data.hydro_due_date, data.cylinder_type,
+          data.hydro_interval_months, data.service_life_years, eq_id))
     await db.commit()
     return {"ok": True}
 
@@ -179,7 +177,8 @@ async def bulk_update(request: Request, data: BulkUpdate, db=Depends(get_db)):
         raise HTTPException(400, "No cylinders selected")
 
     sets, vals = [], []
-    for col in ("mfg_date", "cylinder_type", "hydro_interval_months", "service_life_years"):
+    for col in ("mfg_date", "hydro_due_date", "cylinder_type",
+                "hydro_interval_months", "service_life_years"):
         v = getattr(data, col)
         if v is not None:
             sets.append(f"{col}=?")
@@ -240,6 +239,11 @@ async def create_test(eq_id: int, request: Request, data: TestCreate, db=Depends
         await db.execute(
             "UPDATE equipment SET status='retired', updated_at=datetime('now') WHERE id=?", (eq_id,)
         )
+    elif next_due:
+        # A passing requalification resets the stamped date
+        await db.execute(
+            "UPDATE equipment SET hydro_due_date=?, updated_at=datetime('now') WHERE id=?",
+            (next_due, eq_id))
     await db.commit()
     return {"id": tid, "next_due": next_due}
 

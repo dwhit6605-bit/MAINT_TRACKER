@@ -252,10 +252,6 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
         Dashboard
       </a>
-      <a href="/readiness" class="nav-link" data-page="readiness">
-        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        Readiness
-      </a>
       <a href="/pmcs" class="nav-link" data-page="pmcs">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         PMCS
@@ -263,6 +259,10 @@
       <a href="/rolling-stock" class="nav-link" data-page="rolling-stock">
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         Rolling Stock
+      </a>
+      <a href="/cylinders" class="nav-link" data-page="cylinders">
+        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6V4h6v2m-6 0a3 3 0 00-3 3v9a2 2 0 002 2h8a2 2 0 002-2V9a3 3 0 00-3-3M9 6h6"/></svg>
+        Cylinders
       </a>
       <a href="/power" class="nav-link" data-page="power">
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -1680,8 +1680,8 @@ function calToggleView() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, readiness: readinessPage, 'rolling-stock': rollingStockPage, power: powerPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', readiness:'Readiness Report', 'rolling-stock':'Rolling Stock', power:'Power & Air', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, 'rolling-stock': rollingStockPage, power: powerPage, cylinders: cylindersPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', 'rolling-stock':'Rolling Stock', power:'Power & Air', cylinders:'SCBA / O2 Cylinders', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -8285,6 +8285,270 @@ async function openPaHistory(aid) {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
+    </div>
+  </div>`);
+}
+
+// ═══ SCBA / O2 Cylinders ══════════════════════════════════════════════════════
+// Cylinders are equipment rows in the "SCBA / Breathing Apparatus" category.
+// The hydro due date is typed in off the cylinder stamp rather than derived,
+// because requalification intervals vary by cylinder spec.
+let cylData = { cylinders: [], counts: {}, total: 0, grounded: 0 };
+let _cylSel = new Set();
+
+const CYL_STATUS = {
+  current:   { label: 'Current',   color: '#22c55e' },
+  due_soon:  { label: 'Due Soon',  color: '#f59e0b' },
+  overdue:   { label: 'Overdue',   color: '#dc2626' },
+  expired:   { label: 'Expired',   color: '#991b1b' },
+  condemned: { label: 'Condemned', color: '#6b7280' },
+  unknown:   { label: 'No Date',   color: '#9ca3af' },
+};
+
+async function cylindersPage() {
+  $('page-actions').innerHTML = isTech()
+    ? `<button onclick="openCylBulkModal()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">Bulk Edit</button>`
+    : '';
+  cylData = await api('GET', '/api/cylinders');
+  _cylSel.clear();
+  renderCylTable();
+}
+
+function renderCylTable() {
+  const rows = cylData.cylinders;
+  const c = cylData.counts || {};
+  const tile = (key, n) => `
+    <div class="card" style="padding:0.75rem 1rem;">
+      <div style="font-size:1.5rem;font-weight:800;color:${CYL_STATUS[key].color};">${n||0}</div>
+      <div style="font-size:0.75rem;color:#6b7280;">${CYL_STATUS[key].label}</div>
+    </div>`;
+
+  const filt = document.getElementById('cyl-status-filter')?.value || '';
+  const q    = (document.getElementById('cyl-search')?.value || '').toLowerCase();
+  const list = rows.filter(r =>
+    (!filt || r.cyl_status === filt) &&
+    (!q || (r.serial_num||'').toLowerCase().includes(q)
+        || (r.name||'').toLowerCase().includes(q)
+        || (r.location||'').toLowerCase().includes(q)));
+
+  $('page-content').innerHTML = `
+    ${cylData.grounded ? `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:0.5rem;padding:0.6rem 0.9rem;margin-bottom:1rem;color:#dc2626;font-weight:600;font-size:0.85rem;">
+      ⚠ ${cylData.grounded} cylinder${cylData.grounded!==1?'s':''} must not be filled — overdue, expired, or condemned.</div>` : ''}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.6rem;margin-bottom:1rem;">
+      ${['current','due_soon','overdue','expired','condemned','unknown'].map(k=>tile(k,c[k])).join('')}
+    </div>
+
+    <div class="card p-0 overflow-hidden">
+      <div class="px-5 py-3 border-b" style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;">
+        <input id="cyl-search" class="input" style="max-width:16rem;" placeholder="Serial, name, or location…" oninput="renderCylTable()">
+        <select id="cyl-status-filter" class="input" style="max-width:11rem;" onchange="renderCylTable()">
+          <option value="">All statuses</option>
+          ${Object.entries(CYL_STATUS).map(([k,v])=>`<option value="${k}" ${filt===k?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+        <div style="margin-left:auto;font-size:0.78rem;color:#6b7280;">${list.length} of ${cylData.total}</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+          <thead><tr style="background:var(--c-surface,#f9fafb);font-size:0.7rem;text-transform:uppercase;color:#6b7280;">
+            ${isTech()?`<th style="padding:6px 10px;width:2rem;"><input type="checkbox" onchange="cylSelectAll(this.checked)" title="Select all shown"></th>`:''}
+            <th style="text-align:left;padding:6px 10px;">Serial #</th>
+            <th style="text-align:left;padding:6px 10px;" class="col-m-hide">Type</th>
+            <th style="text-align:left;padding:6px 10px;">Location</th>
+            <th style="text-align:left;padding:6px 10px;" class="col-m-hide">Mfg Date</th>
+            <th style="text-align:left;padding:6px 10px;">Hydro Due</th>
+            <th style="text-align:left;padding:6px 10px;">Status</th>
+            <th style="text-align:right;padding:6px 10px;">Actions</th>
+          </tr></thead>
+          <tbody>
+            ${list.length===0 ? `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#9ca3af;">No cylinders match.</td></tr>`
+            : list.map(r=>{
+              const st=CYL_STATUS[r.cyl_status]||CYL_STATUS.unknown;
+              const days = r.days_to_hydro;
+              return `<tr style="border-top:1px solid var(--c-border,#e5e7eb);">
+                ${isTech()?`<td style="padding:6px 10px;"><input type="checkbox" ${_cylSel.has(r.id)?'checked':''} onchange="cylToggle(${r.id},this.checked)"></td>`:''}
+                <td style="padding:6px 10px;font-family:ui-monospace,monospace;font-weight:600;">${esc(r.serial_num||'—')}</td>
+                <td style="padding:6px 10px;color:#6b7280;" class="col-m-hide">${esc(r.name||'')}</td>
+                <td style="padding:6px 10px;">${esc(r.location||'—')}</td>
+                <td style="padding:6px 10px;color:#6b7280;" class="col-m-hide">${esc(r.mfg_date||'—')}</td>
+                <td style="padding:6px 10px;font-weight:600;">${esc(r.hydro_due_date||'—')}
+                  ${days!=null && days<=90 ? `<span style="font-size:0.7rem;color:${st.color};display:block;font-weight:400;">${days<0?`${Math.abs(days)}d overdue`:`${days}d left`}</span>`:''}</td>
+                <td style="padding:6px 10px;"><span style="font-size:0.7rem;font-weight:700;padding:2px 9px;border-radius:9999px;background:${st.color}22;color:${st.color};white-space:nowrap;">${st.label}</span></td>
+                <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
+                  ${isTech()?`<button onclick="openCylModal(${r.id})" class="text-xs hover:underline" style="color:var(--c-text-2);">Edit</button>
+                    <button onclick="openCylTestModal(${r.id})" class="text-xs hover:underline" style="color:#15803d;margin-left:0.5rem;">+ Hydro</button>`:''}
+                  <button onclick="openCylHistory(${r.id})" class="text-xs hover:underline" style="color:#1e3a5f;margin-left:0.5rem;">History</button>
+                </td>
+              </tr>`;}).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function cylToggle(id, on) { on ? _cylSel.add(id) : _cylSel.delete(id); }
+function cylSelectAll(on) {
+  document.querySelectorAll('#page-content tbody input[type=checkbox]').forEach(cb => {
+    cb.checked = on;
+    cb.dispatchEvent(new Event('change'));
+  });
+}
+
+function openCylModal(id) {
+  const r = cylData.cylinders.find(x => x.id === id);
+  if (!r) return;
+  modal(`<div class="modal" style="max-width:480px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Edit Cylinder</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(r.serial_num||'no serial')} · ${esc(r.name||'')}</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveCyl(event,${id})" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div style="grid-column:1/-1;"><label class="label">Serial #</label>
+        <input class="input w-full" value="${esc(r.serial_num||'')}" disabled
+               style="opacity:0.65;"><div style="font-size:0.68rem;color:#9ca3af;margin-top:2px;">Change serials on the Equipment page.</div></div>
+      <div style="grid-column:1/-1;"><label class="label">Location</label>
+        <input name="location" class="input w-full" value="${esc(r.location||'')}" placeholder="Where the bottle lives"></div>
+      <div><label class="label">Manufacture Date</label>
+        <input name="mfg_date" type="date" class="input w-full" value="${esc(r.mfg_date||'')}"></div>
+      <div><label class="label">Hydrostatic Due</label>
+        <input name="hydro_due_date" type="date" class="input w-full" value="${esc(r.hydro_due_date||'')}"></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveCyl(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const mfg = fd.get('mfg_date') || null, due = fd.get('hydro_due_date') || null;
+  if (mfg && due && due < mfg) return toast('Hydro due date is before the manufacture date.', false);
+  try {
+    await api('PUT', `/api/cylinders/${id}`, {
+      location: fd.get('location') || null, mfg_date: mfg, hydro_due_date: due });
+    closeModal();
+    toast('Cylinder updated.');
+    await cylindersPage();
+  } catch (err) { toast(err.message || 'Save failed.', false); }
+}
+
+function openCylBulkModal() {
+  if (_cylSel.size === 0) return toast('Select cylinders first (checkboxes on the left).', false);
+  modal(`<div class="modal" style="max-width:440px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Bulk Edit</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${_cylSel.size} cylinder${_cylSel.size!==1?'s':''} selected</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveCylBulk(event)" class="px-6 py-4" style="display:grid;gap:0.75rem;">
+      <div style="font-size:0.78rem;color:#6b7280;">Only the fields you fill in are changed.</div>
+      <div><label class="label">Manufacture Date</label><input name="mfg_date" type="date" class="input w-full"></div>
+      <div><label class="label">Hydrostatic Due</label><input name="hydro_due_date" type="date" class="input w-full"></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Apply to ${_cylSel.size}</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveCylBulk(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = { equipment_ids: [..._cylSel] };
+  if (fd.get('mfg_date'))       body.mfg_date = fd.get('mfg_date');
+  if (fd.get('hydro_due_date')) body.hydro_due_date = fd.get('hydro_due_date');
+  if (Object.keys(body).length === 1) return toast('Fill in at least one field.', false);
+  try {
+    const r = await api('POST', '/api/cylinders/bulk', body);
+    closeModal();
+    toast(`Updated ${r.updated} cylinder${r.updated!==1?'s':''}.`);
+    await cylindersPage();
+  } catch (err) { toast(err.message || 'Bulk update failed.', false); }
+}
+
+function openCylTestModal(id) {
+  const r = cylData.cylinders.find(x => x.id === id);
+  if (!r) return;
+  const today = new Date().toISOString().slice(0,10);
+  modal(`<div class="modal" style="max-width:460px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Record Hydro Test</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(r.serial_num||'no serial')}</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveCylTest(event,${id})" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div><label class="label">Tested On *</label><input name="tested_at" type="date" class="input w-full" value="${today}" max="${today}" required></div>
+      <div><label class="label">New Due Date</label><input name="next_due" type="date" class="input w-full">
+        <div style="font-size:0.68rem;color:#9ca3af;margin-top:2px;">Blank = +5 years</div></div>
+      <div><label class="label">Result</label>
+        <select name="result" class="input w-full">
+          <option value="pass">Pass</option><option value="fail">Fail</option><option value="condemned">Condemned</option>
+        </select></div>
+      <div><label class="label">Facility / RIN</label><input name="rin" class="input w-full" placeholder="Requalifier ID"></div>
+      <div style="grid-column:1/-1;"><label class="label">Notes</label><textarea name="notes" class="input w-full" style="min-height:52px;"></textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Record Test</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveCylTest(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    const r = await api('POST', `/api/cylinders/${id}/tests`, {
+      test_type: 'hydrostatic',
+      tested_at: fd.get('tested_at'),
+      next_due:  fd.get('next_due') || null,
+      result:    fd.get('result'),
+      rin:       fd.get('rin') || null,
+      notes:     fd.get('notes') || null,
+    });
+    closeModal();
+    toast(fd.get('result') === 'pass' ? `Test recorded — next due ${r.next_due}.` : 'Test recorded — cylinder retired.');
+    await cylindersPage();
+  } catch (err) { toast(err.message || 'Could not record test.', false); }
+}
+
+async function openCylHistory(id) {
+  const r = cylData.cylinders.find(x => x.id === id) || {};
+  const tests = await api('GET', `/api/cylinders/${id}/tests`);
+  modal(`<div class="modal" style="max-width:620px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <div>
+        <h2 style="font-weight:700;">Hydro History</h2>
+        <div style="font-size:0.78rem;color:#6b7280;">${esc(r.serial_num||'no serial')} · ${esc(r.cyl_detail||'')}</div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <div class="px-6 py-4" style="max-height:60vh;overflow-y:auto;">
+      ${tests.length === 0 ? `<div style="text-align:center;color:#9ca3af;padding:1.5rem;">No tests recorded.</div>`
+      : `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+          <thead><tr style="font-size:0.7rem;text-transform:uppercase;color:#6b7280;">
+            <th style="text-align:left;padding:4px 8px;">Tested</th>
+            <th style="text-align:left;padding:4px 8px;">Result</th>
+            <th style="text-align:left;padding:4px 8px;">Next Due</th>
+            <th style="text-align:left;padding:4px 8px;">RIN</th>
+          </tr></thead>
+          <tbody>${tests.map(t=>`<tr style="border-top:1px solid var(--c-border,#e5e7eb);">
+            <td style="padding:5px 8px;">${esc(t.tested_at)}</td>
+            <td style="padding:5px 8px;color:${t.result==='pass'?'#16a34a':'#dc2626'};font-weight:600;">${esc(t.result)}</td>
+            <td style="padding:5px 8px;">${esc(t.next_due||'—')}</td>
+            <td style="padding:5px 8px;color:#6b7280;">${esc(t.rin||'—')}</td>
+          </tr>`).join('')}</tbody>
+        </table>`}
     </div>
   </div>`);
 }

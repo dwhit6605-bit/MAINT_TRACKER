@@ -458,6 +458,10 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN hydro_interval_months INTEGER")
         if "service_life_years" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN service_life_years INTEGER")
+        # Read off the cylinder stamp rather than derived — requalification
+        # intervals vary by spec, so the stamped date is the authority
+        if "hydro_due_date" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN hydro_due_date TEXT")
 
         pmcs_item_cols = {row[1] async for row in await db.execute("PRAGMA table_info(pmcs_items)")}
         if "equipment_id" not in pmcs_item_cols:
