@@ -1,4 +1,5 @@
 """Hazmat suit inventory, pressure testing, and assignment tracking."""
+from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -52,6 +53,27 @@ class AssignBody(BaseModel):
 
 class PaperAdjust(BaseModel):
     quantity: int
+
+
+BULK_CATEGORIES = {"level_b", "specialty"}
+
+
+class BulkStockCreate(BaseModel):
+    category:     str = "level_b"
+    manufacturer: Optional[str] = None
+    model:        Optional[str] = None
+    size:         str
+    quantity:     int = 0
+    mfg_date:     Optional[str] = None
+    expiry_date:  Optional[str] = None
+    lot_number:   Optional[str] = None
+    location:     Optional[str] = None
+    notes:        Optional[str] = None
+
+
+class BulkQtyAdjust(BaseModel):
+    delta:    Optional[int] = None
+    quantity: Optional[int] = None
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
@@ -315,6 +337,131 @@ async def adjust_paper(size: str, data: PaperAdjust, request: Request, db=Depend
         INSERT INTO hazmat_paper_stock (size, quantity) VALUES (?,?)
         ON CONFLICT(size) DO UPDATE SET quantity=MAX(0,?), updated_at=datetime('now')
     """, (size, max(0, data.quantity), max(0, data.quantity)))
+    await db.commit()
+    return {"ok": True}
+
+
+# ── Bulk stock (Level B + specialty) ─────────────────────────────────────────
+
+def _bulk_status(row: dict, today: date, soon_days: int = 90) -> dict:
+    """Expiry state for one stock line, mirroring how suits are graded."""
+    exp = row.get("expiry_date")
+    d = None
+    if exp:
+        try:
+            d = datetime.strptime(str(exp)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            d = None
+    if d is None:
+        state, days = "unknown", None
+    else:
+        days = (d - today).days
+        state = "expired" if days < 0 else ("expiring" if days <= soon_days else "current")
+    return {**row, "days_to_expiry": days, "expiry_status": state}
+
+
+@router.get("/bulk")
+async def list_bulk(db=Depends(get_db)):
+    async with db.execute("""
+        SELECT * FROM hazmat_bulk_stock
+        ORDER BY category, manufacturer, model, size
+    """) as cur:
+        rows = [_bulk_status(dict(r), date.today()) for r in await cur.fetchall()]
+
+    summary = {}
+    for r in rows:
+        c = summary.setdefault(r["category"], {"lines": 0, "units": 0, "expired": 0, "expiring": 0})
+        c["lines"] += 1
+        c["units"] += r["quantity"] or 0
+        if r["expiry_status"] == "expired":
+            c["expired"] += r["quantity"] or 0
+        elif r["expiry_status"] == "expiring":
+            c["expiring"] += r["quantity"] or 0
+    return {"stock": rows, "summary": summary,
+            "total_units": sum(r["quantity"] or 0 for r in rows)}
+
+
+@router.post("/bulk", status_code=201)
+async def create_bulk(data: BulkStockCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
+    if data.category not in BULK_CATEGORIES:
+        raise HTTPException(400, f"category must be one of {sorted(BULK_CATEGORIES)}")
+    if not data.size.strip():
+        raise HTTPException(400, "Size is required")
+    if data.quantity < 0:
+        raise HTTPException(400, "Quantity cannot be negative")
+    try:
+        async with db.execute("""
+            INSERT INTO hazmat_bulk_stock
+                (category,manufacturer,model,size,quantity,mfg_date,expiry_date,
+                 lot_number,location,notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (data.category, data.manufacturer, data.model, data.size.strip().upper(),
+              data.quantity, data.mfg_date, data.expiry_date, data.lot_number,
+              data.location, data.notes)) as cur:
+            bid = cur.lastrowid
+    except Exception as e:
+        if "UNIQUE" in str(e).upper():
+            raise HTTPException(
+                409, "That manufacturer/model/size/lot already exists — edit that line instead.")
+        raise
+    await db.commit()
+    return {"id": bid}
+
+
+@router.put("/bulk/{bid}")
+async def update_bulk(bid: int, data: BulkStockCreate, request: Request, db=Depends(get_db)):
+    require_tech(request)
+    if data.quantity < 0:
+        raise HTTPException(400, "Quantity cannot be negative")
+    async with db.execute("SELECT id FROM hazmat_bulk_stock WHERE id=?", (bid,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Stock line not found")
+    try:
+        await db.execute("""
+            UPDATE hazmat_bulk_stock SET category=?,manufacturer=?,model=?,size=?,
+                quantity=?,mfg_date=?,expiry_date=?,lot_number=?,location=?,notes=?,
+                updated_at=datetime('now')
+            WHERE id=?
+        """, (data.category, data.manufacturer, data.model, data.size.strip().upper(),
+              data.quantity, data.mfg_date, data.expiry_date, data.lot_number,
+              data.location, data.notes, bid))
+    except Exception as e:
+        if "UNIQUE" in str(e).upper():
+            raise HTTPException(409, "Another line already uses that manufacturer/model/size/lot.")
+        raise
+    await db.commit()
+    return {"ok": True}
+
+
+@router.patch("/bulk/{bid}/qty")
+async def adjust_bulk_qty(bid: int, data: BulkQtyAdjust, request: Request, db=Depends(get_db)):
+    """Issue or receive against a line without opening the full editor."""
+    require_tech(request)
+    async with db.execute("SELECT quantity FROM hazmat_bulk_stock WHERE id=?", (bid,)) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Stock line not found")
+    if data.quantity is not None:
+        new_qty = max(0, data.quantity)
+    elif data.delta is not None:
+        new_qty = max(0, row["quantity"] + data.delta)
+    else:
+        raise HTTPException(400, "Provide either delta or quantity")
+    await db.execute(
+        "UPDATE hazmat_bulk_stock SET quantity=?, updated_at=datetime('now') WHERE id=?",
+        (new_qty, bid))
+    await db.commit()
+    return {"quantity": new_qty}
+
+
+@router.delete("/bulk/{bid}")
+async def delete_bulk(bid: int, request: Request, db=Depends(get_db)):
+    require_superadmin(request)
+    async with db.execute("SELECT id FROM hazmat_bulk_stock WHERE id=?", (bid,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(404, "Stock line not found")
+    await db.execute("DELETE FROM hazmat_bulk_stock WHERE id=?", (bid,))
     await db.commit()
     return {"ok": True}
 

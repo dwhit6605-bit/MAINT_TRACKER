@@ -536,4 +536,32 @@ async def init_db():
                 "INSERT OR IGNORE INTO hazmat_paper_stock (size, quantity) VALUES (?, 0)", (sz,)
             )
 
+        # Level B and specialty suits held as bulk stock rather than serialized.
+        # Unlike paper these carry a manufacturer and an expiry, and the same
+        # model can sit on the shelf as several lots with different dates.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS hazmat_bulk_stock (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                category     TEXT NOT NULL DEFAULT 'level_b',
+                manufacturer TEXT,
+                model        TEXT,
+                size         TEXT NOT NULL,
+                quantity     INTEGER NOT NULL DEFAULT 0,
+                mfg_date     TEXT,
+                expiry_date  TEXT,
+                lot_number   TEXT,
+                location     TEXT,
+                notes        TEXT,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        # COALESCE rather than a plain UNIQUE: SQLite treats every NULL as
+        # distinct, which would let duplicate lines through on nullable columns
+        await db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_hazbulk_uniq ON hazmat_bulk_stock(
+                category, COALESCE(manufacturer,''), COALESCE(model,''),
+                size, COALESCE(lot_number,''))
+        """)
+
         await db.commit()

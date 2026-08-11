@@ -649,6 +649,7 @@ function _renderHazmatTabs() {
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'suits',     label: '🧪 Suits' },
     { id: 'paper',     label: '📦 Paper Stock' },
+    { id: 'bulk',      label: '🥼 Level B & Specialty' },
     { id: 'roster',    label: '📋 Roster' },
   ];
   $('page-actions').innerHTML = tabs.map(t =>
@@ -669,6 +670,7 @@ function _hazmatMobTabBar() {
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'suits',     label: '🧪 Suits' },
     { id: 'paper',     label: '📦 Paper' },
+    { id: 'bulk',      label: '🥼 Level B' },
     { id: 'roster',    label: '📋 Roster' },
   ];
   return `<div class="hz-mob-tabs">${tabs.map(t =>
@@ -683,6 +685,7 @@ async function _loadHazmatTab(tab) {
   if (tab === 'dashboard')  await _renderHazmatDashboard();
   else if (tab === 'suits') await _renderHazmatSuits();
   else if (tab === 'paper') await _renderHazmatPaper();
+  else if (tab === 'bulk')  await _renderHazmatBulk();
   else if (tab === 'roster') await _renderHazmatRoster();
 }
 
@@ -871,6 +874,164 @@ async function paperSet(size) {
 }
 
 // ── Roster ────────────────────────────────────────────────────────────────────
+// ── Level B & specialty bulk stock ────────────────────────────────────────────
+// Counted by manufacturer/model/size/lot rather than serialized, because these
+// are held in quantity. Each line carries its own expiry so lots age separately.
+let _hazBulk = { stock: [], summary: {}, total_units: 0 };
+const HZ_BULK_CATS = { level_b: 'Level B', specialty: 'Specialty' };
+const HZ_BULK_MAKERS = ['Kappler', 'Lakeland', 'DuPont', 'Lion Apparel', 'Trelleborg', 'Ansell'];
+const HZ_BULK_MODELS = ['MT94', 'MT95', 'Zytron 300', 'Zytron 500', 'Tychem 2000', 'Tychem 6000'];
+const HZ_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
+async function _renderHazmatBulk() {
+  _hazBulk = await api('GET', '/api/hazmat/bulk');
+  const rows = _hazBulk.stock;
+  const chip = (r) => {
+    if (r.expiry_status === 'expired')  return `<span class="badge-red">Expired</span>`;
+    if (r.expiry_status === 'expiring') return `<span class="badge-yellow">${r.days_to_expiry}d left</span>`;
+    if (r.expiry_status === 'unknown')  return `<span style="font-size:0.7rem;color:#9ca3af;">No date</span>`;
+    return `<span class="badge-green">OK</span>`;
+  };
+
+  const catBlock = (cat) => {
+    const list = rows.filter(r => r.category === cat);
+    const s = _hazBulk.summary[cat] || { lines:0, units:0, expired:0, expiring:0 };
+    return `
+    <div class="card" style="margin-bottom:1rem;padding:0;overflow:hidden;">
+      <div class="px-5 py-3 border-b" style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:baseline;">
+        <div style="font-weight:700;">${HZ_BULK_CATS[cat]}</div>
+        <div style="font-size:0.78rem;color:#6b7280;">${s.units} units · ${s.lines} line${s.lines!==1?'s':''}</div>
+        ${s.expired  ? `<span class="badge-red">${s.expired} expired</span>` : ''}
+        ${s.expiring ? `<span class="badge-yellow">${s.expiring} expiring</span>` : ''}
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+          <thead><tr style="background:var(--c-surface,#f9fafb);font-size:0.7rem;text-transform:uppercase;color:#6b7280;">
+            <th style="text-align:left;padding:6px 10px;">Manufacturer</th>
+            <th style="text-align:left;padding:6px 10px;">Model</th>
+            <th style="text-align:left;padding:6px 10px;">Size</th>
+            <th style="text-align:left;padding:6px 10px;" class="col-m-hide">Lot</th>
+            <th style="text-align:left;padding:6px 10px;" class="col-m-hide">Expires</th>
+            <th style="text-align:right;padding:6px 10px;">Qty</th>
+            <th style="text-align:left;padding:6px 10px;">Status</th>
+            <th style="text-align:right;padding:6px 10px;">Actions</th>
+          </tr></thead>
+          <tbody>
+            ${list.length === 0
+              ? `<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:#9ca3af;">
+                   No ${HZ_BULK_CATS[cat]} stock recorded.</td></tr>`
+              : list.map(r => `
+              <tr style="border-top:1px solid var(--c-border,#e5e7eb);">
+                <td style="padding:6px 10px;font-weight:600;">${esc(r.manufacturer||'—')}</td>
+                <td style="padding:6px 10px;">${esc(r.model||'—')}</td>
+                <td style="padding:6px 10px;">${esc(r.size)}</td>
+                <td style="padding:6px 10px;color:#6b7280;" class="col-m-hide">${esc(r.lot_number||'—')}</td>
+                <td style="padding:6px 10px;color:#6b7280;" class="col-m-hide">${esc(r.expiry_date||'—')}</td>
+                <td style="padding:6px 10px;text-align:right;font-weight:700;${r.quantity===0?'color:#dc2626;':''}">${r.quantity}</td>
+                <td style="padding:6px 10px;">${chip(r)}</td>
+                <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
+                  ${isTech() ? `
+                    <button onclick="hzBulkQty(${r.id},-1)" title="Issue 1" style="background:#fef2f2;color:#dc2626;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-weight:700;">−</button>
+                    <button onclick="hzBulkQty(${r.id},1)"  title="Receive 1" style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-weight:700;">＋</button>
+                    <button onclick="openHzBulkModal(${r.id})" class="text-xs hover:underline" style="color:var(--c-text-2);margin-left:0.4rem;">Edit</button>` : ''}
+                  ${isSuperAdmin() ? `<button onclick="deleteHzBulk(${r.id})" class="text-xs hover:underline" style="color:#dc2626;margin-left:0.4rem;">Delete</button>` : ''}
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  };
+
+  $('page-content').innerHTML = _hazmatMobTabBar() + `
+    ${isTech() ? `<div style="margin-bottom:1rem;">
+      <button onclick="openHzBulkModal()" class="btn-primary" style="font-size:0.82rem;">＋ Add Stock Line</button>
+    </div>` : ''}
+    ${catBlock('level_b')}
+    ${catBlock('specialty')}`;
+}
+
+async function hzBulkQty(id, delta) {
+  try {
+    await api('PATCH', `/api/hazmat/bulk/${id}/qty`, { delta });
+    await _renderHazmatBulk();
+  } catch (err) { toast(err.message || 'Update failed.', false); }
+}
+
+function openHzBulkModal(id) {
+  const r = id ? _hazBulk.stock.find(x => x.id === id) || {} : {};
+  const opts = (arr, val) => arr.map(v => `<option ${val===v?'selected':''}>${esc(v)}</option>`).join('');
+  modal(`<div class="modal" style="max-width:560px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 style="font-weight:700;">${id?'Edit Stock Line':'Add Stock Line'}</h2>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <form onsubmit="saveHzBulk(event,${id||'null'})" class="px-6 py-4" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div><label class="label">Category *</label>
+        <select name="category" class="input w-full">
+          <option value="level_b"   ${r.category!=='specialty'?'selected':''}>Level B</option>
+          <option value="specialty" ${r.category==='specialty'?'selected':''}>Specialty</option>
+        </select></div>
+      <div><label class="label">Size *</label>
+        <input name="size" class="input w-full" list="hz-sizes" required value="${esc(r.size||'')}" placeholder="L">
+        <datalist id="hz-sizes">${HZ_SIZES.map(s=>`<option>${s}</option>`).join('')}</datalist></div>
+      <div><label class="label">Manufacturer</label>
+        <input name="manufacturer" class="input w-full" list="hz-makers" value="${esc(r.manufacturer||'')}" placeholder="Kappler">
+        <datalist id="hz-makers">${opts(HZ_BULK_MAKERS)}</datalist></div>
+      <div><label class="label">Model</label>
+        <input name="model" class="input w-full" list="hz-models" value="${esc(r.model||'')}" placeholder="MT95">
+        <datalist id="hz-models">${opts(HZ_BULK_MODELS)}</datalist></div>
+      <div><label class="label">Quantity</label>
+        <input name="quantity" type="number" min="0" class="input w-full" value="${r.quantity ?? 0}"></div>
+      <div><label class="label">Lot #</label>
+        <input name="lot_number" class="input w-full" value="${esc(r.lot_number||'')}" placeholder="Separates two lots"></div>
+      <div><label class="label">Mfg Date</label>
+        <input name="mfg_date" type="date" class="input w-full" value="${esc(r.mfg_date||'')}"></div>
+      <div><label class="label">Expiry Date</label>
+        <input name="expiry_date" type="date" class="input w-full" value="${esc(r.expiry_date||'')}"></div>
+      <div style="grid-column:1/-1;"><label class="label">Location</label>
+        <input name="location" class="input w-full" value="${esc(r.location||'')}" placeholder="Where it is stored"></div>
+      <div style="grid-column:1/-1;"><label class="label">Notes</label>
+        <textarea name="notes" class="input w-full" style="min-height:52px;">${esc(r.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">${id?'Save Changes':'Add Line'}</button>
+      </div>
+    </form>
+  </div>`);
+}
+
+async function saveHzBulk(e, id) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  body.quantity = parseInt(body.quantity) || 0;
+  for (const k of ['manufacturer','model','lot_number','mfg_date','expiry_date','location','notes']) {
+    if (!body[k]) body[k] = null;
+  }
+  if (body.mfg_date && body.expiry_date && body.expiry_date < body.mfg_date) {
+    return toast('Expiry date is before the manufacture date.', false);
+  }
+  try {
+    if (id) await api('PUT', `/api/hazmat/bulk/${id}`, body);
+    else    await api('POST', '/api/hazmat/bulk', body);
+    closeModal();
+    toast(id ? 'Stock line updated.' : 'Stock line added.');
+    await _renderHazmatBulk();
+  } catch (err) { toast(err.message || 'Save failed.', false); }
+}
+
+async function deleteHzBulk(id) {
+  const r = _hazBulk.stock.find(x => x.id === id) || {};
+  const label = [r.manufacturer, r.model, r.size].filter(Boolean).join(' ') || 'this line';
+  if (!confirm(`Delete ${label}?\n\n${r.quantity||0} units will stop being tracked.`)) return;
+  try {
+    await api('DELETE', `/api/hazmat/bulk/${id}`);
+    toast('Stock line deleted.');
+    await _renderHazmatBulk();
+  } catch (err) { toast(err.message || 'Delete failed.', false); }
+}
+
 async function _renderHazmatRoster() {
   const suits = await api('GET', '/api/hazmat/roster');
   const paper = await api('GET', '/api/hazmat/paper');
