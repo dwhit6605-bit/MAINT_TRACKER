@@ -986,11 +986,14 @@ function showSuccessScreen(result, sid, payload) {
 
   document.getElementById('dl-link').href='/api/pmcs/sessions/'+sid+'/archive';
 
-  // Load inventory for expend panel
+  // Load inventory for expend panel — remember the session so expended supplies
+  // can be traced back to the run that consumed them
+  _pmcsSessionId = sid;
   loadInventoryForExpend();
 }
 
 let _invItems = [];
+let _pmcsSessionId = null;
 async function loadInventoryForExpend() {
   try {
     const res = await fetch('/api/inventory?token='+getToken());
@@ -1044,7 +1047,9 @@ async function submitExpend() {
       await fetch(`/api/inventory/${e.item_id}/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'remove', quantity: e.qty, reference: 'PMCS', performed_by: opName }),
+        body: JSON.stringify({ action: 'remove', quantity: e.qty,
+          reference: _pmcsSessionId ? 'PMCS #' + _pmcsSessionId : 'PMCS',
+          performed_by: opName }),
       });
     }
     btn.style.display = 'none';

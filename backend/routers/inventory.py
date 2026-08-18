@@ -239,17 +239,64 @@ async def list_items(low_stock: bool = False, location_id: int = None, db=Depend
 
 @router.get("/{item_id}/usage")
 async def get_item_usage(item_id: int, db=Depends(get_db)):
+    """Every recorded movement for one item, newest first.
+
+    Reads inventory_transactions rather than task_parts_used: maintenance is only
+    one of the ways stock moves, and PMCS expends, SKO issues, manual adjustments,
+    reorder receipts and transfers all land here. task_parts_used is merged in for
+    the equipment context it carries, which the transaction reference lacks.
+    """
+    async with db.execute("SELECT name, unit FROM inventory_items WHERE id=?", (item_id,)) as cur:
+        item = await cur.fetchone()
+    if not item:
+        raise HTTPException(404, "Item not found")
+
     async with db.execute("""
-        SELECT tp.quantity_used, tp.created_at as used_at,
+        SELECT t.id, t.action, t.quantity, t.reference, t.performed_by, t.created_at,
+               l.code as location_code, l2.code as to_location_code
+        FROM inventory_transactions t
+        LEFT JOIN inventory_locations l  ON l.id  = t.location_id
+        LEFT JOIN inventory_locations l2 ON l2.id = t.to_location_id
+        WHERE t.item_id=?
+        ORDER BY t.created_at DESC, t.id DESC
+        LIMIT 200
+    """, (item_id,)) as cur:
+        moves = [dict(r) for r in await cur.fetchall()]
+
+    # Equipment/task names for anything booked against a maintenance task
+    async with db.execute("""
+        SELECT tp.quantity_used, tp.created_at, m.id as task_id,
                m.title as task_title, e.name as equipment_name
         FROM task_parts_used tp
         JOIN maintenance_tasks m ON m.id = tp.task_id
-        JOIN equipment e ON e.id = m.equipment_id
+        LEFT JOIN equipment e ON e.id = m.equipment_id
         WHERE tp.item_id = ?
-        ORDER BY tp.created_at DESC
-        LIMIT 100
     """, (item_id,)) as cur:
-        return [dict(r) for r in await cur.fetchall()]
+        by_task = {f"Task #{r['task_id']}": dict(r) for r in await cur.fetchall()}
+
+    for mv in moves:
+        ref = mv.get("reference") or ""
+        hit = next((v for k, v in by_task.items() if ref.startswith(k)), None)
+        mv["equipment_name"] = hit["equipment_name"] if hit else None
+        mv["source"] = (
+            "PMCS"        if ref.startswith("PMCS")        else
+            "Maintenance" if ref.startswith("Task #")      else
+            "SKO"         if ref.startswith("SKO #")       else
+            "Reorder"     if ref.startswith("Reorder")     else
+            "Transfer"    if mv["action"] == "transfer"    else
+            "Import"      if "import" in ref.lower()       else
+            "Manual"
+        )
+
+    consumed = sum(m["quantity"] for m in moves if m["action"] == "remove")
+    received = sum(m["quantity"] for m in moves if m["action"] == "add")
+    return {
+        "item": {"name": item["name"], "unit": item["unit"]},
+        "movements": moves,
+        "consumed": consumed,
+        "received": received,
+        "count": len(moves),
+    }
 
 
 @router.get("/{item_id}")
