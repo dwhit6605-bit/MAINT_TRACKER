@@ -7,6 +7,10 @@ DB_PATH = os.getenv("DB_PATH", "maint.db")
 async def get_db():
     db = await aiosqlite.connect(DB_PATH)
     db.row_factory = aiosqlite.Row
+    # SQLite defaults this OFF per connection, which silently disabled every
+    # ON DELETE CASCADE in the schema — deleting equipment left its maintenance
+    # tasks behind, and the dashboard counted them as overdue.
+    await db.execute("PRAGMA foreign_keys = ON")
     try:
         yield db
     finally:
@@ -17,6 +21,7 @@ async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript("""
             PRAGMA journal_mode=WAL;
+            PRAGMA foreign_keys=ON;
 
             CREATE TABLE IF NOT EXISTS equipment (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -75,9 +75,13 @@ async def auth_middleware(request: Request, call_next):
     if token:
         try:
             request.state.user = decode_token(token)
-            return await call_next(request)
         except Exception:
-            pass  # fall through to unauthenticated handling
+            pass  # bad/expired token — fall through to unauthenticated handling
+        else:
+            # Deliberately outside the try: wrapping call_next here reported every
+            # unhandled endpoint error as "Not authenticated", which hid the real
+            # cause. A genuine 500 must look like a 500.
+            return await call_next(request)
 
     # Unauthenticated — only block API calls; HTML pages let client-side auth handle it
     if path.startswith("/api/"):

@@ -567,7 +567,24 @@ async def transfer_stock(item_id: int, data: StockTransfer, request: Request, db
 
 @router.delete("/{item_id}")
 async def delete_item(item_id: int, request: Request, db=Depends(get_db)):
+    """Refuses while consumption history references the item.
+
+    task_parts_used and sko_parts_used have no ON DELETE action, so with foreign
+    keys enforced the delete would raise IntegrityError. Say why instead, and
+    keep the history — it is the record of what was actually used.
+    """
     require_superadmin(request)
+    async with db.execute("""
+        SELECT (SELECT COUNT(*) FROM task_parts_used WHERE item_id=?) AS tasks,
+               (SELECT COUNT(*) FROM sko_parts_used  WHERE item_id=?) AS skos
+    """, (item_id, item_id)) as cur:
+        used = await cur.fetchone()
+    n = (used["tasks"] or 0) + (used["skos"] or 0)
+    if n:
+        raise HTTPException(
+            409, f"This item is referenced by {n} usage record(s) on maintenance "
+                 f"tasks or SKOs. Set its quantity to 0 instead of deleting it, "
+                 f"so the consumption history stays intact.")
     await db.execute("DELETE FROM inventory_stock WHERE item_id=?", (item_id,))
     await db.execute("DELETE FROM inventory_transactions WHERE item_id=?", (item_id,))
     await db.execute("DELETE FROM inventory_items WHERE id=?", (item_id,))
