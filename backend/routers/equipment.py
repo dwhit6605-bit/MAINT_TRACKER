@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.database import get_db
-from backend.models import EquipmentCreate, EquipmentUpdate, EquipmentOutFor
+from backend.models import (EquipmentCreate, EquipmentUpdate, EquipmentOutFor,
+                            EquipmentBulkLocation)
 from backend.auth import require_admin, require_tech, require_superadmin
 from backend import audit
 
@@ -11,6 +12,7 @@ router = APIRouter(prefix="/api/equipment", tags=["equipment"])
 async def list_equipment(db=Depends(get_db)):
     async with db.execute("""
         SELECT e.*,
+            (SELECT code FROM inventory_locations WHERE id = e.location_id) as location_code,
             (SELECT COUNT(*) FROM maintenance_tasks WHERE equipment_id = e.id AND status = 'pending') as pending_tasks,
             (SELECT COUNT(*) FROM maintenance_tasks WHERE equipment_id = e.id AND status = 'overdue') as overdue_tasks,
             (SELECT next_due FROM calibration_records WHERE equipment_id = e.id ORDER BY id DESC LIMIT 1) as cal_next_due
@@ -50,7 +52,7 @@ async def list_locations(db=Depends(get_db)):
 
 @router.get("/{eq_id}")
 async def get_equipment(eq_id: int, db=Depends(get_db)):
-    async with db.execute("SELECT * FROM equipment WHERE id = ?", (eq_id,)) as cur:
+    async with db.execute("SELECT e.*, l.code AS location_code FROM equipment e LEFT JOIN inventory_locations l ON l.id = e.location_id WHERE e.id = ?", (eq_id,)) as cur:
         row = await cur.fetchone()
     if not row:
         raise HTTPException(404, "Equipment not found")
@@ -62,10 +64,11 @@ async def create_equipment(data: EquipmentCreate, request: Request, db=Depends(g
     require_tech(request)
     async with db.execute("""
         INSERT INTO equipment (name, category, serial_num, model, manufacturer,
-            location, assigned_to, status, notes, purchase_date, warranty_expiry, end_of_life_date, reference_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            location, location_id, assigned_to, status, notes, purchase_date,
+            warranty_expiry, end_of_life_date, reference_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data.name, data.category, data.serial_num, data.model,
-          data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
+          data.manufacturer, data.location, data.location_id, data.assigned_to, data.status, data.notes,
           data.purchase_date, data.warranty_expiry, data.end_of_life_date, data.reference_url)) as cur:
         eq_id = cur.lastrowid
     await audit.log(db, "equipment", eq_id, "created", equipment_id=eq_id,
@@ -79,19 +82,41 @@ async def update_equipment(eq_id: int, data: EquipmentUpdate, request: Request, 
     require_tech(request)
     await db.execute("""
         UPDATE equipment SET name=?, category=?, serial_num=?, model=?, manufacturer=?,
-            location=?, assigned_to=?, status=?, notes=?,
+            location=?, location_id=?, assigned_to=?, status=?, notes=?,
             purchase_date=?, warranty_expiry=?, end_of_life_date=?,
             out_for=?, out_since=?, expected_return=?, reference_url=?,
             updated_at=datetime('now')
         WHERE id=?
     """, (data.name, data.category, data.serial_num, data.model,
-          data.manufacturer, data.location, data.assigned_to, data.status, data.notes,
+          data.manufacturer, data.location, data.location_id, data.assigned_to, data.status, data.notes,
           data.purchase_date, data.warranty_expiry, data.end_of_life_date,
           data.out_for, data.out_since, data.expected_return, data.reference_url, eq_id))
     await audit.log(db, "equipment", eq_id, "updated", equipment_id=eq_id,
                     detail={"name": data.name, "status": data.status})
     await db.commit()
     return {"ok": True}
+
+
+@router.patch("/bulk/location")
+async def bulk_set_location(data: EquipmentBulkLocation, request: Request, db=Depends(get_db)):
+    """Reassign many items to one area at once — the practical way to clean up
+    free-text locations after the migration."""
+    require_tech(request)
+    if not data.ids:
+        raise HTTPException(400, "No equipment selected")
+    if data.location_id is not None:
+        async with db.execute(
+            "SELECT code FROM inventory_locations WHERE id=?", (data.location_id,)
+        ) as cur:
+            loc = await cur.fetchone()
+        if not loc:
+            raise HTTPException(404, "Location not found")
+    marks = ",".join("?" * len(data.ids))
+    await db.execute(
+        f"UPDATE equipment SET location_id=?, updated_at=datetime('now') WHERE id IN ({marks})",
+        (data.location_id, *data.ids))
+    await db.commit()
+    return {"ok": True, "updated": len(data.ids)}
 
 
 @router.patch("/{eq_id}/out-for")

@@ -23,7 +23,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # Strings that mean "no location" rather than naming one
-BLANKS = {"", "N/A", "NA", "NONE", "UNKNOWN", "-", "TBD"}
+# "NULL" is here because some rows hold the literal string, not SQL NULL —
+# without it the migration would create a location called NULL.
+BLANKS = {"", "N/A", "NA", "N\\A", "NONE", "NULL", "NIL", "UNKNOWN", "UNK", "-", "--", "TBD", "?"}
 
 
 def resolve_db() -> Path:

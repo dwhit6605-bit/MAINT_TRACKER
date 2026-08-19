@@ -9,6 +9,7 @@ class EquipmentCreate(BaseModel):
     model: Optional[str] = None
     manufacturer: Optional[str] = None
     location: Optional[str] = None
+    location_id: Optional[int] = None
     assigned_to: Optional[str] = None
     status: str = "active"
     notes: Optional[str] = None
@@ -23,6 +24,11 @@ class EquipmentCreate(BaseModel):
 
 class EquipmentUpdate(EquipmentCreate):
     pass
+
+
+class EquipmentBulkLocation(BaseModel):
+    ids: list[int]
+    location_id: Optional[int] = None      # null clears the assignment
 
 
 class EquipmentOutFor(BaseModel):
