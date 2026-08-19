@@ -4341,6 +4341,9 @@ function inventoryRows(rows) {
           <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
         <button onclick="viewItemUsage(${i.id},'${esc(i.name)}')" class="text-xs" style="color:var(--c-text-3);" title="View movement history">📦 history</button>
         ${isTech() && st.length ? `<button onclick="openTransferModal(${i.id})" class="text-xs hover:underline" style="color:#1e3a5f;" title="Move stock between locations">⇄ Move</button>` : ''}
+        ${isTech() ? (i.catalog_id
+          ? `<button onclick="unlinkItem(${i.id})" class="text-xs hover:underline" style="color:#15803d;" title="${esc(i.catalog_nom||'')}">🔗 linked</button>`
+          : `<button onclick="scSearchFor('${esc(i.name).replace(/'/g,"\\'")}',${i.id})" class="text-xs hover:underline" style="color:var(--c-text-3);" title="Find this in the catalogue">🔗 link</button>`) : ''}
         ${isTech() ? `<button onclick="openItemModal(${i.id})" class="text-gray-500 hover:underline text-xs">Edit</button>` : ''}
         ${isSuperAdmin() ? `<button onclick="deleteItem(${i.id})" class="text-red-500 hover:underline text-xs">Delete</button>` : ''}
       </td>
@@ -8478,6 +8481,16 @@ async function openPaHistory(aid) {
   </div>`);
 }
 
+async function unlinkItem(id) {
+  const i = inventoryData.find(x => x.id === id) || {};
+  if (!confirm(`Unlink "${i.name}" from ${i.catalog_nom || 'the catalogue'}?\n\nIts part number and unit cost are kept.`)) return;
+  try {
+    await api('DELETE', `/api/supcen/link/${id}`);
+    toast('Unlinked.');
+    await reloadInventory();
+  } catch (err) { toast(err.message || 'Unlink failed.', false); }
+}
+
 // ── Stock valuation ──────────────────────────────────────────────────────────
 // Catalogue prices run from $0.75 to $1.7M, so one bad link can swamp the total.
 // The view therefore always shows what is unpriced and ranks by share of total —
@@ -8539,8 +8552,9 @@ async function openValuation() {
             </tr>`).join('')}
         </table></div></div>
 
-    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);">
-      <button onclick="closeModal()" class="btn-secondary" style="width:100%;justify-content:center;">Close</button>
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
+      ${_scLinkFor ? `<button onclick="scLinkPick(${i.id})" class="btn-primary" style="flex:2;justify-content:center;">Link to ${esc(_scLinkFor.name).slice(0,28)}</button>` : ''}
+      <button onclick="closeModal()" class="btn-secondary" style="flex:1;justify-content:center;">Close</button>
     </div>
   </div>`);
 }
@@ -8584,7 +8598,7 @@ function renderReviewQueue() {
         </div>
         <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
           <button onclick="rqNone(${it.id})" class="btn-secondary" style="font-size:0.75rem;">Not in catalogue</button>
-          <button onclick="scSearchFor('${esc(it.name).replace(/'/g,"\\'")}')" class="btn-secondary" style="font-size:0.75rem;">Search catalogue…</button>
+          <button onclick="scSearchFor('${esc(it.name).replace(/'/g,"\\'")}',${it.id})" class="btn-secondary" style="font-size:0.75rem;">Search catalogue…</button>
         </div>
       </div>`;}).join('');
 
@@ -8633,10 +8647,29 @@ async function rqAutoCodes() {
   } catch (err) { toast(err.message || 'Failed.', false); }
 }
 
-function scSearchFor(name) {
+// Searching the catalogue from a link flow has to remember WHAT is being
+// linked, otherwise you land on a browsable catalogue with nothing to click.
+function scSearchFor(name, itemId) {
   closeModal();
+  _scLinkFor = itemId ? { id: itemId, name } : null;
   navigate('supcen');
   setTimeout(() => { _scState.q = name; _scState.page = 1; scLoad(); }, 400);
+}
+
+function scCancelLink() { _scLinkFor = null; scRender(); }
+
+async function scLinkPick(catalogId) {
+  if (!_scLinkFor) return;
+  const target = _scLinkFor;
+  try {
+    const r = await api('POST', `/api/supcen/link/${target.id}`, { catalog_id: catalogId });
+    toast(`Linked ${target.name} · ${r.part_number || 'no code'}${r.unit_cost ? ' · $' + r.unit_cost : ''}`);
+    _scLinkFor = null;
+    closeModal();
+    await reloadInventory();
+    scRender();
+    openReviewQueue();          // straight back to the queue
+  } catch (err) { toast(err.message || 'Link failed.', false); }
 }
 
 // ═══ SupCen Catalog ═══════════════════════════════════════════════════════════
@@ -8647,6 +8680,7 @@ let _scState = { q:'', end_item:'', classification:'', page:1, view:'grid' };
 let _scFacets = null;
 let _scData = { items:[], total:0, page:1, pages:1, dropped_terms:[] };
 let _scTimer = null;
+let _scLinkFor = null;   // {id,name} while picking a match for an inventory item
 
 async function supcenPage() {
   $('page-actions').innerHTML = `
@@ -8689,6 +8723,7 @@ function scRender() {
       <div style="font-size:0.78rem;font-weight:700;line-height:1.25;">${esc(i.nom)}</div>
       <div style="font-size:0.68rem;color:var(--c-text-3);font-family:ui-monospace,monospace;">${code(i)}</div>
       <div style="font-size:0.75rem;font-weight:600;margin-top:auto;">${money(i.unit_price)}<span style="font-weight:400;color:var(--c-text-3);"> · ${esc((i.unit_issue||'').split(' - ')[0])}</span></div>
+      ${_scLinkFor ? `<button onclick="event.stopPropagation();scLinkPick(${i.id})" class="btn-primary" style="font-size:0.72rem;justify-content:center;padding:0.25rem;">Link this</button>` : ''}
     </div>`).join('');
 
   const rows = d.items.map(i => `
@@ -8698,9 +8733,18 @@ function scRender() {
       <td class="px-3 py-2 text-xs col-m-hide" style="font-family:ui-monospace,monospace;color:var(--c-text-3);">${code(i)}</td>
       <td class="px-3 py-2 text-xs col-m-hide" style="color:var(--c-text-3);">${esc(i.end_item||'—')}</td>
       <td class="px-3 py-2 text-sm text-right" style="white-space:nowrap;">${money(i.unit_price)}</td>
+      ${_scLinkFor ? `<td class="px-3 py-2 text-right"><button onclick="event.stopPropagation();scLinkPick(${i.id})" class="btn-primary" style="font-size:0.72rem;">Link</button></td>` : ''}
     </tr>`).join('');
 
   $('page-content').innerHTML = `
+    ${_scLinkFor ? `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:0.5rem;padding:0.6rem 0.9rem;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+      <div style="flex:1;min-width:12rem;">
+        <div style="font-size:0.7rem;color:#1e40af;text-transform:uppercase;letter-spacing:.04em;">Linking</div>
+        <div style="font-weight:700;color:#1e3a8a;">${esc(_scLinkFor.name)}</div>
+        <div style="font-size:0.72rem;color:#1e40af;">Pick the matching catalogue entry below.</div>
+      </div>
+      <button onclick="scCancelLink()" class="btn-secondary" style="font-size:0.78rem;">Cancel</button>
+    </div>` : ''}
     <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;margin-bottom:0.75rem;">
       <input id="sc-q" class="input" style="flex:1;min-width:15rem;" placeholder="Search nomenclature, NSN, MCN…"
              value="${esc(_scState.q)}" oninput="scSearch(this.value)">

@@ -22,8 +22,23 @@ router = APIRouter(prefix="/api/supcen", tags=["supcen"])
 PAGE_SIZE = 60
 
 
+def _stem(t: str) -> str:
+    """Trim a plural 's' so an item named "Gloves" finds a catalogue "GLOVE".
+
+    Only from words of 5+ letters: LIKE %GLOVE% still matches GLOVES, but the
+    reverse does not, and searching "gloves nitrile" for zero hits made the
+    fallback throw away "nitrile" and return butyl gloves. Short words are left
+    alone so GAS does not become GA.
+    """
+    if len(t) >= 5 and t.endswith("IES"):
+        return t[:-3] + "Y"          # BATTERIES -> BATTERY, the catalogue's spelling
+    if len(t) >= 5 and t.endswith("S") and not t.endswith("SS"):
+        return t[:-1]                # GLOVES -> GLOVE
+    return t
+
+
 def _tokens(q: str):
-    return [t for t in (q or "").upper().replace(",", " ").split() if t]
+    return [_stem(t) for t in (q or "").upper().replace(",", " ").split() if t]
 
 
 def _row(r):
@@ -150,7 +165,7 @@ _INDEX = None
 
 
 def _tok(s):
-    return [w for w in re.split(r"[^A-Z0-9]+", str(s or "").upper())
+    return [_stem(w) for w in re.split(r"[^A-Z0-9]+", str(s or "").upper())
             if len(w) > 1 and w not in _STOP]
 
 
