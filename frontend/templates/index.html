@@ -4237,6 +4237,7 @@ async function inventoryPage(tab) {
     <button onclick="openOrderForm()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">📋 Order Form</button>
     ${isTech() ? `<button onclick="openLocationsModal()" class="btn-secondary" style="font-size:0.8rem;">📍 Locations</button>` : ''}
     ${isTech() ? `<button onclick="openReviewQueue()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">🔗 Link Catalogue</button>` : ''}
+    <button onclick="openValuation()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">💰 Valuation</button>
     ${isTech() ? `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>` : ''}`;
   [inventoryData, invLocations] = await Promise.all([
     api('GET', '/api/inventory'),
@@ -4321,8 +4322,13 @@ function inventoryRows(rows) {
         ? esc(st[0].code)
         : `<button onclick="toggleInvStock(${i.id})" style="background:none;border:none;padding:0;cursor:pointer;color:#1e3a5f;font-size:0.8rem;font-weight:600;text-decoration:underline;">
              <span id="inv-caret-${i.id}">▸</span> ${st.length} locations</button>`;
+    const thumb = i.catalog_image
+      ? `<img src="/static/catalog/${esc(i.catalog_image)}" alt="" loading="lazy" title="${esc(i.catalog_nom||'')}"
+             style="width:30px;height:30px;object-fit:contain;background:#fff;border-radius:3px;flex-shrink:0;">`
+      : `<div style="width:30px;height:30px;border-radius:3px;flex-shrink:0;border:1px dashed var(--c-border);"></div>`;
     return `<tr class="table-row border-b last:border-0">
-      <td class="px-4 py-3 font-medium">${esc(i.name)}</td>
+      <td class="px-4 py-3 font-medium">
+        <div style="display:flex;align-items:center;gap:0.5rem;">${thumb}<span>${esc(i.name)}</span></div></td>
       <td class="px-4 py-3 font-mono text-xs text-gray-500 col-m-hide">${esc(i.part_number||'—')}</td>
       <td class="px-4 py-3 text-gray-500 col-m-hide">${locCell}</td>
       <td class="px-4 py-3 text-right font-mono font-medium ${i.quantity===0?'text-red-600':low?'text-yellow-600':''}">${i.quantity} ${i.unit}</td>
@@ -8468,6 +8474,73 @@ async function openPaHistory(aid) {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
+    </div>
+  </div>`);
+}
+
+// ── Stock valuation ──────────────────────────────────────────────────────────
+// Catalogue prices run from $0.75 to $1.7M, so one bad link can swamp the total.
+// The view therefore always shows what is unpriced and ranks by share of total —
+// an item taking an implausible slice is how a wrong link gets caught.
+async function openValuation() {
+  const d = await api('GET', '/api/inventory/valuation');
+  const money = v => '$' + Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pctBar = p => `<div style="height:4px;background:var(--c-border);border-radius:2px;overflow:hidden;">
+      <div style="height:100%;width:${Math.min(100,p)}%;background:${p>=40?'#dc2626':p>=15?'#f59e0b':'#3b82f6'};"></div></div>`;
+  const cov = d.total_items ? Math.round(100 * d.valued_items / d.total_items) : 0;
+
+  modal(`<div class="modal" style="max-width:720px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Stock Valuation</h2>
+        <div style="font-size:0.78rem;color:var(--c-text-3);">${d.linked_items} of ${d.total_items} items linked to the catalogue</div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+
+    <div class="px-6 py-4" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;">
+      <div class="card" style="padding:0.75rem;">
+        <div style="font-size:1.4rem;font-weight:800;">${money(d.total_value)}</div>
+        <div style="font-size:0.72rem;color:var(--c-text-3);">Valued stock</div></div>
+      <div class="card" style="padding:0.75rem;">
+        <div style="font-size:1.4rem;font-weight:800;">${cov}%</div>
+        <div style="font-size:0.72rem;color:var(--c-text-3);">${d.valued_items} of ${d.total_items} priced</div></div>
+      <div class="card" style="padding:0.75rem;">
+        <div style="font-size:1.4rem;font-weight:800;color:${d.unvalued_items?'#f59e0b':'inherit'};">${d.unvalued_items}</div>
+        <div style="font-size:0.72rem;color:var(--c-text-3);">Unpriced · ${(d.unvalued_units||0).toLocaleString()} units</div></div>
+    </div>
+
+    ${d.unvalued_items ? `<div class="px-6" style="margin-bottom:0.75rem;">
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:0.4rem;padding:0.5rem 0.75rem;font-size:0.78rem;color:#92400e;">
+        ${d.unvalued_items} item${d.unvalued_items!==1?'s':''} have no unit cost, so the total above understates.
+        Link them to the catalogue to price them.</div></div>` : ''}
+
+    <div class="px-6 pb-2"><div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--c-text-3);margin-bottom:0.35rem;">By location</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        ${d.by_location.length===0?`<tr><td style="color:var(--c-text-3);padding:0.4rem 0;">No stock placed.</td></tr>`
+        : d.by_location.map(l=>`<tr style="border-top:1px solid var(--c-border);">
+            <td style="padding:0.35rem 0;font-weight:600;">${esc(l.code)}</td>
+            <td style="padding:0.35rem 0;color:var(--c-text-3);font-size:0.75rem;">${l.items} items${l.unpriced?` · ${l.unpriced} unpriced`:''}</td>
+            <td style="padding:0.35rem 0;text-align:right;font-weight:700;">${money(l.value)}</td>
+          </tr>`).join('')}
+      </table></div>
+
+    <div class="px-6 py-3"><div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--c-text-3);margin-bottom:0.35rem;">Largest by value — check anything implausible</div>
+      <div style="max-height:34vh;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+          ${d.top_items.length===0?`<tr><td style="color:var(--c-text-3);padding:0.4rem 0;">Nothing priced yet.</td></tr>`
+          : d.top_items.map(i=>`<tr style="border-top:1px solid var(--c-border);">
+              <td style="padding:0.35rem 0;">${esc(i.name)}
+                <div style="font-size:0.7rem;color:var(--c-text-3);">${i.quantity} ${esc(i.unit||'')} × ${money(i.unit_cost)}</div>
+                ${pctBar(i.pct)}</td>
+              <td style="padding:0.35rem 0 0.35rem 0.75rem;text-align:right;white-space:nowrap;">
+                <div style="font-weight:700;">${money(i.value)}</div>
+                <div style="font-size:0.7rem;color:var(--c-text-3);">${i.pct}%</div></td>
+            </tr>`).join('')}
+        </table></div></div>
+
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);">
+      <button onclick="closeModal()" class="btn-secondary" style="width:100%;justify-content:center;">Close</button>
     </div>
   </div>`);
 }

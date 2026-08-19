@@ -285,7 +285,7 @@ async function load() {
         id: `${i.id}-${st.location_id}`,
         qr: `/api/qr/inventory/${i.id}?loc=${st.location_id}`,
         name: i.name, serial_num: i.part_number || '',
-        category: st.code,
+        category: st.code, photo: i.catalog_image || null,
       });
     }));
   } else {
@@ -366,6 +366,9 @@ function renderPreview() {
   }
   const labels = items.map(e => `
     <div class="label">
+      ${e.photo ? `<div style="width:46px;flex-shrink:0;display:flex;align-items:center;">
+        <img src="/static/catalog/${e.photo}" alt="" style="width:100%;object-fit:contain;">
+      </div>` : ''}
       <div class="label-qr">
         <img src="${e.qr}${e.qr.includes('?') ? '&' : '?'}${token ? 'token=' + encodeURIComponent(token) : ''}" alt="QR" loading="lazy">
       </div>

@@ -219,15 +219,17 @@ async def delete_location(loc_id: int, request: Request, db=Depends(get_db)):
 
 @router.get("")
 async def list_items(low_stock: bool = False, location_id: int = None, db=Depends(get_db)):
-    query = "SELECT * FROM inventory_items"
+    query = ("SELECT i.*, c.image AS catalog_image, c.nsn AS catalog_nsn, "
+             "c.mcn AS catalog_mcn, c.nom AS catalog_nom, c.shelf_life AS catalog_shelf_life "
+             "FROM inventory_items i LEFT JOIN supcen_catalog c ON c.id = i.catalog_id")
     params = ()
     if location_id:
-        query += (" WHERE id IN (SELECT item_id FROM inventory_stock "
+        query += (" WHERE i.id IN (SELECT item_id FROM inventory_stock "
                   "WHERE location_id=? AND quantity<>0)")
         params = (location_id,)
     if low_stock:
-        query += (" AND" if location_id else " WHERE") + " quantity <= min_stock"
-    query += " ORDER BY name"
+        query += (" AND" if location_id else " WHERE") + " i.quantity <= i.min_stock"
+    query += " ORDER BY i.name"
     async with db.execute(query, params) as cur:
         rows = [dict(r) for r in await cur.fetchall()]
     bd = await _breakdown(db, {r["id"] for r in rows})
@@ -235,6 +237,53 @@ async def list_items(low_stock: bool = False, location_id: int = None, db=Depend
         r["stock"] = bd.get(r["id"], [])
         r["location_count"] = len(r["stock"])
     return rows
+
+
+@router.get("/valuation")
+async def valuation(db=Depends(get_db)):
+    """What the stock is worth, and how much of it we cannot price.
+
+    Catalogue prices span $0.75 to $1.7M, so a single bad link can dominate the
+    total. The response therefore reports what is unvalued and ranks items by
+    share of total, which is how a wrong link gets spotted.
+    """
+    async with db.execute("""
+        SELECT i.id, i.name, i.quantity, i.unit, i.unit_cost, i.catalog_id,
+               (i.quantity * COALESCE(i.unit_cost,0)) AS value
+        FROM inventory_items i
+    """) as cur:
+        items = [dict(r) for r in await cur.fetchall()]
+
+    valued = [i for i in items if i["unit_cost"] is not None]
+    unvalued = [i for i in items if i["unit_cost"] is None]
+    total = round(sum(i["value"] for i in valued), 2)
+
+    for i in valued:
+        i["pct"] = round(100 * i["value"] / total, 1) if total else 0
+    top = sorted(valued, key=lambda x: -x["value"])[:15]
+
+    async with db.execute("""
+        SELECT l.code, COALESCE(SUM(s.quantity * i.unit_cost), 0) AS value,
+               COUNT(DISTINCT s.item_id) AS items,
+               SUM(CASE WHEN i.unit_cost IS NULL THEN 1 ELSE 0 END) AS unpriced
+        FROM inventory_stock s
+        JOIN inventory_items i ON i.id = s.item_id
+        JOIN inventory_locations l ON l.id = s.location_id
+        WHERE s.quantity <> 0
+        GROUP BY l.id ORDER BY value DESC
+    """) as cur:
+        by_location = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "total_value": total,
+        "valued_items": len(valued),
+        "unvalued_items": len(unvalued),
+        "unvalued_units": sum(i["quantity"] for i in unvalued),
+        "linked_items": sum(1 for i in items if i["catalog_id"]),
+        "total_items": len(items),
+        "by_location": [dict(r, value=round(r["value"], 2)) for r in by_location],
+        "top_items": [{k: v for k, v in i.items() if k != "catalog_id"} for i in top],
+    }
 
 
 @router.get("/{item_id}/usage")
@@ -301,7 +350,12 @@ async def get_item_usage(item_id: int, db=Depends(get_db)):
 
 @router.get("/{item_id}")
 async def get_item(item_id: int, db=Depends(get_db)):
-    async with db.execute("SELECT * FROM inventory_items WHERE id=?", (item_id,)) as cur:
+    async with db.execute("""
+        SELECT i.*, c.image AS catalog_image, c.nsn AS catalog_nsn, c.mcn AS catalog_mcn,
+               c.nom AS catalog_nom, c.shelf_life AS catalog_shelf_life, c.unit_price AS catalog_price
+        FROM inventory_items i LEFT JOIN supcen_catalog c ON c.id = i.catalog_id
+        WHERE i.id=?
+    """, (item_id,)) as cur:
         row = await cur.fetchone()
     if not row:
         raise HTTPException(404, "Item not found")
