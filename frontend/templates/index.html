@@ -4236,6 +4236,7 @@ async function inventoryPage(tab) {
     <a href="#" onclick="event.preventDefault();window.open('/api/csv/inventory/export?token='+getToken(),'_blank')" class="btn-secondary col-m-hide" style="font-size:0.8rem;text-decoration:none;">⬇ Export CSV</a>
     <button onclick="openOrderForm()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">📋 Order Form</button>
     ${isTech() ? `<button onclick="openLocationsModal()" class="btn-secondary" style="font-size:0.8rem;">📍 Locations</button>` : ''}
+    ${isTech() ? `<button onclick="openReviewQueue()" class="btn-secondary col-m-hide" style="font-size:0.8rem;">🔗 Link Catalogue</button>` : ''}
     ${isTech() ? `<button onclick="openItemModal()" class="btn-primary">+ Add Item</button>` : ''}`;
   [inventoryData, invLocations] = await Promise.all([
     api('GET', '/api/inventory'),
@@ -8469,6 +8470,100 @@ async function openPaHistory(aid) {
       </table>
     </div>
   </div>`);
+}
+
+// ── Link inventory items to catalogue entries ────────────────────────────────
+// The matcher ranks; a person decides. Nothing is linked automatically except an
+// exact NSN/MCN, because a name match scored 0.845 on the wrong battery part.
+let _rqData = { items:[], pending:0, linked:0, marked_none:0 };
+
+async function openReviewQueue() {
+  _rqData = await api('GET', '/api/supcen/review-queue?limit=25');
+  renderReviewQueue();
+}
+
+function renderReviewQueue() {
+  const d = _rqData;
+  const money = v => v == null ? '' : '$' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const band = s => s >= 0.8 ? ['#16a34a','likely'] : s >= 0.55 ? ['#f59e0b','check'] : ['#9ca3af','weak'];
+
+  const body = d.items.length === 0
+    ? `<div style="text-align:center;padding:2.5rem;color:var(--c-text-3);">
+         Nothing left to review. ${d.linked} linked · ${d.marked_none} marked not-in-catalogue.</div>`
+    : d.items.map(it => {
+      const [col, lbl] = band(it.top_score);
+      return `<div class="card" style="margin-bottom:0.75rem;padding:0.75rem;" id="rq-${it.id}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.75rem;margin-bottom:0.5rem;">
+          <div style="font-weight:700;">${esc(it.name)}</div>
+          <div style="font-size:0.7rem;color:${col};font-weight:700;white-space:nowrap;">${lbl} ${it.top_score.toFixed(2)}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:0.5rem;">
+          ${it.candidates.map(c => `
+            <button onclick="rqLink(${it.id},${c.id})" style="text-align:left;display:flex;gap:0.5rem;padding:0.45rem;border:1px solid var(--c-border);border-radius:0.45rem;background:none;cursor:pointer;color:var(--c-text);">
+              <div style="width:44px;height:44px;background:#fff;border-radius:4px;flex-shrink:0;overflow:hidden;">
+                ${c.image?`<img src="/static/catalog/${esc(c.image)}" style="width:100%;height:100%;object-fit:contain;" loading="lazy">`:''}</div>
+              <div style="min-width:0;">
+                <div style="font-size:0.72rem;font-weight:600;line-height:1.2;">${esc(c.nom).slice(0,58)}</div>
+                <div style="font-size:0.66rem;color:var(--c-text-3);font-family:ui-monospace,monospace;">${esc(c.nsn||c.mcn||'')}</div>
+                <div style="font-size:0.68rem;">${money(c.unit_price)} <span style="color:var(--c-text-3);">· ${c.score.toFixed(2)}</span></div>
+              </div>
+            </button>`).join('')}
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+          <button onclick="rqNone(${it.id})" class="btn-secondary" style="font-size:0.75rem;">Not in catalogue</button>
+          <button onclick="scSearchFor('${esc(it.name).replace(/'/g,"\\'")}')" class="btn-secondary" style="font-size:0.75rem;">Search catalogue…</button>
+        </div>
+      </div>`;}).join('');
+
+  modal(`<div class="modal" style="max-width:860px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">Link to Catalogue</h2>
+        <div style="font-size:0.78rem;color:var(--c-text-3);">
+          ${d.pending} unreviewed · ${d.linked} linked · ${d.marked_none} not in catalogue
+        </div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div class="px-6 py-3" style="background:var(--c-surface);font-size:0.75rem;color:var(--c-text-3);">
+      Pick the matching catalogue entry to fill in its NSN/MCN and unit price. Suggestions are ranked, not verified — check before clicking.
+    </div>
+    <div class="px-6 py-4" style="max-height:60vh;overflow-y:auto;">${body}</div>
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
+      <button onclick="rqAutoCodes()" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">Auto-link exact NSN/MCN</button>
+      <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Done</button>
+    </div>
+  </div>`);
+}
+
+async function rqLink(itemId, catalogId) {
+  try {
+    const r = await api('POST', `/api/supcen/link/${itemId}`, { catalog_id: catalogId });
+    toast(`Linked · ${r.part_number || 'no code'}${r.unit_cost ? ' · $' + r.unit_cost : ''}`);
+    document.getElementById('rq-' + itemId)?.remove();
+    await reloadInventory();
+  } catch (err) { toast(err.message || 'Link failed.', false); }
+}
+
+async function rqNone(itemId) {
+  try {
+    await api('POST', `/api/supcen/link/${itemId}`, { not_in_catalog: true });
+    document.getElementById('rq-' + itemId)?.remove();
+  } catch (err) { toast(err.message || 'Failed.', false); }
+}
+
+async function rqAutoCodes() {
+  try {
+    const r = await api('POST', '/api/supcen/auto-link-codes', {});
+    toast(r.linked ? `Linked ${r.linked} by exact code.` : 'No exact NSN/MCN matches to link.');
+    await openReviewQueue();
+  } catch (err) { toast(err.message || 'Failed.', false); }
+}
+
+function scSearchFor(name) {
+  closeModal();
+  navigate('supcen');
+  setTimeout(() => { _scState.q = name; _scState.page = 1; scLoad(); }, 400);
 }
 
 // ═══ SupCen Catalog ═══════════════════════════════════════════════════════════

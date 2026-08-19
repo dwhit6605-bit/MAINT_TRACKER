@@ -489,6 +489,14 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN service_life_years INTEGER")
         # Read off the cylinder stamp rather than derived — requalification
         # intervals vary by spec, so the stamped date is the authority
+        inv_cols = {row[1] async for row in await db.execute("PRAGMA table_info(inventory_items)")}
+        if "catalog_id" not in inv_cols:
+            await db.execute("ALTER TABLE inventory_items ADD COLUMN catalog_id INTEGER REFERENCES supcen_catalog(id) ON DELETE SET NULL")
+        if "catalog_none" not in inv_cols:
+            # 1 = a human confirmed this item has no catalogue entry, so the
+            # review queue stops offering it
+            await db.execute("ALTER TABLE inventory_items ADD COLUMN catalog_none INTEGER NOT NULL DEFAULT 0")
+
         if "hydro_due_date" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN hydro_due_date TEXT")
 
