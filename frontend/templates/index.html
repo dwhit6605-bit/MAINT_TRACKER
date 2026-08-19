@@ -2035,7 +2035,7 @@ function openDashCustomize() {
       <p style="font-size:0.8rem;color:#6b7280;margin-bottom:0.25rem;">Choose which widgets appear on your dashboard. Settings are saved per user.</p>
       ${DASH_WIDGETS.map(w=>`
         <label style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;border-radius:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;cursor:pointer;">
-          <input type="checkbox" id="dw-${w.id}" ${cfg[w.id]!==false?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#1e3a5f;">
+          <input type="checkbox" id="dw-${w.id}" ${cfg[w.id]!==false?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:var(--c-primary);">
           <span style="font-size:0.875rem;font-weight:500;color:#1e293b;">${w.label}</span>
         </label>`).join('')}
     </div>
@@ -2538,7 +2538,7 @@ async function eqTab(tab) {
             <span style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${faultColor(s.fault_count)}22;color:${faultColor(s.fault_count)};white-space:nowrap;">
               ${s.fault_count === 0 ? '✓ Clean' : s.fault_count+' fault'+(s.fault_count>1?'s':'')}
             </span>
-            ${s.status==='completed' ? `<a href="/api/pmcs/sessions/${s.id}/archive?token=${getToken()}" target="_blank" style="font-size:0.7rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">PDF</a>` : `<span style="font-size:0.7rem;color:#9ca3af;">${s.status}</span>`}
+            ${s.status==='completed' ? `<a href="/api/pmcs/sessions/${s.id}/archive?token=${getToken()}" target="_blank" style="font-size:0.7rem;color:var(--c-primary);text-decoration:underline;white-space:nowrap;">PDF</a>` : `<span style="font-size:0.7rem;color:#9ca3af;">${s.status}</span>`}
           </div>`).join('')}
         </div>`;
   }
@@ -3839,7 +3839,7 @@ function renderTaskAttModal(taskId, taskTitle, atts) {
         ? `<img src="${fileUrl(a)}" style="width:3rem;height:3rem;object-fit:cover;border-radius:0.375rem;flex-shrink:0;" loading="lazy">`
         : `<div style="width:3rem;height:3rem;background:#f3f4f6;border-radius:0.375rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">📄</div>`}
       <div style="flex:1;min-width:0;">
-        <a href="${fileUrl(a)}" target="_blank" style="font-size:0.8rem;font-weight:600;color:#1e3a5f;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
+        <a href="${fileUrl(a)}" target="_blank" style="font-size:0.8rem;font-weight:600;color:var(--c-primary);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
         <div style="font-size:0.72rem;color:#9ca3af;">${fmtSize(a.file_size||0)} · ${a.created_at?.slice(0,10)||''}</div>
       </div>
       ${isTech() ? `<button onclick="deleteTaskAtt(${taskId},'${esc(taskTitle)}',${a.id})" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;padding:0.25rem;">✕</button>` : ''}
@@ -3852,7 +3852,7 @@ function renderTaskAttModal(taskId, taskTitle, atts) {
          ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
          ondragleave="this.style.borderColor='#d1d5db'"
          ondrop="event.preventDefault();this.style.borderColor='#d1d5db';uploadTaskAtts(${taskId},'${esc(taskTitle)}',event.dataTransfer.files)">
-      <div style="font-size:0.85rem;color:#6b7280;">Drop files here or <span style="color:#1e3a5f;font-weight:600;">browse</span></div>
+      <div style="font-size:0.85rem;color:#6b7280;">Drop files here or <span style="color:var(--c-primary);font-weight:600;">browse</span></div>
       <div style="font-size:0.72rem;color:#9ca3af;margin-top:0.25rem;">Images, PDF, Office docs · max 50 MB each</div>
     </div>
     <input id="task-att-input" type="file" multiple style="display:none"
@@ -3910,7 +3910,7 @@ async function uploadTaskAtts(taskId, taskTitle, files) {
           ${isImg ? `<img src="${fileUrl}" style="width:3rem;height:3rem;object-fit:cover;border-radius:0.375rem;flex-shrink:0;" loading="lazy">`
                   : `<div style="width:3rem;height:3rem;background:#f3f4f6;border-radius:0.375rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;">📄</div>`}
           <div style="flex:1;min-width:0;">
-            <a href="${fileUrl}" target="_blank" style="font-size:0.8rem;font-weight:600;color:#1e3a5f;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
+            <a href="${fileUrl}" target="_blank" style="font-size:0.8rem;font-weight:600;color:var(--c-primary);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.original_name)}</a>
             <div style="font-size:0.72rem;color:#9ca3af;">${fmtSize(a.file_size||0)} · ${a.created_at?.slice(0,10)||''}</div>
           </div>
           ${isTech() ? `<button onclick="deleteTaskAtt(${taskId},'${esc(taskTitle)}',${a.id})" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;padding:0.25rem;">✕</button>` : ''}
@@ -3958,7 +3958,7 @@ function renderCalTable(rows) {
   const bulkBar = isTech() ? `
     <div id="cal-bulk-bar" style="display:none;background:#1e3a5f;color:#fff;padding:0.6rem 1.25rem;display:flex;align-items:center;gap:1rem;font-size:0.85rem;">
       <span id="cal-bulk-count">0 selected</span>
-      <button onclick="openCalBulkEdit()" style="background:#fff;color:#1e3a5f;border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;font-size:0.8rem;font-weight:600;cursor:pointer;">✏️ Bulk Update</button>
+      <button onclick="openCalBulkEdit()" style="background:#fff;color:var(--c-primary);border:none;border-radius:0.375rem;padding:0.3rem 0.8rem;font-size:0.8rem;font-weight:600;cursor:pointer;">✏️ Bulk Update</button>
       <button onclick="calClearSelection()" style="background:transparent;color:rgba(255,255,255,.7);border:none;cursor:pointer;font-size:0.8rem;">✕ Clear</button>
     </div>` : '';
   $('page-content').innerHTML = `
@@ -4245,8 +4245,8 @@ async function inventoryPage(tab) {
   ]);
   // Tab bar
   $('page-content').innerHTML = `
-    <div style="display:flex;border-bottom:1px solid #e5e7eb;margin-bottom:1rem;">
-      <button id="inv-tab-stock" onclick="invTab('stock')" style="padding:0.5rem 1.25rem;font-size:0.85rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;">Stock</button>
+    <div style="display:flex;background:var(--c-card);border:1px solid var(--c-border);border-radius:0.5rem;padding:0 0.4rem;margin-bottom:1rem;overflow-x:auto;">
+      <button id="inv-tab-stock" onclick="invTab('stock')" style="padding:0.5rem 1.25rem;font-size:0.85rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:var(--c-primary);">Stock</button>
       <button id="inv-tab-reorder" id="reorder-tab-btn" onclick="invTab('reorder')" style="padding:0.5rem 1.25rem;font-size:0.85rem;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;">Reorder Requests</button>
     </div>
     <div id="inv-tab-body"></div>`;
@@ -4264,10 +4264,12 @@ async function inventoryPage(tab) {
 }
 
 async function invTab(tab) {
-  document.getElementById('inv-tab-stock').style.borderBottomColor   = tab==='stock'   ? '#1e3a5f' : 'transparent';
-  document.getElementById('inv-tab-stock').style.color               = tab==='stock'   ? '#1e3a5f' : '#6b7280';
-  document.getElementById('inv-tab-reorder').style.borderBottomColor = tab==='reorder' ? '#1e3a5f' : 'transparent';
-  document.getElementById('inv-tab-reorder').style.color             = tab==='reorder' ? '#1e3a5f' : '#6b7280';
+  // var(--c-primary), not the literal navy: in dark mode that navy IS the page
+  // background, so the selected tab became unreadable
+  document.getElementById('inv-tab-stock').style.borderBottomColor   = tab==='stock'   ? 'var(--c-primary)' : 'transparent';
+  document.getElementById('inv-tab-stock').style.color               = tab==='stock'   ? 'var(--c-primary)' : 'var(--c-text-3)';
+  document.getElementById('inv-tab-reorder').style.borderBottomColor = tab==='reorder' ? 'var(--c-primary)' : 'transparent';
+  document.getElementById('inv-tab-reorder').style.color             = tab==='reorder' ? 'var(--c-primary)' : 'var(--c-text-3)';
   const body = document.getElementById('inv-tab-body');
   if (tab === 'reorder') {
     body.setAttribute('data-reorder-table', '1');
@@ -4320,7 +4322,7 @@ function inventoryRows(rows) {
       ? '<span class="text-gray-400">—</span>'
       : st.length === 1
         ? esc(st[0].code)
-        : `<button onclick="toggleInvStock(${i.id})" style="background:none;border:none;padding:0;cursor:pointer;color:#1e3a5f;font-size:0.8rem;font-weight:600;text-decoration:underline;">
+        : `<button onclick="toggleInvStock(${i.id})" style="background:none;border:none;padding:0;cursor:pointer;color:var(--c-primary);font-size:0.8rem;font-weight:600;text-decoration:underline;">
              <span id="inv-caret-${i.id}">▸</span> ${st.length} locations</button>`;
     const thumb = i.catalog_image
       ? `<img src="/static/catalog/${esc(i.catalog_image)}" alt="" loading="lazy" title="${esc(i.catalog_nom||'')}"
@@ -4340,7 +4342,7 @@ function inventoryRows(rows) {
           <button onclick="quickAdjustInv(${i.id},1)"  title="Add 1"    style="background:#f0fdf4;color:#15803d;border:none;border-radius:0.25rem;padding:0.1rem 0.45rem;cursor:pointer;font-size:0.85rem;font-weight:700;">+</button>
           <button onclick="adjustModal(${i.id},'${esc(i.name)}')" class="text-gray-800 hover:underline text-xs">Adjust</button>` : ''}
         <button onclick="viewItemUsage(${i.id},'${esc(i.name)}')" class="text-xs" style="color:var(--c-text-3);" title="View movement history">📦 history</button>
-        ${isTech() && st.length ? `<button onclick="openTransferModal(${i.id})" class="text-xs hover:underline" style="color:#1e3a5f;" title="Move stock between locations">⇄ Move</button>` : ''}
+        ${isTech() && st.length ? `<button onclick="openTransferModal(${i.id})" class="text-xs hover:underline" style="color:var(--c-primary);" title="Move stock between locations">⇄ Move</button>` : ''}
         ${isTech() ? (i.catalog_id
           ? `<button onclick="unlinkItem(${i.id})" class="text-xs hover:underline" style="color:#15803d;" title="${esc(i.catalog_nom||'')}">🔗 linked</button>`
           : `<button onclick="scSearchFor('${esc(i.name).replace(/'/g,"\\'")}',${i.id})" class="text-xs hover:underline" style="color:var(--c-text-3);" title="Find this in the catalogue">🔗 link</button>`) : ''}
@@ -4506,7 +4508,10 @@ function lrMarkup(loc) {
         <span style="font-size:0.68rem;color:var(--c-text-3);"> ${esc(i.unit||'')}</span>
       </td>
       <td class="px-2 py-2" style="text-align:right;white-space:nowrap;">
-        ${tech?`<button onclick="lrToggleMove(${i.id})" title="Move elsewhere" class="text-xs hover:underline" style="color:#1e3a5f;background:none;border:none;cursor:pointer;">⇄</button>` : ''}
+        ${tech?`<button onclick="lrToggleMove(${i.id})" title="Move to another location"
+          style="display:inline-flex;align-items:center;gap:0.2rem;padding:0.3rem 0.55rem;min-height:36px;
+                 border:1px solid var(--c-border);border-radius:0.35rem;background:none;
+                 color:var(--c-primary);font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;">⇄ Move</button>` : ''}
         <span class="col-m-hide" style="font-size:0.7rem;color:var(--c-text-3);margin-left:0.4rem;" title="Total across all locations">${i.quantity} tot</span>
       </td>
     </tr>
@@ -4856,8 +4861,8 @@ async function openLocationsModal() {
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.item_count}</td>
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.unit_count}</td>
       <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
-        <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${l.id}&token='+getToken(),'_blank')" class="text-xs hover:underline" style="color:#1e3a5f;text-decoration:none;" title="Print a label for every item on this shelf">🏷 Labels</a>
-        <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#1e3a5f;margin-left:0.5rem;">Rename</button>
+        <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${l.id}&token='+getToken(),'_blank')" class="text-xs hover:underline" style="color:var(--c-primary);text-decoration:none;" title="Print a label for every item on this shelf">🏷 Labels</a>
+        <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:var(--c-primary);margin-left:0.5rem;">Rename</button>
         ${isSuperAdmin() ? `<button onclick="deleteLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#dc2626;margin-left:0.5rem;">Delete</button>` : ''}
       </td>
     </tr>`).join('');
@@ -5022,7 +5027,7 @@ function openOrderForm() {
       return sum + i.unit_cost * Math.max(0, i.min_stock - i.quantity);
     }, 0);
     return `<div style="margin-bottom:1.5rem;">
-      <div style="font-weight:700;font-size:0.9rem;color:#1e3a5f;background:#f0f7ff;padding:0.45rem 0.75rem;border-radius:0.4rem 0.4rem 0 0;border:1px solid #bfdbfe;">${esc(sup)}</div>
+      <div style="font-weight:700;font-size:0.9rem;color:var(--c-primary);background:#f0f7ff;padding:0.45rem 0.75rem;border-radius:0.4rem 0.4rem 0 0;border:1px solid #bfdbfe;">${esc(sup)}</div>
       <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-top:none;font-size:0.82rem;">
         <thead style="background:#f9fafb;"><tr>
           <th style="padding:0.4rem 0.75rem;text-align:left;font-size:0.72rem;color:#6b7280;text-transform:uppercase;">Item</th>
@@ -7996,7 +8001,7 @@ async function openRsHistory(vid, vname) {
                 <span style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:9999px;background:${color}22;color:${color};white-space:nowrap;">
                   ${unsats===0?'✓ All SAT':unsats+' UNSAT'}
                 </span>
-                <a href="/api/rolling-stock/inspections/${i.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">FK5105</a>
+                <a href="/api/rolling-stock/inspections/${i.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:var(--c-primary);text-decoration:underline;white-space:nowrap;">FK5105</a>
               </div>`;}).join('')}
           </div>`}
     </div>
@@ -8570,7 +8575,7 @@ async function openPaHistory(aid) {
             ? `<span style="color:#dc2626;font-weight:700;">${unsat} UNSAT</span>`
             : `<span style="color:#16a34a;">All SAT</span>`}${l.status==='open'?' <span style="color:#f59e0b;font-weight:700;">· OPEN</span>':''}</td>
           <td style="padding:6px 8px;text-align:right;">
-            <a href="/api/power-assets/logs/${l.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:#1e3a5f;text-decoration:underline;white-space:nowrap;">Print</a>
+            <a href="/api/power-assets/logs/${l.id}/print?token=${getToken()}" target="_blank" style="font-size:0.72rem;color:var(--c-primary);text-decoration:underline;white-space:nowrap;">Print</a>
           </td></tr>`;
       }).join('');
 
@@ -9037,7 +9042,7 @@ function renderCylTable() {
                 <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
                   ${isTech()?`<button onclick="openCylModal(${r.id})" class="text-xs hover:underline" style="color:var(--c-text-2);">Edit</button>
                     <button onclick="openCylTestModal(${r.id})" class="text-xs hover:underline" style="color:#15803d;margin-left:0.5rem;">+ Hydro</button>`:''}
-                  <button onclick="openCylHistory(${r.id})" class="text-xs hover:underline" style="color:#1e3a5f;margin-left:0.5rem;">History</button>
+                  <button onclick="openCylHistory(${r.id})" class="text-xs hover:underline" style="color:var(--c-primary);margin-left:0.5rem;">History</button>
                 </td>
               </tr>`;}).join('')}
           </tbody>
@@ -9530,7 +9535,7 @@ function printRequisition(id) {
   w.document.write(`<!DOCTYPE html><html><head><title>Reorder Requisition</title>
   <style>
     body{font-family:Arial,sans-serif;padding:2rem;color:#111;max-width:700px;margin:0 auto;}
-    h1{font-size:1.2rem;border-bottom:2px solid #1e3a5f;padding-bottom:.5rem;margin-bottom:1rem;color:#1e3a5f;}
+    h1{font-size:1.2rem;border-bottom:2px solid #1e3a5f;padding-bottom:.5rem;margin-bottom:1rem;color:var(--c-primary);}
     table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;}
     td{padding:6px 10px;border:1px solid #ccc;font-size:0.9rem;}
     td:first-child{font-weight:700;background:#f8f9fa;width:35%;}
