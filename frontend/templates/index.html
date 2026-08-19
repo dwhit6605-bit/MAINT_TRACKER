@@ -260,6 +260,10 @@
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         Rolling Stock
       </a>
+      <a href="/supcen" class="nav-link" data-page="supcen">
+        <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        SupCen Catalog
+      </a>
       <a href="/cylinders" class="nav-link" data-page="cylinders">
         <svg style="width:1.1rem;height:1.1rem;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6V4h6v2m-6 0a3 3 0 00-3 3v9a2 2 0 002 2h8a2 2 0 002-2V9a3 3 0 00-3-3M9 6h6"/></svg>
         Cylinders
@@ -1680,8 +1684,8 @@ function calToggleView() {
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, 'rolling-stock': rollingStockPage, power: powerPage, cylinders: cylindersPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
-const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', 'rolling-stock':'Rolling Stock', power:'Power & Air', cylinders:'SCBA / O2 Cylinders', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
+const PAGES = { dashboard: dashboardPage, equipment: equipmentPage, maintenance: maintenancePage, calibration: calibrationPage, inventory: inventoryPage, pmcs: pmcsPage, users: usersPage, skos: skosPage, 'rolling-stock': rollingStockPage, power: powerPage, cylinders: cylindersPage, supcen: supcenPage, faults: faultsPage, mywork: myWorkPage, commander: commanderPage, calendar: calendarPage, hazmat: hazmatPage };
+const TITLES = { dashboard:'Dashboard', equipment:'Equipment Registry', maintenance:'Maintenance Tasks', calibration:'Calibration Records', inventory:'Parts & Inventory', pmcs:'PMCS Checklists', users:'User Management', skos:'SKOs — Sets, Kits & Outfits', 'rolling-stock':'Rolling Stock', power:'Power & Air', cylinders:'SCBA / O2 Cylinders', supcen:'SupCen Catalog', mywork:'My Work', commander:"Commander's Dashboard", calendar:'Maintenance Calendar', hazmat:'Hazmat Suit Accountability' };
 
 function navigate(page) {
   history.pushState({page}, '', `/${page}`);
@@ -8463,6 +8467,150 @@ async function openPaHistory(aid) {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
+    </div>
+  </div>`);
+}
+
+// ═══ SupCen Catalog ═══════════════════════════════════════════════════════════
+// Read-only port of the COMSUPCEN catalog prototype: 2,499 items with NSN/MCN,
+// unit price and a thumbnail. Rows come from SQLite and images are static files,
+// so the page does not pay the prototype's 14 MB up-front cost.
+let _scState = { q:'', end_item:'', classification:'', page:1, view:'grid' };
+let _scFacets = null;
+let _scData = { items:[], total:0, page:1, pages:1, dropped_terms:[] };
+let _scTimer = null;
+
+async function supcenPage() {
+  $('page-actions').innerHTML = `
+    <button onclick="scSetView('grid')" id="sc-v-grid" class="btn-secondary" style="font-size:0.8rem;">▦ Grid</button>
+    <button onclick="scSetView('list')" id="sc-v-list" class="btn-secondary" style="font-size:0.8rem;">☰ List</button>`;
+  if (!_scFacets) _scFacets = await api('GET', '/api/supcen/facets');
+  await scLoad();
+}
+
+function scSetView(v) { _scState.view = v; scRender(); }
+
+async function scLoad() {
+  const p = new URLSearchParams({
+    q: _scState.q, end_item: _scState.end_item,
+    classification: _scState.classification, page: _scState.page,
+  });
+  _scData = await api('GET', `/api/supcen/catalog?${p}`);
+  scRender();
+}
+
+function scSearch(v) {
+  _scState.q = v; _scState.page = 1;
+  clearTimeout(_scTimer);
+  _scTimer = setTimeout(scLoad, 220);
+}
+function scFacet(field, val) { _scState[field] = val; _scState.page = 1; scLoad(); }
+function scPage(n) { _scState.page = n; scLoad(); window.scrollTo(0,0); }
+
+function scRender() {
+  const d = _scData, f = _scFacets || { end_items:[], classifications:[], total:0 };
+  const money = v => v == null ? '' : '$' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+  const img = i => i.image
+    ? `<img src="/static/catalog/${esc(i.image)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;">`
+    : `<div style="color:var(--c-text-3);font-size:0.7rem;display:flex;align-items:center;justify-content:center;height:100%;">no image</div>`;
+  const code = i => esc(i.nsn || i.mcn || i.stock_number || '—');
+
+  const cards = d.items.map(i => `
+    <div class="card" style="padding:0.6rem;cursor:pointer;display:flex;flex-direction:column;gap:0.4rem;" onclick="scDetail(${i.id})">
+      <div style="height:110px;background:#fff;border-radius:0.4rem;overflow:hidden;">${img(i)}</div>
+      <div style="font-size:0.78rem;font-weight:700;line-height:1.25;">${esc(i.nom)}</div>
+      <div style="font-size:0.68rem;color:var(--c-text-3);font-family:ui-monospace,monospace;">${code(i)}</div>
+      <div style="font-size:0.75rem;font-weight:600;margin-top:auto;">${money(i.unit_price)}<span style="font-weight:400;color:var(--c-text-3);"> · ${esc((i.unit_issue||'').split(' - ')[0])}</span></div>
+    </div>`).join('');
+
+  const rows = d.items.map(i => `
+    <tr class="table-row border-b last:border-0" style="cursor:pointer;" onclick="scDetail(${i.id})">
+      <td class="px-3 py-2" style="width:46px;"><div style="width:38px;height:38px;background:#fff;border-radius:4px;overflow:hidden;">${img(i)}</div></td>
+      <td class="px-3 py-2 text-sm font-medium">${esc(i.nom)}</td>
+      <td class="px-3 py-2 text-xs col-m-hide" style="font-family:ui-monospace,monospace;color:var(--c-text-3);">${code(i)}</td>
+      <td class="px-3 py-2 text-xs col-m-hide" style="color:var(--c-text-3);">${esc(i.end_item||'—')}</td>
+      <td class="px-3 py-2 text-sm text-right" style="white-space:nowrap;">${money(i.unit_price)}</td>
+    </tr>`).join('');
+
+  $('page-content').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;margin-bottom:0.75rem;">
+      <input id="sc-q" class="input" style="flex:1;min-width:15rem;" placeholder="Search nomenclature, NSN, MCN…"
+             value="${esc(_scState.q)}" oninput="scSearch(this.value)">
+      <select class="input" style="max-width:18rem;" onchange="scFacet('end_item',this.value)">
+        <option value="">All end items (${f.end_items.length})</option>
+        ${f.end_items.map(e=>`<option value="${esc(e.end_item)}" ${_scState.end_item===e.end_item?'selected':''}>${esc(e.end_item)} (${e.n})</option>`).join('')}
+      </select>
+      <select class="input" style="max-width:12rem;" onchange="scFacet('classification',this.value)">
+        <option value="">All classes</option>
+        ${f.classifications.map(c=>`<option value="${esc(c.classification)}" ${_scState.classification===c.classification?'selected':''}>${esc(c.classification)} (${c.n})</option>`).join('')}
+      </select>
+    </div>
+
+    ${d.dropped_terms.length ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:0.4rem;padding:0.45rem 0.75rem;font-size:0.8rem;color:#92400e;margin-bottom:0.75rem;">
+      No match for every word — ignored <strong>${d.dropped_terms.map(esc).join(', ')}</strong>. The catalog may not use that term.</div>` : ''}
+
+    <div style="font-size:0.78rem;color:var(--c-text-3);margin-bottom:0.6rem;">
+      ${d.total.toLocaleString()} item${d.total!==1?'s':''}${_scState.q||_scState.end_item||_scState.classification?' matching':''} · page ${d.page} of ${d.pages}
+    </div>
+
+    ${d.total===0
+      ? `<div class="card" style="text-align:center;padding:2.5rem;color:var(--c-text-3);">Nothing found.</div>`
+      : _scState.view==='grid'
+        ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;">${cards}</div>`
+        : `<div class="card p-0 overflow-hidden"><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+             <thead><tr style="background:var(--c-surface);font-size:0.7rem;text-transform:uppercase;color:var(--c-text-3);">
+               <th></th><th class="px-3 py-2 text-left">Nomenclature</th>
+               <th class="px-3 py-2 text-left col-m-hide">NSN / MCN</th>
+               <th class="px-3 py-2 text-left col-m-hide">End Item</th>
+               <th class="px-3 py-2 text-right">Price</th></tr></thead>
+             <tbody>${rows}</tbody></table></div></div>`}
+
+    ${d.pages>1 ? `<div style="display:flex;gap:0.5rem;justify-content:center;align-items:center;margin-top:1rem;">
+      <button class="btn-secondary" ${d.page<=1?'disabled':''} onclick="scPage(${d.page-1})">← Prev</button>
+      <span style="font-size:0.8rem;color:var(--c-text-3);">${d.page} / ${d.pages}</span>
+      <button class="btn-secondary" ${d.page>=d.pages?'disabled':''} onclick="scPage(${d.page+1})">Next →</button>
+    </div>` : ''}`;
+
+  const box = document.getElementById('sc-q');
+  if (box && document.activeElement !== box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  ['grid','list'].forEach(v => {
+    const b = document.getElementById('sc-v-'+v);
+    if (b) b.style.cssText = 'font-size:0.8rem;' + (_scState.view===v ? 'background:var(--c-primary);color:#fff;border-color:var(--c-primary);' : '');
+  });
+}
+
+async function scDetail(id) {
+  const i = await api('GET', `/api/supcen/item/${id}`);
+  const money = v => v == null ? '—' : '$' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+  const field = (l, v) => v ? `<div><div style="font-size:0.66rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.04em;">${l}</div>
+      <div style="font-size:0.85rem;${/NSN|MCN|Stock|LIN/.test(l)?'font-family:ui-monospace,monospace;':''}">${esc(v)}</div></div>` : '';
+  modal(`<div class="modal" style="max-width:640px;">
+    <div class="px-6 py-4 border-b flex items-start justify-between" style="border-color:var(--c-border);">
+      <div style="min-width:0;">
+        <h2 style="font-weight:700;font-size:1rem;color:var(--c-text);">${esc(i.nom)}</h2>
+        <div style="font-size:0.78rem;color:var(--c-text-3);">${esc(i.end_item||'')}</div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div class="px-6 py-4" style="display:flex;gap:1rem;flex-wrap:wrap;">
+      ${i.image?`<div style="width:170px;height:170px;background:#fff;border-radius:0.5rem;overflow:hidden;flex-shrink:0;">
+        <img src="/static/catalog/${esc(i.image)}" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`:''}
+      <div style="flex:1;min-width:200px;display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
+        ${field('NSN', i.nsn)}${field('MCN', i.mcn)}
+        ${field('Stock Number', i.stock_number)}${field('LIN / NSLIN', i.lin)}
+        <div><div style="font-size:0.66rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.04em;">Unit Price</div>
+          <div style="font-size:1rem;font-weight:700;">${money(i.unit_price)}</div></div>
+        ${field('Unit Issue', i.unit_issue)}
+        ${field('Classification', i.classification)}${field('Shelf Life', i.shelf_life)}
+        ${field('Material Code', i.material_code)}${field('Weight', i.weight)}
+      </div>
+    </div>
+    ${i.orgs?`<div class="px-6 pb-2"><div style="font-size:0.66rem;color:var(--c-text-3);text-transform:uppercase;">Orgs</div>
+      <div style="font-size:0.8rem;">${esc(i.orgs)}</div></div>`:''}
+    ${i.remarks?`<div class="px-6 pb-4"><div style="font-size:0.66rem;color:var(--c-text-3);text-transform:uppercase;">Remarks</div>
+      <div style="font-size:0.8rem;">${esc(i.remarks)}</div></div>`:''}
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);">
+      <button onclick="closeModal()" class="btn-secondary" style="width:100%;justify-content:center;">Close</button>
     </div>
   </div>`);
 }

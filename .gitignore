@@ -25,3 +25,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# CoMSupCen catalog source (13.9 MB); extracted artifacts are committed instead
+COMSUPCEN/

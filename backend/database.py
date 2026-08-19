@@ -314,6 +314,35 @@ async def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_cyltest_eq ON cylinder_tests(equipment_id);
 
+            CREATE TABLE IF NOT EXISTS supcen_catalog (
+                id             INTEGER PRIMARY KEY,
+                nom            TEXT NOT NULL,
+                stock_number   TEXT,
+                nsn            TEXT,
+                mcn            TEXT,
+                lin            TEXT,
+                aesip          TEXT,
+                unit_price     REAL,
+                unit_issue     TEXT,
+                unit_amt       TEXT,
+                weight         TEXT,
+                end_item       TEXT,
+                orgs           TEXT,
+                shelf_life     TEXT,
+                classification TEXT,
+                material_code  TEXT,
+                certification  TEXT,
+                remarks        TEXT,
+                other          TEXT,
+                cats           TEXT,
+                image          TEXT,
+                search_blob    TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_supcen_nom     ON supcen_catalog(nom);
+            CREATE INDEX IF NOT EXISTS idx_supcen_enditem ON supcen_catalog(end_item);
+            CREATE INDEX IF NOT EXISTS idx_supcen_nsn     ON supcen_catalog(nsn);
+            CREATE INDEX IF NOT EXISTS idx_supcen_mcn     ON supcen_catalog(mcn);
+
             -- Multi-location inventory.
             -- inventory_stock is the source of truth per bin; inventory_items.quantity
             -- is a rollup of SUM(stock) kept current by the triggers below, so the six
@@ -568,4 +597,40 @@ async def init_db():
                 size, COALESCE(lot_number,''))
         """)
 
+        await _seed_supcen_catalog(db)
+
         await db.commit()
+
+
+async def _seed_supcen_catalog(db):
+    """Load the CoMSupCen catalog once. Skipped when already populated, so a
+    redeploy is cheap and any local edits survive."""
+    import json
+    from pathlib import Path
+    async with db.execute("SELECT COUNT(*) FROM supcen_catalog") as cur:
+        if (await cur.fetchone())[0]:
+            return
+    src = Path(__file__).resolve().parent / "data" / "supcen_catalog.json"
+    if not src.exists():
+        return
+    items = json.loads(src.read_text())
+    rows = []
+    for it in items:
+        cats = it.get("cats") or []
+        # One denormalised column so a token search is a single LIKE per term
+        blob = " ".join(str(x) for x in [
+            it.get("nom"), it.get("nsn"), it.get("mcn"), it.get("stock_number"),
+            it.get("lin"), it.get("end_item"), it.get("orgs"),
+            it.get("classification"), it.get("remarks"), " ".join(cats),
+        ] if x).upper()
+        rows.append((
+            it["id"], it.get("nom", ""), it.get("stock_number"), it.get("nsn"),
+            it.get("mcn"), it.get("lin"), it.get("aesip"), it.get("unit_price"),
+            it.get("unit_issue"), it.get("unit_amt"), it.get("weight"),
+            it.get("end_item"), it.get("orgs"), it.get("shelf_life"),
+            it.get("classification"), it.get("material_code"), it.get("certification"),
+            it.get("remarks"), it.get("other"), json.dumps(cats), it.get("image"), blob,
+        ))
+    await db.executemany(
+        "INSERT OR IGNORE INTO supcen_catalog VALUES (" + ",".join("?" * 22) + ")", rows
+    )
