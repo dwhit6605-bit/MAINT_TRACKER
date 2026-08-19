@@ -4386,6 +4386,84 @@ function filterInventory() {
   $('inv-tbody').innerHTML = inventoryRows(filtered);
 }
 
+// ── Location inventory sheet ─────────────────────────────────────────────────
+// A printable "what should be in this area" listing covering end items and
+// consumables. Items marked out_for are listed but struck through: they are
+// accounted for, just not on the shelf. Calibration and fault flags are shown
+// separately, because "due" is not the same as "gone".
+async function openLocationSheet(locId) {
+  let d;
+  try { d = await api('GET', `/api/inventory/locations/${locId}/sheet`); }
+  catch (err) { return toast(err.message || 'Could not build the sheet.', false); }
+
+  const byCat = {};
+  d.equipment.forEach(e => (byCat[e.category || 'Uncategorised'] ||= []).push(e));
+
+  const eqRows = Object.entries(byCat).map(([cat, list]) => `
+    <tr><td colspan="4" style="background:var(--c-surface);font-weight:700;font-size:0.72rem;
+        text-transform:uppercase;letter-spacing:.04em;padding:4px 8px;">${esc(cat)} · ${list.length}</td></tr>
+    ${list.map(e => `
+      <tr style="border-top:1px solid var(--c-border);${e.absent?'opacity:0.72;':''}">
+        <td style="padding:5px 8px;width:22px;text-align:center;">
+          <span style="display:inline-block;width:13px;height:13px;border:1.5px solid var(--c-text-3);border-radius:2px;"></span></td>
+        <td style="padding:5px 8px;font-size:0.83rem;${e.absent?'text-decoration:line-through;':''}">${esc(e.name)}
+          ${e.model?`<span style="color:var(--c-text-3);font-size:0.72rem;"> · ${esc(e.model)}</span>`:''}</td>
+        <td style="padding:5px 8px;font-family:ui-monospace,monospace;font-size:0.72rem;color:var(--c-text-3);">${esc(e.serial_num||'—')}</td>
+        <td style="padding:5px 8px;font-size:0.7rem;">
+          ${e.annotations.map(a => {
+            const gone = a.startsWith('OUT:');
+            return `<div style="color:${gone?'#dc2626':'var(--c-text-3)'};font-weight:${gone?'700':'400'};">${esc(a)}</div>`;
+          }).join('') || '<span style="color:#16a34a;">✓</span>'}</td>
+      </tr>`).join('')}`).join('');
+
+  const stockRows = d.stock.map(i => `
+    <tr style="border-top:1px solid var(--c-border);">
+      <td style="padding:5px 8px;width:22px;text-align:center;">
+        <span style="display:inline-block;width:13px;height:13px;border:1.5px solid var(--c-text-3);border-radius:2px;"></span></td>
+      <td style="padding:5px 8px;font-size:0.83rem;">${esc(i.name)}</td>
+      <td style="padding:5px 8px;font-family:ui-monospace,monospace;font-size:0.72rem;color:var(--c-text-3);">${esc(i.part_number||i.catalog_nsn||'—')}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:700;font-size:0.85rem;white-space:nowrap;">
+        ${i.here} <span style="font-weight:400;color:var(--c-text-3);font-size:0.72rem;">${esc(i.unit||'')}</span>
+        ${i.low?'<div style="font-size:0.68rem;color:#f59e0b;font-weight:600;">low</div>':''}</td>
+    </tr>`).join('');
+
+  const c = d.counts;
+  modal(`<div class="modal" style="max-width:820px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <div style="font-size:0.7rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.05em;">Location inventory</div>
+        <h2 style="font-weight:700;font-size:1.1rem;color:var(--c-text);">${esc(d.location.code)}</h2>
+        <div style="font-size:0.78rem;color:var(--c-text-3);">
+          ${c.equipment} end item${c.equipment!==1?'s':''} · ${c.stock_lines} stock line${c.stock_lines!==1?'s':''} (${c.stock_units} units)
+          ${c.absent?` · <span style="color:#dc2626;font-weight:600;">${c.absent} out</span>`:''}
+          ${c.flagged?` · <span style="color:#f59e0b;font-weight:600;">${c.flagged} flagged</span>`:''}
+        </div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+
+    <div style="max-height:58vh;overflow-y:auto;" id="loc-sheet-body">
+      ${c.equipment === 0 && c.stock_lines === 0
+        ? `<div style="padding:2.5rem;text-align:center;color:var(--c-text-3);">
+             Nothing is recorded in this location yet.</div>`
+        : ''}
+      ${c.equipment ? `<div style="padding:0.5rem 1rem 0;font-size:0.72rem;font-weight:700;color:var(--c-text-3);text-transform:uppercase;">Equipment</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>${eqRows}</tbody></table>` : ''}
+      ${c.stock_lines ? `<div style="padding:0.9rem 1rem 0;font-size:0.72rem;font-weight:700;color:var(--c-text-3);text-transform:uppercase;">Consumables</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>${stockRows}</tbody></table>` : ''}
+    </div>
+
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
+      <button onclick="printLocationSheet(${locId})" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">🖨 Print</button>
+      <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Close</button>
+    </div>
+  </div>`);
+}
+
+function printLocationSheet(locId) {
+  window.open(`/location-sheet/${locId}?token=` + encodeURIComponent(getToken()), '_blank');
+}
+
 // ── QR: shelf quick-adjust and location roll-up ───────────────────────────────
 // Labels encode /inventory?item=45&loc=9, so a scan already knows which bin the
 // operator is standing at and can act without asking.
@@ -4557,7 +4635,8 @@ function lrMarkup(loc) {
     </div>
 
     <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
-      <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${locId}&token='+getToken(),'_blank')" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;text-decoration:none;">🏷 Labels</a>
+      <button onclick="openLocationSheet(${locId})" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">📋 Inventory sheet</button>
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${locId}&token='+getToken(),'_blank')" class="btn-secondary col-m-hide" style="flex:1;justify-content:center;font-size:0.8rem;text-decoration:none;">🏷 Labels</a>
       <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Done</button>
     </div>
   </div>`;
@@ -4861,7 +4940,8 @@ async function openLocationsModal() {
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.item_count}</td>
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.unit_count}</td>
       <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
-        <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${l.id}&token='+getToken(),'_blank')" class="text-xs hover:underline" style="color:var(--c-primary);text-decoration:none;" title="Print a label for every item on this shelf">🏷 Labels</a>
+        <button onclick="closeModal();openLocationSheet(${l.id})" class="text-xs hover:underline" style="color:var(--c-primary);background:none;border:none;cursor:pointer;" title="Inventory sheet for this area">📋 Sheet</button>
+        <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${l.id}&token='+getToken(),'_blank')" class="text-xs hover:underline" style="color:var(--c-primary);text-decoration:none;margin-left:0.5rem;" title="Print a label for every item on this shelf">🏷 Labels</a>
         <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:var(--c-primary);margin-left:0.5rem;">Rename</button>
         ${isSuperAdmin() ? `<button onclick="deleteLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#dc2626;margin-left:0.5rem;">Delete</button>` : ''}
       </td>

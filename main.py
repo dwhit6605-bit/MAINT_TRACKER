@@ -175,6 +175,78 @@ async def pmcs_checklist(request: Request, template_id: int):
     )
 
 
+@app.get("/location-sheet/{loc_id}", response_class=HTMLResponse)
+async def location_sheet_page(request: Request, loc_id: int):
+    """Printable inventory sheet for one area — end items plus consumables.
+
+    Rendered server-side rather than printing the SPA, so it lands on paper as a
+    signable document with tick boxes, the way the hand receipt does.
+    """
+    import aiosqlite
+    from datetime import date
+    db_path = os.getenv("DB_PATH", "maint.db")
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON")
+        async with db.execute("SELECT * FROM inventory_locations WHERE id=?", (loc_id,)) as cur:
+            loc = await cur.fetchone()
+        if not loc:
+            return HTMLResponse("<h2>Location not found</h2>", status_code=404)
+        async with db.execute("""
+            SELECT e.name, e.category, e.serial_num, e.model, e.assigned_to,
+                   e.out_for, e.out_since, e.expected_return,
+                   (SELECT r.next_due FROM calibration_records r
+                     WHERE r.equipment_id=e.id ORDER BY r.calibrated_at DESC LIMIT 1) AS cal_due,
+                   (SELECT COUNT(*) FROM maintenance_tasks m
+                     WHERE m.equipment_id=e.id AND m.status='overdue') AS overdue_tasks,
+                   (SELECT COUNT(*) FROM maintenance_tasks m
+                     WHERE m.equipment_id=e.id AND m.status IN ('pending','overdue')) AS open_tasks
+            FROM equipment e WHERE e.location_id=? AND e.status<>'retired'
+            ORDER BY e.category, e.name
+        """, (loc_id,)) as cur:
+            equipment = [dict(r) for r in await cur.fetchall()]
+        async with db.execute("""
+            SELECT i.name, i.part_number, i.unit, i.min_stock, i.quantity AS total,
+                   s.quantity AS here, c.nsn AS catalog_nsn
+            FROM inventory_stock s
+            JOIN inventory_items i ON i.id=s.item_id
+            LEFT JOIN supcen_catalog c ON c.id=i.catalog_id
+            WHERE s.location_id=? AND s.quantity<>0 ORDER BY i.name
+        """, (loc_id,)) as cur:
+            stock = [dict(r) for r in await cur.fetchall()]
+
+    today = date.today().isoformat()
+    for e in equipment:
+        notes, absent = [], bool(e["out_for"])
+        if absent:
+            n = f"OUT: {str(e['out_for']).upper()}"
+            if e["expected_return"]:
+                n += f" — due back {e['expected_return']}"
+            elif e["out_since"]:
+                n += f" — since {e['out_since']}"
+            notes.append(n)
+        if e["cal_due"] and e["cal_due"] < today:
+            notes.append(f"Cal overdue {e['cal_due']}")
+        elif not e["cal_due"]:
+            notes.append("No cal record")
+        if e["overdue_tasks"]:
+            notes.append(f"{e['overdue_tasks']} overdue task(s)")
+        elif e["open_tasks"]:
+            notes.append(f"{e['open_tasks']} open task(s)")
+        if e["assigned_to"]:
+            notes.append(f"Signed to {e['assigned_to']}")
+        e["notes"], e["absent"] = notes, absent
+    for i in stock:
+        i["low"] = bool(i["min_stock"] and i["total"] <= i["min_stock"])
+
+    return templates.TemplateResponse(
+        "location_sheet.html",
+        {"request": request, "loc": dict(loc), "equipment": equipment,
+         "stock": stock, "today": today,
+         "absent": sum(1 for e in equipment if e["absent"])},
+    )
+
+
 @app.get("/labels", response_class=HTMLResponse)
 async def labels_page(request: Request, ids: str = "", type: str = "equipment",
                       loc: str = ""):

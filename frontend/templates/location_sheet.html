@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Location Inventory — {{ loc.code }}</title>
+<style>
+  /* A paper form: never let the viewer's dark theme invert it */
+  html { color-scheme: only light; background:#fff; }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Arial,Helvetica,sans-serif; font-size:9pt; color:#000; background:#fff;
+         padding:0.4in; max-width:8.5in; margin:0 auto; }
+  h1 { font-size:12pt; text-align:center; margin-bottom:2px; }
+  .sub { font-size:8pt; text-align:center; color:#555; margin-bottom:10px; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; border:1px solid #000;
+          padding:5px; margin-bottom:8px; }
+  .meta div span { display:block; font-size:7pt; font-weight:bold; color:#444; }
+  .meta div b { font-size:9.5pt; }
+  h2 { font-size:9pt; text-transform:uppercase; letter-spacing:.05em; background:#1e3a5f;
+       color:#fff; padding:3px 6px; margin:10px 0 0; }
+  table { width:100%; border-collapse:collapse; }
+  th { font-size:7.5pt; text-transform:uppercase; letter-spacing:.03em; color:#444;
+       border-bottom:1px solid #999; padding:3px 5px; text-align:left; }
+  td { border-bottom:1px solid #ddd; padding:3px 5px; font-size:8.5pt; vertical-align:top; }
+  .box { width:12px; height:12px; border:1.2px solid #444; display:inline-block; }
+  .cat { background:#eef2f7; font-weight:bold; font-size:7.5pt; text-transform:uppercase; }
+  .sn { font-family:"Courier New",monospace; font-size:7.5pt; color:#555; }
+  .out { color:#b91c1c; font-weight:bold; font-size:7.5pt; }
+  .flag { color:#92400e; font-size:7.5pt; }
+  .ok { color:#15803d; }
+  .absent td:nth-child(2) { text-decoration:line-through; color:#666; }
+  .qty { text-align:right; font-weight:bold; white-space:nowrap; }
+  .low { color:#b45309; font-size:7pt; font-weight:bold; }
+  .note { font-size:7pt; border:1px solid #aaa; background:#fffbeb; padding:4px 6px; margin:8px 0; }
+  .sigs { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+  .sig { border-top:1px solid #000; padding-top:2px; font-size:7.5pt; color:#555; }
+  .empty { text-align:center; color:#777; padding:14px; font-style:italic; }
+  @media print { body{padding:0.25in;} .no-print{display:none!important;} h2{break-after:avoid;} tr{break-inside:avoid;} }
+</style>
+</head>
+<body>
+
+<button class="no-print" onclick="window.print()"
+  style="float:right;padding:6px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:4px;
+         cursor:pointer;font-size:9pt;margin-bottom:8px;">🖨 Print / Save PDF</button>
+
+<h1>Location Inventory — {{ loc.code }}</h1>
+<div class="sub">9th CST (WMD) · GEAR GUARD · generated {{ today }}</div>
+
+<div class="meta">
+  <div><span>Location</span><b>{{ loc.code }}</b></div>
+  <div><span>End items</span><b>{{ equipment|length }}</b></div>
+  <div><span>Stock lines</span><b>{{ stock|length }}</b></div>
+  <div><span>Out of area</span><b>{{ absent }}</b></div>
+</div>
+
+{% if absent %}
+<div class="note"><strong>{{ absent }} item(s) are signed out of this area</strong> and are struck
+through below. They are accounted for — do not expect to find them on the shelf. Items flagged only
+for calibration or open faults <em>are</em> still here.</div>
+{% endif %}
+
+{% if equipment %}
+<h2>Equipment ({{ equipment|length }})</h2>
+<table>
+  <thead><tr><th style="width:20px;"></th><th>Nomenclature</th><th style="width:120px;">Serial</th><th style="width:190px;">Status</th></tr></thead>
+  <tbody>
+  {% set ns = namespace(cat='') %}
+  {% for e in equipment %}
+    {% if e.category != ns.cat %}{% set ns.cat = e.category %}
+      <tr><td colspan="4" class="cat">{{ e.category or 'Uncategorised' }}</td></tr>
+    {% endif %}
+    <tr {% if e.absent %}class="absent"{% endif %}>
+      <td><span class="box"></span></td>
+      <td>{{ e.name }}{% if e.model %} <span style="color:#666;">· {{ e.model }}</span>{% endif %}</td>
+      <td class="sn">{{ e.serial_num or '—' }}</td>
+      <td>
+        {% if e.notes %}{% for n in e.notes %}
+          <div class="{{ 'out' if n.startswith('OUT:') else 'flag' }}">{{ n }}</div>
+        {% endfor %}{% else %}<span class="ok">✓</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if stock %}
+<h2>Consumables ({{ stock|length }})</h2>
+<table>
+  <thead><tr><th style="width:20px;"></th><th>Item</th><th style="width:130px;">Part / NSN</th><th style="width:90px;" class="qty">Qty here</th></tr></thead>
+  <tbody>
+  {% for i in stock %}
+    <tr>
+      <td><span class="box"></span></td>
+      <td>{{ i.name }}</td>
+      <td class="sn">{{ i.part_number or i.catalog_nsn or '—' }}</td>
+      <td class="qty">{{ i.here }} {{ i.unit or '' }}{% if i.low %}<div class="low">LOW</div>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if not equipment and not stock %}
+<div class="empty">Nothing is recorded in this location.</div>
+{% endif %}
+
+<div class="sigs">
+  <div class="sig">Inventoried by (print / sign)<br><br>_______________________________<br>Date: ____________</div>
+  <div class="sig">Verified by (print / sign)<br><br>_______________________________<br>Date: ____________</div>
+</div>
+
+</body>
+</html>

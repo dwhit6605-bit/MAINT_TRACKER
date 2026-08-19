@@ -483,6 +483,12 @@ async def init_db():
             await db.execute("ALTER TABLE equipment ADD COLUMN expected_return TEXT")
         if "reference_url" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN reference_url TEXT")
+        # Equipment shares the canonical location list with consumables, so one
+        # area shows both. The legacy free-text `location` is kept as written.
+        if "location_id" not in eq_cols:
+            await db.execute("ALTER TABLE equipment ADD COLUMN location_id INTEGER "
+                             "REFERENCES inventory_locations(id) ON DELETE SET NULL")
+
         # Pressure cylinders (SCBA / O2 bottles) — DOT requalification tracking
         if "mfg_date" not in eq_cols:
             await db.execute("ALTER TABLE equipment ADD COLUMN mfg_date TEXT")
