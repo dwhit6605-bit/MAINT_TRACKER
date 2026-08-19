@@ -225,14 +225,12 @@ async def location_sheet_page(request: Request, loc_id: int):
             elif e["out_since"]:
                 n += f" — since {e['out_since']}"
             notes.append(n)
-        if e["cal_due"] and e["cal_due"] < today:
-            notes.append(f"Cal overdue {e['cal_due']}")
-        elif not e["cal_due"]:
-            notes.append("No cal record")
+        # Calibration status is intentionally omitted — see the API sheet.
+        # Only exceptions belong on a walk-through sheet. A routine pending task
+        # sits on nearly every item, so listing it flagged 41 of 43 lines and
+        # buried the two that had actually left the room.
         if e["overdue_tasks"]:
             notes.append(f"{e['overdue_tasks']} overdue task(s)")
-        elif e["open_tasks"]:
-            notes.append(f"{e['open_tasks']} open task(s)")
         if e["assigned_to"]:
             notes.append(f"Signed to {e['assigned_to']}")
         e["notes"], e["absent"] = notes, absent
