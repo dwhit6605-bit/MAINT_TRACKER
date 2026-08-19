@@ -36,7 +36,7 @@ _PUBLIC_PREFIXES = ("/static", "/uploads", "/sw.js")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
 _PUBLIC_API_RE = re.compile(
-    r"^/api/(pmcs/(templates/\d+/sessions|sessions/\d+/(complete|archive))|qr/(equipment|pmcs)/\d+)$"
+    r"^/api/(pmcs/(templates/\d+/sessions|sessions/\d+/(complete|archive))|qr/(equipment|pmcs|location|inventory)/\d+)$"
 )
 
 
@@ -170,28 +170,17 @@ async def pmcs_checklist(request: Request, template_id: int):
 
 
 @app.get("/labels", response_class=HTMLResponse)
-async def labels_page(request: Request, ids: str = ""):
-    """QR label print sheet — ?ids=1,2,3 or all equipment if omitted."""
-    import aiosqlite
-    db_path = os.getenv("DB_PATH", "maint.db")
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        if ids:
-            id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
-            placeholders = ",".join("?" * len(id_list))
-            async with db.execute(
-                f"SELECT id, name, serial_num, category FROM equipment WHERE id IN ({placeholders}) ORDER BY name",
-                id_list
-            ) as cur:
-                equipment_rows = [dict(r) for r in await cur.fetchall()]
-        else:
-            async with db.execute(
-                "SELECT id, name, serial_num, category FROM equipment ORDER BY name"
-            ) as cur:
-                equipment_rows = [dict(r) for r in await cur.fetchall()]
+async def labels_page(request: Request, ids: str = "", type: str = "equipment",
+                      loc: str = ""):
+    """QR label print sheet. The page fetches its own rows client-side; these
+    params just tell it which set to build.
+
+    type=equipment (default) | locations | inventory   ·   loc= narrows
+    type=inventory to a single shelf, which is the usual reprint case.
+    """
     return templates.TemplateResponse(
         "labels.html",
-        {"request": request, "equipment_list": equipment_rows}
+        {"request": request, "label_type": type, "preselect_ids": ids, "preselect_loc": loc},
     )
 
 

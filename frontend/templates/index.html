@@ -4245,6 +4245,16 @@ async function inventoryPage(tab) {
     </div>
     <div id="inv-tab-body"></div>`;
   invTab(tab || 'stock');
+
+  // A scan from the phone's own camera lands here as a plain URL
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('item')) {
+    openInvQuickAdjust(parseInt(qp.get('item')), parseInt(qp.get('loc')) || null);
+    history.replaceState({page:'inventory'}, '', '/inventory');
+  } else if (qp.get('loc')) {
+    openLocationRollup(parseInt(qp.get('loc')));
+    history.replaceState({page:'inventory'}, '', '/inventory');
+  }
 }
 
 async function invTab(tab) {
@@ -4358,6 +4368,138 @@ function filterInventory() {
         && (!locId || (i.stock||[]).some(x=>x.location_id===locId));
   });
   $('inv-tbody').innerHTML = inventoryRows(filtered);
+}
+
+// ── QR: shelf quick-adjust and location roll-up ───────────────────────────────
+// Labels encode /inventory?item=45&loc=9, so a scan already knows which bin the
+// operator is standing at and can act without asking.
+async function openInvQuickAdjust(itemId, locId) {
+  if (!inventoryData.length) await reloadInventory();
+  const i = inventoryData.find(x => x.id === itemId);
+  if (!i) return toast('That item no longer exists.', false);
+
+  const bins = i.stock || [];
+  // Fall back to the only/largest bin when the label predates multi-location
+  const bin = (locId && bins.find(b => b.location_id === locId))
+           || (locId ? { location_id: locId, code: (invLocations.find(l=>l.id===locId)||{}).code || '?', quantity: 0 } : null)
+           || bins[0] || null;
+  const label = bin ? bin.code : 'no location';
+  const onHand = bin ? bin.quantity : i.quantity;
+
+  modal(`<div class="modal" style="max-width:420px;">
+    <div class="px-6 py-4 border-b" style="border-color:var(--c-border);">
+      <div style="font-size:0.7rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.05em;">Scanned</div>
+      <h2 style="font-weight:700;font-size:1.05rem;color:var(--c-text);">${esc(i.name)}</h2>
+      <div style="font-size:0.8rem;color:var(--c-text-3);">${esc(label)}${i.part_number?' · '+esc(i.part_number):''}</div>
+    </div>
+    <div class="px-6 py-5" style="text-align:center;">
+      <div style="font-size:0.72rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.05em;">On hand here</div>
+      <div id="qa-qty" style="font-size:3rem;font-weight:800;line-height:1.1;color:var(--c-text);">${onHand}</div>
+      <div style="font-size:0.78rem;color:var(--c-text-3);margin-bottom:1rem;">${esc(i.unit||'ea')} · ${i.quantity} total across ${bins.length||1} location${bins.length===1?'':'s'}</div>
+
+      <div style="display:flex;gap:0.5rem;justify-content:center;align-items:center;margin-bottom:0.75rem;">
+        <button onclick="qaStep(${itemId},${bin?bin.location_id:'null'},-1)" style="flex:1;height:64px;font-size:1.6rem;font-weight:800;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:0.6rem;cursor:pointer;">−</button>
+        <input id="qa-step" type="number" min="1" value="1" style="width:70px;height:64px;text-align:center;font-size:1.1rem;font-weight:700;border:1px solid var(--c-border);border-radius:0.6rem;background:var(--c-input,transparent);color:var(--c-text);">
+        <button onclick="qaStep(${itemId},${bin?bin.location_id:'null'},1)" style="flex:1;height:64px;font-size:1.6rem;font-weight:800;background:#f0fdf4;color:#15803d;border:1px solid #86efac;border-radius:0.6rem;cursor:pointer;">＋</button>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;">
+        <button onclick="qaSetCount(${itemId},${bin?bin.location_id:'null'})" class="btn-secondary" style="flex:1;justify-content:center;">Set count</button>
+        <button onclick="closeModal();openTransferModal(${itemId})" class="btn-secondary" style="flex:1;justify-content:center;" ${bins.length?'':'disabled'}>⇄ Move</button>
+      </div>
+    </div>
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
+      <button onclick="closeModal();viewItemUsage(${itemId},'${esc(i.name)}')" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">📦 History</button>
+      <button onclick="closeModal();openItemModal(${itemId})" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">Full record</button>
+      <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Done</button>
+    </div>
+  </div>`);
+}
+
+async function qaStep(itemId, locId, dir) {
+  const step = Math.max(1, parseInt(document.getElementById('qa-step').value) || 1);
+  const el = document.getElementById('qa-qty');
+  try {
+    const body = { action: dir > 0 ? 'add' : 'remove', quantity: step,
+                   performed_by: cu(), reference: 'Scanned at shelf' };
+    if (locId) body.location_id = locId;
+    await api('POST', `/api/inventory/${itemId}/adjust`, body);
+    await reloadInventory();
+    const i = inventoryData.find(x => x.id === itemId);
+    const bin = (i.stock || []).find(b => b.location_id === locId);
+    el.textContent = bin ? bin.quantity : (locId ? 0 : i.quantity);
+    el.style.color = dir > 0 ? '#16a34a' : '#dc2626';
+    setTimeout(() => { el.style.color = 'var(--c-text)'; }, 400);
+  } catch (err) { toast(err.message || 'Update failed.', false); }
+}
+
+async function qaSetCount(itemId, locId) {
+  const cur = document.getElementById('qa-qty').textContent;
+  const v = prompt('Actual count on this shelf:', cur);
+  if (v === null) return;
+  const n = parseInt(v);
+  if (Number.isNaN(n) || n < 0) return toast('Enter a whole number of 0 or more.', false);
+  try {
+    if (locId) await api('POST', `/api/inventory/${itemId}/stock`,
+                         { location_id: locId, quantity: n, reference: 'Shelf count', performed_by: cu() });
+    else await api('POST', `/api/inventory/${itemId}/adjust`,
+                   { action: 'set', quantity: n, reference: 'Shelf count', performed_by: cu() });
+    await reloadInventory();
+    document.getElementById('qa-qty').textContent = n;
+    toast('Count recorded.');
+  } catch (err) { toast(err.message || 'Update failed.', false); }
+}
+
+async function openLocationRollup(locId) {
+  if (!inventoryData.length) await reloadInventory();
+  const loc = (invLocations || []).find(l => l.id === locId);
+  if (!loc) return toast('That location no longer exists.', false);
+  const items = inventoryData
+    .filter(i => (i.stock || []).some(s => s.location_id === locId))
+    .map(i => ({ ...i, here: (i.stock.find(s => s.location_id === locId) || {}).quantity || 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const units = items.reduce((s, i) => s + i.here, 0);
+  const low = items.filter(i => i.min_stock > 0 && i.quantity <= i.min_stock).length;
+
+  modal(`<div class="modal" style="max-width:720px;">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:var(--c-border);">
+      <div>
+        <div style="font-size:0.7rem;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.05em;">Location</div>
+        <h2 style="font-weight:700;font-size:1.1rem;color:var(--c-text);">${esc(loc.code)}</h2>
+        <div style="font-size:0.78rem;color:var(--c-text-3);">
+          ${items.length} item${items.length!==1?'s':''} · ${units} units
+          ${low ? ` · <span style="color:#f59e0b;font-weight:600;">${low} low</span>` : ''}
+        </div>
+      </div>
+      <button onclick="closeModal()" style="color:var(--c-text-3);font-size:1.5rem;background:none;border:none;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="max-height:60vh;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--c-surface);position:sticky;top:0;">
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;">Item</th>
+          <th class="px-4 py-2 text-left text-xs" style="color:var(--c-text-3);font-weight:600;">Part #</th>
+          <th class="px-4 py-2 text-right text-xs" style="color:var(--c-text-3);font-weight:600;">Here</th>
+          <th class="px-4 py-2 text-right text-xs" style="color:var(--c-text-3);font-weight:600;">Total</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${items.length === 0
+            ? `<tr><td colspan="5" class="px-4 py-6 text-center text-sm" style="color:var(--c-text-3);">Nothing stored here.</td></tr>`
+            : items.map(i => `<tr class="table-row border-b last:border-0">
+              <td class="px-4 py-2 text-sm font-medium">${esc(i.name)}</td>
+              <td class="px-4 py-2 text-xs" style="color:var(--c-text-3);font-family:ui-monospace,monospace;">${esc(i.part_number||'—')}</td>
+              <td class="px-4 py-2 text-sm text-right" style="font-weight:700;">${i.here} <span style="font-weight:400;color:var(--c-text-3);">${esc(i.unit||'')}</span></td>
+              <td class="px-4 py-2 text-sm text-right" style="color:var(--c-text-3);">${i.quantity}</td>
+              <td class="px-4 py-2 text-right">${isTech()?`<button onclick="closeModal();openInvQuickAdjust(${i.id},${locId})" class="text-xs hover:underline" style="color:#1e3a5f;">Adjust</button>`:''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${locId}&token='+getToken(),'_blank')" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;text-decoration:none;">🏷 Shelf labels</a>
+      <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Close</button>
+    </div>
+  </div>`);
 }
 
 // ── Move stock between locations ──────────────────────────────────────────────
@@ -4583,7 +4725,8 @@ async function openLocationsModal() {
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.item_count}</td>
       <td style="padding:6px 8px;text-align:right;font-size:0.78rem;">${l.unit_count}</td>
       <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
-        <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#1e3a5f;">Rename</button>
+        <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&loc=${l.id}&token='+getToken(),'_blank')" class="text-xs hover:underline" style="color:#1e3a5f;text-decoration:none;" title="Print a label for every item on this shelf">🏷 Labels</a>
+        <button onclick="renameLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#1e3a5f;margin-left:0.5rem;">Rename</button>
         ${isSuperAdmin() ? `<button onclick="deleteLocation(${l.id},'${esc(l.code)}')" class="text-xs hover:underline" style="color:#dc2626;margin-left:0.5rem;">Delete</button>` : ''}
       </td>
     </tr>`).join('');
@@ -4595,6 +4738,10 @@ async function openLocationsModal() {
         <div style="font-size:0.78rem;color:#6b7280;">${invLocations.length} locations · used by the Move and Add Item dialogs</div>
       </div>
       <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
+    </div>
+    <div class="px-6 pt-4" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=locations&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">🏷 Print location QRs</a>
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">🏷 Print all shelf labels</a>
     </div>
     ${isTech() ? `<form onsubmit="addLocation(event)" class="px-6 pt-4" style="display:flex;gap:0.5rem;align-items:flex-end;">
       <div style="flex:1;"><label class="label">New location code</label>
@@ -9180,6 +9327,19 @@ function _onQrSuccess(decodedText) {
       navigate('equipment');
       setTimeout(() => openEqDetail(eqId), 400);
       toast('Opening equipment #' + eqId);
+      return;
+    }
+    // Inventory QR labels: ?loc= is a shelf, ?item= is a per-item label
+    if (params.get('loc') && !params.get('item')) {
+      navigate('inventory');
+      setTimeout(() => openLocationRollup(parseInt(params.get('loc'))), 500);
+      return;
+    }
+    if (params.get('item')) {
+      const it = parseInt(params.get('item'));
+      const lc = parseInt(params.get('loc')) || null;
+      navigate('inventory');
+      setTimeout(() => openInvQuickAdjust(it, lc), 500);
       return;
     }
     const pmcsMatch = path.match(/\/pmcs\/(\d+)/);

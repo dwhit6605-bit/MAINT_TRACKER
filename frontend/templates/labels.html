@@ -258,14 +258,42 @@ const token  = params.get('token') || '';
 let allEquipment = [];
 let selected = new Set();
 let activeCategory = '';
+// equipment | locations | inventory — set by the /labels query string
+const LABEL_TYPE = {{ label_type|tojson }};
+const PRESELECT_LOC = {{ preselect_loc|tojson }};
 
 async function load() {
   const headers = token ? { Authorization: 'Bearer ' + token } : {};
-  const res = await fetch('/api/equipment', { headers });
+  let url = '/api/equipment';
+  if (LABEL_TYPE === 'locations') url = '/api/inventory/locations';
+  else if (LABEL_TYPE === 'inventory') url = '/api/inventory';
+  const res = await fetch(url, { headers });
   if (!res.ok) { document.getElementById('eq-list').innerHTML = '<div class="eq-empty">Not authenticated.</div>'; return; }
-  allEquipment = await res.json();
+  const raw = await res.json();
+
+  if (LABEL_TYPE === 'locations') {
+    allEquipment = raw.map(l => ({
+      id: 'L' + l.id, qr: `/api/qr/location/${l.id}`,
+      name: l.code, serial_num: l.name || '', category: 'Storage location',
+    }));
+  } else if (LABEL_TYPE === 'inventory') {
+    // One label per stock row: the QR carries item + bin so a scan knows the shelf
+    allEquipment = [];
+    raw.forEach(i => (i.stock || []).forEach(st => {
+      if (PRESELECT_LOC && String(st.location_id) !== String(PRESELECT_LOC)) return;
+      allEquipment.push({
+        id: `${i.id}-${st.location_id}`,
+        qr: `/api/qr/inventory/${i.id}?loc=${st.location_id}`,
+        name: i.name, serial_num: i.part_number || '',
+        category: st.code,
+      });
+    }));
+  } else {
+    allEquipment = raw.map(e => ({ ...e, qr: `/api/qr/equipment/${e.id}` }));
+  }
   buildCatFilter();
   renderList();
+  if (LABEL_TYPE !== 'equipment') { selectAll(); }
 }
 
 function buildCatFilter() {
@@ -303,7 +331,7 @@ function renderList() {
       <input type="checkbox" ${selected.has(e.id) ? 'checked' : ''} onclick="event.stopPropagation();toggleItem(${e.id})">
       <div class="eq-item-text">
         <div class="eq-item-name">${esc(e.name)}</div>
-        <div class="eq-item-sub">${e.serial_num ? 'S/N: ' + esc(e.serial_num) : 'No serial'}</div>
+        <div class="eq-item-sub">${e.serial_num ? (LABEL_TYPE === 'equipment' ? 'S/N: ' : '') + esc(e.serial_num) : (LABEL_TYPE === 'equipment' ? 'No serial' : '')}</div>
         ${e.category ? `<div class="eq-item-cat">${esc(e.category)}</div>` : ''}
       </div>
     </div>`).join('');
@@ -339,14 +367,14 @@ function renderPreview() {
   const labels = items.map(e => `
     <div class="label">
       <div class="label-qr">
-        <img src="/api/qr/equipment/${e.id}${token ? '?token=' + encodeURIComponent(token) : ''}" alt="QR" loading="lazy">
+        <img src="${e.qr}${e.qr.includes('?') ? '&' : '?'}${token ? 'token=' + encodeURIComponent(token) : ''}" alt="QR" loading="lazy">
       </div>
       <div class="label-text">
         <div class="label-org">9th CST (WMD)</div>
         <div class="label-name">${esc(e.name)}</div>
         ${e.serial_num
-          ? `<div class="label-serial">S/N: <span>${esc(e.serial_num)}</span></div>`
-          : `<div class="label-serial" style="color:#aaa;">No serial recorded</div>`}
+          ? `<div class="label-serial">${LABEL_TYPE === 'equipment' ? 'S/N: ' : ''}<span>${esc(e.serial_num)}</span></div>`
+          : `<div class="label-serial" style="color:#aaa;">${LABEL_TYPE === 'equipment' ? 'No serial recorded' : ''}</div>`}
         ${e.category ? `<div class="label-category">${esc(e.category)}</div>` : ''}
       </div>
     </div>`).join('');
