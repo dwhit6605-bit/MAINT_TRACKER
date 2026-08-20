@@ -68,14 +68,24 @@ def _qr_png(url: str) -> Response:
 
 
 @router.get("/location/{loc_id}")
-async def get_location_qr(loc_id: int, db=Depends(get_db)):
-    """Shelf/zone label — scanning gives a roll-up of what should be there."""
+async def get_location_qr(loc_id: int, view: str = "stock", db=Depends(get_db)):
+    """Area label.
+
+    view=stock (default) opens the shelf roll-up with the -/+ and move controls.
+    view=sheet opens the location inventory listing — everything that should be
+    in the area, equipment included, with anything out annotated.
+
+    Both point at the SPA rather than the printable page, so the scan goes
+    through normal sign-in. A QR on a wall is exactly the route by which an
+    unauthenticated person would otherwise reach a server-rendered sheet.
+    """
     async with db.execute(
         "SELECT id, code FROM inventory_locations WHERE id=?", (loc_id,)
     ) as cur:
         if not await cur.fetchone():
             raise HTTPException(404, "Location not found")
-    return _qr_png(f"{BASE_URL}/inventory?loc={loc_id}")
+    suffix = "&view=sheet" if view == "sheet" else ""
+    return _qr_png(f"{BASE_URL}/inventory?loc={loc_id}{suffix}")
 
 
 @router.get("/inventory/{item_id}")

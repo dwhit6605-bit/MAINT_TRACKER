@@ -181,7 +181,13 @@ async def location_sheet_page(request: Request, loc_id: int):
 
     Rendered server-side rather than printing the SPA, so it lands on paper as a
     signable document with tick boxes, the way the hand receipt does.
+
+    Server-rendered means the data is in the HTML, so unlike /labels — which
+    fetches client-side and shows nothing without a token — this must check auth
+    itself. The middleware only blocks /api/ paths.
     """
+    if not getattr(request.state, "user", None):
+        return RedirectResponse(f"/login?next=/location-sheet/{loc_id}", status_code=303)
     import aiosqlite
     from datetime import date
     db_path = os.getenv("DB_PATH", "maint.db")

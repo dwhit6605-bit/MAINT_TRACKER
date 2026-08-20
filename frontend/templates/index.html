@@ -2100,6 +2100,7 @@ function renderEquipmentTable(rows) {
                      max-width:11rem;background:#fff;color:#1f2937;">
         <option value="">move to…</option>
         <option value="__clear__">— Unassign —</option>
+        <option value="__new__">+ New location…</option>
       </select>
       <span style="font-size:0.72rem;opacity:.7;margin:0 0.1rem 0 0.4rem;">Status:</span>
       <button onclick="bulkSetStatus('active')"      style="background:#4ade80;color:#14532d;border:none;border-radius:4px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:0.78rem;" title="Fully Mission Capable">FMC</button>
@@ -2204,7 +2205,22 @@ async function bulkSetLocation(sel) {
   if (!val) return;
   const ids = [...document.querySelectorAll('.eq-row-check:checked')].map(cb => parseInt(cb.dataset.id));
   if (!ids.length) return;
-  const locId = val === '__clear__' ? null : parseInt(val);
+
+  let locId;
+  if (val === '__new__') {
+    const code = (prompt('New location code (e.g. BAY-2):') || '').trim().toUpperCase();
+    if (!code) return;
+    try {
+      const existing = (invLocations || []).find(l => l.code === code);
+      const loc = existing || await api('POST', '/api/inventory/locations', { code });
+      invLocations = await api('GET', '/api/inventory/locations');
+      // rebuild the picker so the new code is selectable next time
+      sel.insertAdjacentHTML('beforeend', `<option value="${loc.id}">${esc(code)}</option>`);
+      locId = loc.id;
+    } catch (err) { return toast(err.message || 'Could not create that location.', false); }
+  } else {
+    locId = val === '__clear__' ? null : parseInt(val);
+  }
   const label = locId ? (invLocations.find(l => l.id === locId) || {}).code : 'Unassigned';
   if (!confirm(`Move ${ids.length} item${ids.length>1?'s':''} to ${label}?`)) return;
   try {
@@ -3349,10 +3365,13 @@ async function openEquipmentModal(id) {
       </div>
 
       <div><label class="label">Location</label>
-        <select class="input" name="location_id" id="eq-location-select">
+        <select class="input" name="location_id" id="eq-location-select" onchange="eqLocNewToggle(this)">
           <option value="">— Unassigned —</option>
           ${(invLocations||[]).map(l=>`<option value="${l.id}" ${eq.location_id===l.id?'selected':''}>${esc(l.code)}</option>`).join('')}
+          <option value="__new__">+ Add new location…</option>
         </select>
+        <input class="input" id="eq-location-new" name="location_new" placeholder="New location code, e.g. BAY-2"
+               style="display:none;margin-top:0.4rem;text-transform:uppercase;">
         <div style="font-size:0.68rem;color:var(--c-text-3);margin-top:2px;">
           Shared with consumables${eq.location && !eq.location_id ? ` · was written as “${esc(eq.location)}”` : ''}</div>
         <input type="hidden" name="location" id="eq-location-val" value="${esc(eq.location||'')}">
@@ -3419,9 +3438,33 @@ function syncNewAssigned(input) {
   document.getElementById('eq-assigned-val').value = input.value.trim();
 }
 
+function eqLocNewToggle(sel) {
+  const inp = document.getElementById('eq-location-new');
+  if (!inp) return;
+  const adding = sel.value === '__new__';
+  inp.style.display = adding ? 'block' : 'none';
+  if (adding) inp.focus(); else inp.value = '';
+}
+
 async function saveEquipment(e, id) {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target));
+
+  // "+ Add new location…" has to become a real location before the equipment
+  // can reference it — the picker is bound to the shared list, not free text
+  if (body.location_id === '__new__') {
+    const code = (body.location_new || '').trim().toUpperCase();
+    if (!code) { toast('Enter a name for the new location.', false); return; }
+    try {
+      const existing = (invLocations || []).find(l => l.code === code);
+      const loc = existing || await api('POST', '/api/inventory/locations', { code });
+      invLocations = await api('GET', '/api/inventory/locations');
+      body.location_id = loc.id;
+      if (!existing) toast(`Created location ${code}.`);
+    } catch (err) { toast(err.message || 'Could not create that location.', false); return; }
+  }
+  body.location_id = body.location_id ? parseInt(body.location_id) : null;
+
   delete body.location_select;
   delete body.location_new;
   delete body.assigned_select;
@@ -4288,7 +4331,8 @@ async function inventoryPage(tab) {
     openInvQuickAdjust(parseInt(qp.get('item')), parseInt(qp.get('loc')) || null);
     history.replaceState({page:'inventory'}, '', '/inventory');
   } else if (qp.get('loc')) {
-    openLocationRollup(parseInt(qp.get('loc')));
+    const lid = parseInt(qp.get('loc'));
+    qp.get('view') === 'sheet' ? openLocationSheet(lid) : openLocationRollup(lid);
     history.replaceState({page:'inventory'}, '', '/inventory');
   }
 }
@@ -4485,6 +4529,7 @@ async function openLocationSheet(locId) {
 
     <div class="px-6 py-3" style="border-top:1px solid var(--c-border);display:flex;gap:0.5rem;">
       <button onclick="printLocationSheet(${locId})" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;">🖨 Print</button>
+      <a href="#" onclick="event.preventDefault();window.open('/api/qr/location/${locId}?view=sheet&token='+getToken(),'_blank')" class="btn-secondary" style="flex:1;justify-content:center;font-size:0.8rem;text-decoration:none;">▩ QR for this area</a>
       <button onclick="closeModal()" class="btn-primary" style="flex:1;justify-content:center;font-size:0.8rem;">Close</button>
     </div>
   </div>`);
@@ -4986,7 +5031,8 @@ async function openLocationsModal() {
       <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#9ca3af;">✕</button>
     </div>
     <div class="px-6 pt-4" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-      <a href="#" onclick="event.preventDefault();window.open('/labels?type=locations&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">🏷 Print location QRs</a>
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=locations&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">🏷 Shelf QRs</a>
+      <a href="#" onclick="event.preventDefault();window.open('/labels?type=location-sheets&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">📋 Inventory-listing QRs</a>
       <a href="#" onclick="event.preventDefault();window.open('/labels?type=inventory&token='+getToken(),'_blank')" class="btn-secondary" style="font-size:0.78rem;text-decoration:none;">🏷 Print all shelf labels</a>
     </div>
     ${isTech() ? `<form onsubmit="addLocation(event)" class="px-6 pt-4" style="display:flex;gap:0.5rem;align-items:flex-end;">
@@ -9993,8 +10039,10 @@ function _onQrSuccess(decodedText) {
     }
     // Inventory QR labels: ?loc= is a shelf, ?item= is a per-item label
     if (params.get('loc') && !params.get('item')) {
+      const lid = parseInt(params.get('loc'));
+      const sheet = params.get('view') === 'sheet';
       navigate('inventory');
-      setTimeout(() => openLocationRollup(parseInt(params.get('loc'))), 500);
+      setTimeout(() => sheet ? openLocationSheet(lid) : openLocationRollup(lid), 500);
       return;
     }
     if (params.get('item')) {

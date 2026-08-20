@@ -265,7 +265,7 @@ const PRESELECT_LOC = {{ preselect_loc|tojson }};
 async function load() {
   const headers = token ? { Authorization: 'Bearer ' + token } : {};
   let url = '/api/equipment';
-  if (LABEL_TYPE === 'locations') url = '/api/inventory/locations';
+  if (LABEL_TYPE === 'locations' || LABEL_TYPE === 'location-sheets') url = '/api/inventory/locations';
   else if (LABEL_TYPE === 'inventory') url = '/api/inventory';
   const res = await fetch(url, { headers });
   if (!res.ok) { document.getElementById('eq-list').innerHTML = '<div class="eq-empty">Not authenticated.</div>'; return; }
@@ -275,6 +275,13 @@ async function load() {
     allEquipment = raw.map(l => ({
       id: 'L' + l.id, qr: `/api/qr/location/${l.id}`,
       name: l.code, serial_num: l.name || '', category: 'Storage location',
+    }));
+  } else if (LABEL_TYPE === 'location-sheets') {
+    // Same areas, but the QR opens the inventory listing rather than the
+    // shelf roll-up — the label you mount on a door or cage
+    allEquipment = raw.map(l => ({
+      id: 'S' + l.id, qr: `/api/qr/location/${l.id}?view=sheet`,
+      name: l.code, serial_num: 'Inventory listing', category: 'Scan to view contents',
     }));
   } else if (LABEL_TYPE === 'inventory') {
     // One label per stock row: the QR carries item + bin so a scan knows the shelf
