@@ -46,9 +46,17 @@ async def commander_summary(request: Request, db=Depends(get_db)):
 
     # Rolling stock
     async with db.execute("""
-        SELECT id, name, serial_num, status, vehicle_type
+        -- rolling_stock has no name/serial_num/vehicle_type; it is described by
+        -- year/make/model with a tag number. Querying the old column names made
+        -- this endpoint 500, and because it is public the middleware used to
+        -- report that as "Not authenticated", so it went unnoticed.
+        SELECT id,
+               TRIM(COALESCE(year,'') || ' ' || COALESCE(make,'') || ' ' || COALESCE(model,'')) AS name,
+               COALESCE(NULLIF(vin,''), tag_number) AS serial_num,
+               status,
+               model AS vehicle_type
         FROM rolling_stock WHERE status != 'retired'
-        ORDER BY name
+        ORDER BY make, model
     """) as cur:
         vehicles = [dict(r) for r in await cur.fetchall()]
 
