@@ -24,15 +24,13 @@ from backend.routers import supcen as supcen_router
 from backend.routers import task_attachments as task_attachments_router
 from backend.routers import faults as faults_router
 from backend.routers import eq_checklists as eq_checklists_router
-from backend.routers import commander as commander_router
-from backend.routers import calendar_view as calendar_router
 from backend.routers import hazmat as hazmat_router
 from backend.notifications import run_daily_check
 
 scheduler = AsyncIOScheduler()
 
 # Paths that don't require authentication
-_PUBLIC_PATHS = {"/login", "/api/auth/login", "/api/commander"}
+_PUBLIC_PATHS = {"/login", "/api/auth/login"}
 _PUBLIC_PREFIXES = ("/static", "/uploads", "/sw.js")
 _PUBLIC_PMCS_RE = re.compile(r"^/pmcs/\d+$")
 # PMCS checklist API calls used from the public QR page
@@ -116,8 +114,6 @@ app.include_router(supcen_router.router)
 app.include_router(task_attachments_router.router)
 app.include_router(faults_router.router)
 app.include_router(eq_checklists_router.router)
-app.include_router(commander_router.router)
-app.include_router(calendar_router.router)
 app.include_router(hazmat_router.router)
 
 
@@ -269,7 +265,7 @@ async def labels_page(request: Request, ids: str = "", type: str = "equipment",
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{page}", response_class=HTMLResponse)
 async def spa(request: Request, page: str = "dashboard"):
-    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "power", "cylinders", "supcen", "faults", "calendar", "commander", "hazmat"}
+    valid = {"dashboard", "equipment", "maintenance", "calibration", "inventory", "pmcs", "users", "skos", "readiness", "rolling-stock", "power", "cylinders", "supcen", "faults", "hazmat"}
     if page not in valid:
         page = "dashboard"
     return templates.TemplateResponse("index.html", {"request": request, "page": page})
